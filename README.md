@@ -31,7 +31,7 @@ Google Sheet (two options: paste into the Apps Script editor, or push with
 | **Tours** | One row per scheduled visit/tour. |
 | **Touring Students** | Visiting students tied to a Tour ID. |
 | **Assignments** | The master schedule: which ambassador is doing which job, for which tour, when. |
-| **Ambassadors** | Your roster of student ambassadors (name, grade, teacher, active status). |
+| **Ambassadors** | Your roster of student ambassadors (name, grade, borough, both parents' contact info, teacher, active status). Ships pre-seeded with the current roster. |
 | **Eligibility** | Checkbox matrix: ambassador rows × job columns. |
 | **Jobs** | The list of jobs ambassadors can be assigned to (Tour Guide, Greeter, etc). |
 | **Teachers** | Teacher names + email addresses, used for the weekly email and as the "Teacher" dropdown on Ambassadors. |
@@ -43,6 +43,7 @@ Opening the spreadsheet adds a **🎓 Tour & Ambassador Scheduler** menu with:
 
 - **First-Time Setup** — creates every sheet, headers, dropdowns, and sample rows. Safe to re-run any time.
 - **Schedule a Tour…**, **Add Touring Student…**, **Assign Ambassador…** — form dialogs, so staff never has to hand-edit raw rows.
+- **Import / Update Ambassadors…** — paste a roster (Name, Grade, Borough, Parent 1 Name/Email, Parent 2 Name/Email — tab- or comma-separated, straight out of a spreadsheet) and it upserts the Ambassadors sheet. Matches on name **and** borough, since a student can legitimately have two rows (one per borough they're paired with). Fields you've hand-set per student — Teacher, Student Email, Active, Notes — are never overwritten by an import.
 - **Rebuild Eligibility Matrix** — re-syncs the checkbox grid after you add ambassadors or jobs (keeps existing checkmarks).
 - **Refresh Dashboard Now** — manually rebuild the live view.
 - **Send Weekly Teacher Emails Now** — trigger the email immediately (good for testing).
@@ -66,7 +67,12 @@ Opening the spreadsheet adds a **🎓 Tour & Ambassador Scheduler** menu with:
 - Ambassadors are matched by full name (First + Last) across sheets rather
   than a synthetic ID, since this is meant to be edited directly by
   non-technical staff and row-based IDs break when rows are
-  sorted/deleted.
+  sorted/deleted. The Import feature matches on name **+ borough**
+  specifically to allow the same student to appear twice (see Blake Glenn
+  in the seed data) without the second row being treated as a duplicate.
+- Borough uses single-letter codes (M/B/Q/X/S/J) with a dropdown and a
+  note on the header cell explaining the legend — hover the **Borough**
+  header on the Ambassadors sheet to see it.
 - The **Dashboard** sheet is fully regenerated on refresh — anything typed
   into it directly will be wiped on the next refresh.
 - All the "business logic" (eligibility checks, conflict detection,

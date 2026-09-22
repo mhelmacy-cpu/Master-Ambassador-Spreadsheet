@@ -17,7 +17,8 @@ const SHEETS = {
 };
 
 const HEADERS = {};
-HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Grade', 'Teacher', 'Student Email', 'Active', 'Notes'];
+HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Grade', 'Borough', 'Parent 1 Name', 'Parent 1 Email',
+  'Parent 2 Name', 'Parent 2 Email', 'Teacher', 'Student Email', 'Active', 'Notes'];
 HEADERS[SHEETS.JOBS] = ['Job Name', 'Description', 'Active'];
 HEADERS[SHEETS.TOURS] = ['Tour ID', 'Date', 'Start Time', 'End Time', 'Visiting School / Group', 'Contact Name', 'Contact Email', 'Grade Level', '# of Visitors', 'Status', 'Notes'];
 HEADERS[SHEETS.TOURING_STUDENTS] = ['Tour ID', 'First Name', 'Last Name', 'Grade', 'School', 'Allergies / Medical Notes', 'Chaperone Name', 'Chaperone Contact', 'Notes'];
@@ -28,6 +29,10 @@ HEADERS[SHEETS.SETTINGS] = ['Setting', 'Value'];
 const TOUR_STATUSES = ['Scheduled', 'Completed', 'Cancelled'];
 const ASSIGNMENT_STATUSES = ['Scheduled', 'Completed', 'No-Show', 'Cancelled'];
 const YES_NO = ['Yes', 'No'];
+
+const BOROUGH_CODES = ['M', 'B', 'Q', 'X', 'S', 'J'];
+const BOROUGH_NAMES = { M: 'Manhattan', B: 'Brooklyn', Q: 'Queens', X: 'Bronx', S: 'Staten Island', J: 'New Jersey' };
+const BOROUGH_LEGEND = BOROUGH_CODES.map(c => c + ' = ' + BOROUGH_NAMES[c]).join('\n');
 
 const DEFAULT_SETTINGS = [
   ['School Name', 'Our School'],

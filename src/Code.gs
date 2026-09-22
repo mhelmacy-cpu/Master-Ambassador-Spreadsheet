@@ -10,6 +10,7 @@ function onOpen() {
     .addItem('➕ Schedule a Tour…', 'showAddTourDialog')
     .addItem('👩‍🎓 Add Touring Student…', 'showAddTouringStudentDialog')
     .addItem('🗓️ Assign Ambassador…', 'showAssignAmbassadorDialog')
+    .addItem('📋 Import / Update Ambassadors…', 'showImportAmbassadorsDialog')
     .addSeparator()
     .addItem('🔁 Rebuild Eligibility Matrix', 'rebuildEligibilityMatrix')
     .addItem('📍 Refresh Dashboard Now', 'refreshDashboard')
@@ -34,6 +35,10 @@ function showAddTouringStudentDialog() {
 
 function showAssignAmbassadorDialog() {
   showDialog_('ui/AssignAmbassadorDialog', 'Assign Ambassador', 480, 560);
+}
+
+function showImportAmbassadorsDialog() {
+  showDialog_('ui/ImportAmbassadorsDialog', 'Import / Update Ambassadors', 640, 560);
 }
 
 /* ---- Data providers for the dialogs (google.script.run) ---- */
@@ -64,4 +69,8 @@ function api_addTouringStudent(data) {
 
 function api_assignAmbassador(data) {
   return assignAmbassador(data);
+}
+
+function api_importAmbassadors(text) {
+  return importAmbassadors(text);
 }

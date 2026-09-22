@@ -57,6 +57,14 @@ function fullName_(first, last) {
   return String(first || '').trim() + ' ' + String(last || '').trim();
 }
 
+/** Splits "First Middle Last" into {first: "First", last: "Middle Last"}. */
+function splitFullName_(name) {
+  const trimmed = String(name || '').trim().replace(/\s+/g, ' ');
+  if (!trimmed) return { first: '', last: '' };
+  const parts = trimmed.split(' ');
+  return { first: parts[0], last: parts.slice(1).join(' ') };
+}
+
 /** Formats a Date or date-like value as yyyy-MM-dd for comparisons/IDs. */
 function toISODate(value) {
   const d = toDate_(value);

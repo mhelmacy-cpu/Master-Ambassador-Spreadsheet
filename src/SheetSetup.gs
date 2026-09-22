@@ -59,13 +59,13 @@ function setupAmbassadorsSheet_() {
   const sheet = getOrCreateSheet(SHEETS.AMBASSADORS);
   const headers = HEADERS[SHEETS.AMBASSADORS];
   if (sheet.getLastRow() < 2) {
-    sheet.getRange(2, 1, 2, headers.length).setValues([
-      ['Alex', 'Kim', '8', 'Ms. Rivera', 'alex.kim@example.org', 'Yes', ''],
-      ['Jordan', 'Patel', '7', 'Mr. Chen', 'jordan.patel@example.org', 'Yes', '']
-    ]);
+    const seedRows = buildAmbassadorSeedRows_();
+    sheet.getRange(2, 1, seedRows.length, headers.length).setValues(seedRows);
   }
   const lastRow = Math.max(sheet.getLastRow(), 2);
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Active'), YES_NO);
+  applyDropdown_(sheet, lastRow, colNum_(headers, 'Borough'), BOROUGH_CODES);
+  sheet.getRange(1, colNum_(headers, 'Borough')).setNote(BOROUGH_LEGEND);
   applyTeacherDropdown_(sheet, lastRow, colNum_(headers, 'Teacher'));
   sheet.autoResizeColumns(1, headers.length);
 }
