@@ -1,14 +1,44 @@
 /**
  * Per-tour emails, sent once a tour's Staff This Tour slate is
- * confirmed. Three separate audiences:
- * A) Each participating ambassador - their own job(s)/time(s).
- * B) Each ambassador's Teacher - which of their student(s) will be
- * pulled out, when, for what job (same idea as the weekly digest,
- * scoped to just this one tour).
- * C) Each teacher whose class is receiving touring visitors (the
- * grade-matched Tour Guide's own class, per the staffing algorithm)
- * - just the headcount, no student names, per instruction.
+ * confirmed, and again by the Monday/Tuesday/Wednesday reminders.
+ * Four audiences:
+ * A) Each ambassador - their own job(s) and times, plus where and when
+ *    to report.
+ * B) Their advisor - which advisee(s) are out and when.
+ * C) The teacher whose class they walk out of, from the bell schedule.
+ * D) Each teacher receiving touring visitors - the headcount only, no
+ *    student names and no pod code, per instruction.
  */
+
+/**
+ * How to refer to the tour date in an email sent today.
+ *
+ * The same message goes out Monday afternoon, Tuesday afternoon and
+ * Wednesday morning, so a fixed "Today" would be wrong on two of the
+ * three. This says Today, Tomorrow, or the weekday, according to when
+ * it is actually being sent.
+ */
+function whenLabel_(tourDate) {
+  const tour = toDate_(tourDate);
+  if (!tour) return '';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(tour.getFullYear(), tour.getMonth(), tour.getDate());
+  const daysOut = Math.round((target - today) / 86400000);
+  const tz = ss_().getSpreadsheetTimeZone();
+  const dayName = Utilities.formatDate(target, tz, 'EEEE');
+  const shortDate = Utilities.formatDate(target, tz, 'MMM d');
+
+  if (daysOut === 0) return 'today (' + dayName + ', ' + shortDate + ')';
+  if (daysOut === 1) return 'tomorrow (' + dayName + ', ' + shortDate + ')';
+  return dayName + ', ' + shortDate;
+}
+
+/** Title-case version for subject lines. */
+function whenLabelForSubject_(tourDate) {
+  const label = whenLabel_(tourDate);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
 function sendTourDayEmails(tourId) {
   const tour = getTourById_(tourId);
@@ -33,14 +63,16 @@ function sendTourDayEmails(tourId) {
     throw new Error('No assignments found for this tour yet - use "Staff This Tour..." first.');
   }
 
-  const schoolName = getSetting('School Name', 'Our School');
   const senderName = getSetting('Email Sender Name', 'Tour & Ambassador Program');
   const teacherEmails = getTeacherEmailMap_();
   const ambassadorEmails = getAmbassadorStudentEmailMap_();
   const ambassadorByName = {};
   getAmbassadorDirectory_().forEach(a => { ambassadorByName[normalizeName_(a.name)] = a; });
 
-  const dateLabel = formatDate_(tourRows[0][cols.date]);
+  const when = whenLabel_(tourRows[0][cols.date]);
+  const whenSubject = whenLabelForSubject_(tourRows[0][cols.date]);
+  const reportTo = getSetting('Ambassadors Report To', 'the cafeteria');
+  const reportAt = getSetting('Ambassadors Report At', '8:25 AM');
   const tourEndLabel = tour.endTime ? formatTime_(combineDateAndTime_(toDate_(tour.date), tour.endTime)) : '';
 
   // ---------- A: participating ambassadors ----------
@@ -56,10 +88,11 @@ function sendTourDayEmails(tourId) {
     const listHtml = items.map(r => '<li>' + escapeHtml_(r[cols.job]) + ' - ' +
       formatTime_(r[cols.start]) + '-' + formatTime_(r[cols.end]) + '</li>').join('');
     const html = '<p>Hi ' + escapeHtml_(String(name).split(' ')[0]) + ',</p>' +
-      "<p>You're on the schedule for the tour on " + dateLabel + ' at ' + escapeHtml_(schoolName) + ':</p>' +
+      "<p>You're on the schedule for the tour " + when + ':</p>' +
       '<ul>' + listHtml + '</ul>' +
+      '<p><b>Please come to ' + escapeHtml_(reportTo) + ' at ' + escapeHtml_(reportAt) + '.</b></p>' +
       '<p>Thanks for being an ambassador!<br>' + escapeHtml_(senderName) + '</p>';
-    MailApp.sendEmail({ to: email, subject: 'Your Tour Duty - ' + dateLabel, htmlBody: html, name: senderName });
+    MailApp.sendEmail({ to: email, subject: 'Your Tour Duty - ' + whenSubject, htmlBody: html, name: senderName });
     ambassadorsSent++;
   });
 
@@ -81,20 +114,20 @@ function sendTourDayEmails(tourId) {
       '<td style="padding:4px 8px;border:1px solid #ddd;">' + formatTime_(r[cols.start]) + '-' + formatTime_(r[cols.end]) + '</td>' +
       '<td style="padding:4px 8px;border:1px solid #ddd;">' + escapeHtml_(r[cols.job]) + '</td></tr>').join('');
     const html = '<p>Hi ' + escapeHtml_(teacher) + ',</p>' +
-      '<p>Your student(s) will be out for ambassador duty on ' + dateLabel + ':</p>' +
+      '<p>Your advisee(s) will be out for ambassador duty ' + when + ':</p>' +
       '<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px;">' +
       '<tr style="background:#4a86e8;color:#fff;">' +
-      '<th style="padding:4px 8px;">Student</th><th style="padding:4px 8px;">Time</th><th style="padding:4px 8px;">Job</th></tr>' +
+      '<th style="padding:4px 8px;">Advisee</th><th style="padding:4px 8px;">Time</th><th style="padding:4px 8px;">Job</th></tr>' +
       rowsHtml + '</table>' +
       '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p>';
-    MailApp.sendEmail({ to: email, subject: 'Ambassador Duty Today - ' + dateLabel, htmlBody: html, name: senderName });
+    MailApp.sendEmail({ to: email, subject: 'Advisee Ambassador Duty - ' + whenSubject, htmlBody: html, name: senderName });
     teachersMissingSent++;
   });
 
   // ---------- B2: the teacher whose class they are actually missing ----------
   // The advisor round above is pastoral; this one is the class the student
   // walks out of, worked out from their pod's bell schedule at the tour's time.
-  const classTeacherResult = sendMissedClassEmails_(tourRows, cols, ambassadorByName, dateLabel, senderName);
+  const classTeacherResult = sendMissedClassEmails_(tourRows, cols, ambassadorByName, when, whenSubject, senderName);
 
   // ---------- C: teachers receiving touring visitors (count only) ----------
   const touringStudents = listTouringStudentsForTour(tourId);
@@ -138,10 +171,13 @@ function sendTourDayEmails(tourId) {
     const count = receivingCounts[key];
     const html = '<p>Hi ' + escapeHtml_(teacher) + ',</p>' +
       '<p>Heads up - expect ' + count + ' prospective student visitor' + (count === 1 ? '' : 's') +
-      " sitting in on your class (" + escapeHtml_(pod) + ") during today's tour, " + dateLabel +
-      (tourEndLabel ? ' (wrapping up around ' + tourEndLabel + ')' : '') + '.</p>' +
+      ' sitting in on your class ' + when +
+      (tourEndLabel ? ', wrapping up around ' + tourEndLabel : '') + '.</p>' +
       '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p>';
-    MailApp.sendEmail({ to: email, subject: 'Prospective Family Visit Today - ' + dateLabel, htmlBody: html, name: senderName });
+    MailApp.sendEmail({
+      to: email,
+      subject: 'Student Visitor' + (count === 1 ? '' : 's') + ' in Your Class - ' + whenSubject,
+      htmlBody: html, name: senderName });
     receivingSent++;
   });
 
@@ -165,7 +201,7 @@ function sendTourDayEmails(tourId) {
  * in needsCheck for a human to forward. Same for initials with no
  * matching row on the Teachers sheet.
  */
-function sendMissedClassEmails_(tourRows, cols, ambassadorByName, dateLabel, senderName) {
+function sendMissedClassEmails_(tourRows, cols, ambassadorByName, when, whenSubject, senderName) {
   const byTeacherEmail = {};   // email -> {name, students: [{student, what, start, end}]}
   const needsCheck = [];
 
@@ -217,7 +253,7 @@ function sendMissedClassEmails_(tourRows, cols, ambassadorByName, dateLabel, sen
       '<td style="padding:4px 8px;border:1px solid #ddd;">' + escapeHtml_(s.what) + '</td>' +
       '<td style="padding:4px 8px;border:1px solid #ddd;">' + escapeHtml_(s.job) + '</td></tr>').join('');
     const html = '<p>Hi ' + escapeHtml_(entry.name) + ',</p>' +
-      '<p>The student(s) below will be out of your class on ' + dateLabel +
+      '<p>The student(s) below will be out of your class ' + when +
       ' for a school tour:</p>' +
       '<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px;">' +
       '<tr style="background:#4a86e8;color:#fff;">' +
@@ -225,7 +261,7 @@ function sendMissedClassEmails_(tourRows, cols, ambassadorByName, dateLabel, sen
       '<th style="padding:4px 8px;">Class</th><th style="padding:4px 8px;">Tour Job</th></tr>' +
       rowsHtml + '</table>' +
       '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p>';
-    MailApp.sendEmail({ to: email, subject: 'Student Out of Your Class - ' + dateLabel,
+    MailApp.sendEmail({ to: email, subject: 'Student Out of Your Class - ' + whenSubject,
       htmlBody: html, name: senderName });
     sent++;
   });

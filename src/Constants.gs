@@ -54,6 +54,8 @@ const DEFAULT_SETTINGS = [
   ['Dashboard "Starting Soon" Window (minutes)', '15'],
   ['Tour Start Time', '08:30'],
   ['Tour End Time', '09:25'],
+  ['Ambassadors Report To', 'the cafeteria'],
+  ['Ambassadors Report At', '8:25 AM'],
   ['Lobby Greeters Needed', '3'],
   ['Table Greeters Needed', '2'],
   ['Panelists Needed', '5'],
