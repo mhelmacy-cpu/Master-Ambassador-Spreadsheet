@@ -10,6 +10,7 @@ function onOpen() {
     .addItem('➕ Schedule a Tour…', 'showAddTourDialog')
     .addItem('👩‍🎓 Add Touring Student…', 'showAddTouringStudentDialog')
     .addItem('🗓️ Assign Ambassador…', 'showAssignAmbassadorDialog')
+    .addItem('🧑‍🤝‍🧑 Staff This Tour…', 'showStaffTourDialog')
     .addItem('📋 Import / Update Ambassadors…', 'showImportAmbassadorsDialog')
     .addItem('🏫 Sync Homerooms / Advisors', 'syncAmbassadorHomeroomsFromMenu_')
     .addSeparator()
@@ -40,6 +41,10 @@ function showAssignAmbassadorDialog() {
 
 function showImportAmbassadorsDialog() {
   showDialog_('ui/ImportAmbassadorsDialog', 'Import / Update Ambassadors', 640, 560);
+}
+
+function showStaffTourDialog() {
+  showDialog_('ui/StaffTourDialog', 'Staff This Tour', 640, 600);
 }
 
 /* ---- Data providers for the dialogs (google.script.run) ---- */
@@ -74,4 +79,12 @@ function api_assignAmbassador(data) {
 
 function api_importAmbassadors(text) {
   return importAmbassadors(text);
+}
+
+function api_suggestStaffingForTour(tourId) {
+  return suggestStaffingForTour(tourId);
+}
+
+function api_confirmTourStaffing(tourId, selections) {
+  return confirmTourStaffing(tourId, selections);
 }

@@ -39,23 +39,18 @@ function assignAmbassador(data) {
 
   // Conflict check: no overlapping assignment for this ambassador.
   const { rows: assignmentRows } = readSheet(SHEETS.ASSIGNMENTS);
-  const aDateCol = colNum_(headers, 'Date') - 1;
-  const aStartCol = colNum_(headers, 'Start Time') - 1;
-  const aEndCol = colNum_(headers, 'End Time') - 1;
-  const aAmbassadorCol = colNum_(headers, 'Ambassador') - 1;
-  const aStatusCol = colNum_(headers, 'Status') - 1;
-
+  const aCols = assignmentCols_();
   const conflict = assignmentRows.find(r => {
-    if (r[aAmbassadorCol] !== data.ambassador) return false;
-    if (String(r[aStatusCol]).trim() === 'Cancelled') return false;
-    if (toISODate(r[aDateCol]) !== toISODate(dateVal)) return false;
-    const existingStart = combineDateAndTime_(r[aDateCol], r[aStartCol]);
-    const existingEnd = combineDateAndTime_(r[aDateCol], r[aEndCol]);
+    if (r[aCols.ambassador] !== data.ambassador) return false;
+    if (String(r[aCols.status]).trim() === 'Cancelled') return false;
+    if (toISODate(r[aCols.date]) !== toISODate(dateVal)) return false;
+    const existingStart = combineDateAndTime_(r[aCols.date], r[aCols.start]);
+    const existingEnd = combineDateAndTime_(r[aCols.date], r[aCols.end]);
     return rangesOverlap_(start, end, existingStart, existingEnd);
   });
   if (conflict) {
     throw new Error(data.ambassador + ' is already scheduled for ' +
-      formatTime_(conflict[aStartCol]) + '–' + formatTime_(conflict[aEndCol]) + ' that day.');
+      formatTime_(conflict[aCols.start]) + '–' + formatTime_(conflict[aCols.end]) + ' that day.');
   }
 
   const sheet = getOrCreateSheet(SHEETS.ASSIGNMENTS);
@@ -73,6 +68,7 @@ function assignAmbassador(data) {
       case 'Job': return data.job;
       case 'Ambassador': return data.ambassador;
       case 'Ambassador Teacher': return ambassadorRow[teacherCol] || '';
+      case 'Touring Student': return data.touringStudent || '';
       case 'Status': return 'Scheduled';
       case 'Notes': return data.notes || '';
       default: return '';
@@ -89,6 +85,29 @@ function assignAmbassador(data) {
   return assignmentId;
 }
 
+/** Column index map for the Assignments sheet, for code that scans many rows in a loop. */
+function assignmentCols_() {
+  const headers = HEADERS[SHEETS.ASSIGNMENTS];
+  return {
+    date: colNum_(headers, 'Date') - 1,
+    start: colNum_(headers, 'Start Time') - 1,
+    end: colNum_(headers, 'End Time') - 1,
+    ambassador: colNum_(headers, 'Ambassador') - 1,
+    status: colNum_(headers, 'Status') - 1
+  };
+}
+
+function isAmbassadorBusy_(assignmentRows, cols, ambassadorName, dateVal, start, end) {
+  return assignmentRows.some(r => {
+    if (r[cols.ambassador] !== ambassadorName) return false;
+    if (String(r[cols.status]).trim() === 'Cancelled') return false;
+    if (toISODate(r[cols.date]) !== toISODate(dateVal)) return false;
+    const existingStart = combineDateAndTime_(r[cols.date], r[cols.start]);
+    const existingEnd = combineDateAndTime_(r[cols.date], r[cols.end]);
+    return rangesOverlap_(start, end, existingStart, existingEnd);
+  });
+}
+
 /** Ambassadors eligible+active for a job, annotated with a conflict flag for the given date/time. */
 function getAssignableAmbassadors(job, dateStr, startTime, endTime) {
   const candidates = getEligibleActiveAmbassadors(job);
@@ -97,23 +116,11 @@ function getAssignableAmbassadors(job, dateStr, startTime, endTime) {
   const dateVal = toDate_(dateStr);
   const start = combineDateAndTime_(dateVal, startTime);
   const end = combineDateAndTime_(dateVal, endTime);
-  const headers = HEADERS[SHEETS.ASSIGNMENTS];
   const { rows } = readSheet(SHEETS.ASSIGNMENTS);
-  const aDateCol = colNum_(headers, 'Date') - 1;
-  const aStartCol = colNum_(headers, 'Start Time') - 1;
-  const aEndCol = colNum_(headers, 'End Time') - 1;
-  const aAmbassadorCol = colNum_(headers, 'Ambassador') - 1;
-  const aStatusCol = colNum_(headers, 'Status') - 1;
+  const cols = assignmentCols_();
 
-  return candidates.map(name => {
-    const busy = rows.some(r => {
-      if (r[aAmbassadorCol] !== name) return false;
-      if (String(r[aStatusCol]).trim() === 'Cancelled') return false;
-      if (toISODate(r[aDateCol]) !== toISODate(dateVal)) return false;
-      const existingStart = combineDateAndTime_(r[aDateCol], r[aStartCol]);
-      const existingEnd = combineDateAndTime_(r[aDateCol], r[aEndCol]);
-      return rangesOverlap_(start, end, existingStart, existingEnd);
-    });
-    return { name, busy };
-  });
+  return candidates.map(name => ({
+    name,
+    busy: isAmbassadorBusy_(rows, cols, name, dateVal, start, end)
+  }));
 }

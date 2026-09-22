@@ -56,3 +56,18 @@ function listTours() {
     }))
     .sort((a, b) => a.id < b.id ? 1 : -1);
 }
+
+function getTourById_(tourId) {
+  const headers = HEADERS[SHEETS.TOURS];
+  const { rows } = readSheet(SHEETS.TOURS);
+  const idCol = colNum_(headers, 'Tour ID') - 1;
+  const row = rows.find(r => r[idCol] === tourId);
+  if (!row) return null;
+  return {
+    id: row[idCol],
+    date: row[colNum_(headers, 'Date') - 1],
+    startTime: row[colNum_(headers, 'Start Time') - 1],
+    endTime: row[colNum_(headers, 'End Time') - 1],
+    group: row[colNum_(headers, 'Visiting School / Group') - 1]
+  };
+}

@@ -8,9 +8,16 @@ visitor-tour and student-ambassador program end to end:
 - **Assign student ambassadors** to jobs on those tours — only ambassadors
   who are marked **Active** and **Eligible** for that job are selectable,
   and the tool blocks double-booking.
+- **Staff an entire tour in one click**: the 4 roles (Panelist, Lobby
+  Greeter, Table Greeter, Tour Guide) are suggested automatically —
+  spread fairly across the roster, and Tour Guides matched to each
+  visiting student by grade/borough/gender — for staff to review and
+  confirm before anything is saved.
 - **See where ambassadors are right now** on a live **Dashboard** tab:
   "Happening Now," "Starting Soon," and "Today's Full Schedule" — built so
   front-office staff can glance at it and go pull the right kid.
+- **Track each ambassador's tour history** — Total Tours and Last Tour
+  Date columns on the Ambassadors sheet, kept current automatically.
 - **Email teachers automatically, once a week**, a list of when their
   student(s) will be pulled for ambassador duty.
 - **Manage job eligibility** per ambassador with a simple checkbox matrix.
@@ -31,9 +38,9 @@ Google Sheet (two options: paste into the Apps Script editor, or push with
 | **Tours** | One row per scheduled visit/tour. |
 | **Touring Students** | Visiting students tied to a Tour ID. |
 | **Assignments** | The master schedule: which ambassador is doing which job, for which tour, when. |
-| **Ambassadors** | Your roster of student ambassadors (name, grade, borough, both parents' contact info, teacher, active status). Ships pre-seeded with the current roster. |
+| **Ambassadors** | Your roster of student ambassadors (name, grade, homeroom pod, borough, gender, both parents' contact info, teacher/advisor, active status, and auto-computed Total Tours / Last Tour Date). Ships pre-seeded with the current roster. |
 | **Eligibility** | Checkbox matrix: ambassador rows × job columns. |
-| **Jobs** | The list of jobs ambassadors can be assigned to (Tour Guide, Greeter, etc). |
+| **Jobs** | The 4 tour roles: Panelist, Lobby Greeter, Table Greeter, Tour Guide. |
 | **Teachers** | Teacher names + email addresses, used for the weekly email and as the "Teacher" dropdown on Ambassadors. |
 | **Settings** | Key/value settings: school name, email schedule, dashboard refresh window. |
 
@@ -43,6 +50,8 @@ Opening the spreadsheet adds a **🎓 Tour & Ambassador Scheduler** menu with:
 
 - **First-Time Setup** — creates every sheet, headers, dropdowns, and sample rows. Safe to re-run any time.
 - **Schedule a Tour…**, **Add Touring Student…**, **Assign Ambassador…** — form dialogs, so staff never has to hand-edit raw rows.
+- **Staff This Tour…** — pick a tour and it suggests one Panelist, one Lobby Greeter, one Table Greeter, and (for every touring student added to that tour) 2 Tour Guides each. Every dropdown is editable before you click Confirm & Save — nothing is written until you do. See **Staffing algorithm** below for exactly how picks are ranked.
+- **Sync Homerooms / Advisors** — re-matches Ambassadors against the official Homeroom/Advisories roster (`HOMEROOM_DATA_` in `HomeroomSeedData.gs`) by name, refreshing Grade/Homeroom Pod/Teacher. Re-run it after pasting in a new year's roster data. A student who was 8th grade and no longer matches is assumed to have graduated Middle School and is marked Inactive with a note — check and undo if that's wrong.
 - **Import / Update Ambassadors…** — paste a roster (Name, Grade, Borough, Parent 1 Name/Email, Parent 2 Name/Email — tab- or comma-separated, straight out of a spreadsheet) and it upserts the Ambassadors sheet. Matches on name **and** borough, since a student can legitimately have two rows (one per borough they're paired with). Fields you've hand-set per student — Teacher, Student Email, Active, Notes — are never overwritten by an import.
 - **Rebuild Eligibility Matrix** — re-syncs the checkbox grid after you add ambassadors or jobs (keeps existing checkmarks).
 - **Refresh Dashboard Now** — manually rebuild the live view.
@@ -61,6 +70,35 @@ Opening the spreadsheet adds a **🎓 Tour & Ambassador Scheduler** menu with:
    to go out, so the front office can send a pass / call the classroom.
 6. Turn on **Automation → weekly teacher emails** once, and teachers get a
    heads-up email every week listing when their student(s) will step out.
+
+## Staffing algorithm
+
+**Panelist / Lobby Greeter / Table Greeter** — one pick each, from
+ambassadors who are Active, marked Eligible for that job (Eligibility
+sheet), and free at the tour's time. Ranked by fairness (fewest **Total
+Tours** first, so duty rotates), with a within-pass tiebreak so the same
+kid isn't suggested for two roles on the same tour unless the pool is too
+small to avoid it.
+
+**Tour Guide** — 2 per touring student (from the Touring Students rows
+added to that tour), ranked by:
+1. Grade fit (exact grade beats one grade off beats no match)
+2. Borough fit (exact match)
+3. Fairness (fewest Total Tours), as the tiebreaker
+
+Gender is a **constraint, not a weighted score**: Guide 1 is the
+best-fit candidate whose Gender matches the touring student's (when
+both are set and a match exists); Guide 2 is simply the next-best-fit
+candidate of *any* gender. So a boy touring might get one girl guide and
+one boy guide, or two boys — the rule only guarantees *at least one*
+gender match when possible, never that both must match.
+
+Nothing is ever saved by the suggestion step itself — **Staff This
+Tour…** always shows an editable slate first, and only writes to
+Assignments when you click Confirm & Save. If a suggested pick turns out
+to conflict with something saved after the suggestion was generated,
+that one row is skipped with an error shown in the results (the rest of
+the slate still saves).
 
 ## Notes on the design
 

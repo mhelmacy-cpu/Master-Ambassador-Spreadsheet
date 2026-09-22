@@ -112,6 +112,12 @@ function formatDate_(value) {
   return Utilities.formatDate(d, ss_().getSpreadsheetTimeZone(), 'EEE, MMM d, yyyy');
 }
 
+/** Pulls the leading integer out of a grade string like "6th" or "6" — null if none. */
+function parseGradeNum_(g) {
+  const m = /(\d+)/.exec(String(g || ''));
+  return m ? parseInt(m[1], 10) : null;
+}
+
 function rangesOverlap_(startA, endA, startB, endB) {
   return startA < endB && startB < endA;
 }

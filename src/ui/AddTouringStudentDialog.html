@@ -35,13 +35,34 @@
     <div class="row">
       <div>
         <label>Grade</label>
-        <input type="text" id="grade">
+        <input type="text" id="grade" placeholder="e.g. 6th">
       </div>
       <div>
-        <label>Current School</label>
-        <input type="text" id="school">
+        <label>Borough <span class="hint">— used to match a guide</span></label>
+        <select id="borough">
+          <option value="">—</option>
+          <option value="M">M — Manhattan</option>
+          <option value="B">B — Brooklyn</option>
+          <option value="Q">Q — Queens</option>
+          <option value="X">X — Bronx</option>
+          <option value="S">S — Staten Island</option>
+          <option value="J">J — New Jersey</option>
+        </select>
+      </div>
+      <div>
+        <label>Gender</label>
+        <select id="gender">
+          <option value="">—</option>
+          <option value="Female">Female</option>
+          <option value="Male">Male</option>
+          <option value="Non-binary">Non-binary</option>
+          <option value="Other">Other</option>
+        </select>
       </div>
     </div>
+
+    <label>Current School</label>
+    <input type="text" id="school">
 
     <label>Allergies / Medical Notes</label>
     <textarea id="medicalNotes" rows="2"></textarea>
@@ -96,6 +117,8 @@
         firstName: document.getElementById('firstName').value,
         lastName: document.getElementById('lastName').value,
         grade: document.getElementById('grade').value,
+        borough: document.getElementById('borough').value,
+        gender: document.getElementById('gender').value,
         school: document.getElementById('school').value,
         medicalNotes: document.getElementById('medicalNotes').value,
         chaperoneName: document.getElementById('chaperoneName').value,

@@ -5,6 +5,8 @@
  */
 
 function refreshDashboard() {
+  refreshAmbassadorStats();
+
   const sheet = getOrCreateSheet(SHEETS.DASHBOARD);
   sheet.clear();
   sheet.clearFormats();

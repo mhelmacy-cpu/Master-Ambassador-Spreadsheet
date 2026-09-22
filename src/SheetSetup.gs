@@ -67,7 +67,10 @@ function setupAmbassadorsSheet_() {
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Active'), YES_NO);
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Borough'), BOROUGH_CODES);
   sheet.getRange(1, colNum_(headers, 'Borough')).setNote(BOROUGH_LEGEND);
+  applyDropdown_(sheet, lastRow, colNum_(headers, 'Gender'), GENDER_OPTIONS, true);
   applyTeacherDropdown_(sheet, lastRow, colNum_(headers, 'Teacher'));
+  sheet.getRange(1, colNum_(headers, 'Total Tours')).setNote('Computed automatically — do not edit by hand. Refreshed whenever assignments change.');
+  sheet.getRange(1, colNum_(headers, 'Last Tour Date')).setNote('Computed automatically — do not edit by hand. Refreshed whenever assignments change.');
   sheet.autoResizeColumns(1, headers.length);
 }
 
@@ -84,7 +87,11 @@ function setupToursSheet_() {
 
 function setupTouringStudentsSheet_() {
   const sheet = getOrCreateSheet(SHEETS.TOURING_STUDENTS);
-  sheet.autoResizeColumns(1, HEADERS[SHEETS.TOURING_STUDENTS].length);
+  const headers = HEADERS[SHEETS.TOURING_STUDENTS];
+  const lastRow = Math.max(sheet.getLastRow(), 2);
+  applyDropdown_(sheet, lastRow, colNum_(headers, 'Borough'), BOROUGH_CODES, true);
+  applyDropdown_(sheet, lastRow, colNum_(headers, 'Gender'), GENDER_OPTIONS, true);
+  sheet.autoResizeColumns(1, headers.length);
 }
 
 function setupAssignmentsSheet_() {
@@ -106,8 +113,8 @@ function setupSettingsSheet_() {
   sheet.autoResizeColumns(1, 2);
 }
 
-function applyDropdown_(sheet, lastRow, col, values) {
-  const rule = SpreadsheetApp.newDataValidation().requireValueInList(values, true).setAllowInvalid(false).build();
+function applyDropdown_(sheet, lastRow, col, values, allowInvalid) {
+  const rule = SpreadsheetApp.newDataValidation().requireValueInList(values, true).setAllowInvalid(!!allowInvalid).build();
   sheet.getRange(2, col, Math.max(lastRow - 1, 200), 1).setDataValidation(rule);
 }
 

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #333; padding: 4px 8px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    select { width: 100%; box-sizing: border-box; padding: 6px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    button { margin-top: 12px; padding: 8px 16px; background: #4a86e8; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    button.secondary { background: #f1f3f4; color: #333; }
+    button:disabled { background: #aaa; }
+    #status { margin-top: 10px; font-style: italic; white-space: pre-wrap; }
+    .error { color: #cc0000; }
+    .success { color: #137333; }
+    .hint { color: #777; font-weight: normal; font-size: 11px; }
+    h3 { margin: 18px 0 4px; font-size: 13px; color: #1c4587; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; }
+    .guide-row { border: 1px solid #e0e0e0; border-radius: 4px; padding: 8px; margin-top: 8px; }
+    .guide-row .row { display: flex; gap: 10px; }
+    .guide-row .row > div { flex: 1; }
+    .student-name { font-weight: bold; }
+    .empty { color: #999; font-style: italic; }
+  </style>
+</head>
+<body>
+  <label>Tour *</label>
+  <select id="tourId"></select>
+  <button type="button" id="suggestBtn">Suggest Staffing</button>
+
+  <div id="results" style="display:none;">
+    <h3>Panelist</h3>
+    <select id="panelist"></select>
+
+    <h3>Lobby Greeter</h3>
+    <select id="lobbyGreeter"></select>
+
+    <h3>Table Greeter</h3>
+    <select id="tableGreeter"></select>
+
+    <h3>Tour Guides <span class="hint">— 2 per touring student; guide 1 is picked to match gender when possible</span></h3>
+    <div id="guideRows"></div>
+
+    <button type="button" id="confirmBtn">Confirm &amp; Save</button>
+    <button type="button" id="reSuggestBtn" class="secondary">Re-suggest</button>
+  </div>
+
+  <div id="status"></div>
+
+  <script>
+    let lastSuggestion = null;
+
+    function loadTours() {
+      google.script.run.withSuccessHandler(function (tours) {
+        const sel = document.getElementById('tourId');
+        sel.innerHTML = '';
+        if (tours.length === 0) {
+          sel.innerHTML = '<option value="">No tours scheduled yet</option>';
+          return;
+        }
+        tours.forEach(function (t) {
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.label;
+          sel.appendChild(opt);
+        });
+      }).api_getTours();
+    }
+    loadTours();
+
+    function fillSelect(sel, alternates, chosen) {
+      sel.innerHTML = '';
+      if (!alternates || alternates.length === 0) {
+        sel.innerHTML = '<option value="">— no eligible/available ambassador —</option>';
+        sel.disabled = true;
+        return;
+      }
+      sel.disabled = false;
+      const blank = document.createElement('option');
+      blank.value = '';
+      blank.textContent = '— none —';
+      sel.appendChild(blank);
+      alternates.forEach(function (name) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        if (name === chosen) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    function renderSuggestion(suggestion) {
+      lastSuggestion = suggestion;
+      document.getElementById('results').style.display = 'block';
+
+      fillSelect(document.getElementById('panelist'), suggestion.singleRoles['Panelist'].alternates, suggestion.singleRoles['Panelist'].chosen);
+      fillSelect(document.getElementById('lobbyGreeter'), suggestion.singleRoles['Lobby Greeter'].alternates, suggestion.singleRoles['Lobby Greeter'].chosen);
+      fillSelect(document.getElementById('tableGreeter'), suggestion.singleRoles['Table Greeter'].alternates, suggestion.singleRoles['Table Greeter'].chosen);
+
+      const guideRows = document.getElementById('guideRows');
+      guideRows.innerHTML = '';
+      if (suggestion.tourGuides.length === 0) {
+        guideRows.innerHTML = '<p class="empty">No touring students added for this tour yet — add some via "Add Touring Student…" first.</p>';
+        return;
+      }
+      suggestion.tourGuides.forEach(function (g, i) {
+        const div = document.createElement('div');
+        div.className = 'guide-row';
+        div.innerHTML =
+          '<div class="student-name">' + g.studentName + '</div>' +
+          '<div class="row">' +
+          '<div><label>Guide 1</label><select data-idx="' + i + '" data-slot="guide1"></select></div>' +
+          '<div><label>Guide 2</label><select data-idx="' + i + '" data-slot="guide2"></select></div>' +
+          '</div>';
+        guideRows.appendChild(div);
+        fillSelect(div.querySelector('[data-slot="guide1"]'), g.alternates, g.guide1);
+        fillSelect(div.querySelector('[data-slot="guide2"]'), g.alternates, g.guide2);
+      });
+    }
+
+    function suggest() {
+      const tourId = document.getElementById('tourId').value;
+      const status = document.getElementById('status');
+      if (!tourId) { status.className = 'error'; status.textContent = 'Choose a tour first.'; return; }
+      status.className = '';
+      status.textContent = 'Working out the best fit…';
+      document.getElementById('suggestBtn').disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function (suggestion) {
+          status.textContent = '';
+          document.getElementById('suggestBtn').disabled = false;
+          renderSuggestion(suggestion);
+        })
+        .withFailureHandler(function (err) {
+          status.className = 'error';
+          status.textContent = err.message || String(err);
+          document.getElementById('suggestBtn').disabled = false;
+        })
+        .api_suggestStaffingForTour(tourId);
+    }
+
+    document.getElementById('suggestBtn').addEventListener('click', suggest);
+    document.getElementById('reSuggestBtn').addEventListener('click', suggest);
+
+    document.getElementById('confirmBtn').addEventListener('click', function () {
+      const tourId = document.getElementById('tourId').value;
+      const status = document.getElementById('status');
+      const btn = document.getElementById('confirmBtn');
+      btn.disabled = true;
+      status.className = '';
+      status.textContent = 'Saving…';
+
+      const tourGuides = lastSuggestion.tourGuides.map(function (g, i) {
+        const guide1Sel = document.querySelector('[data-idx="' + i + '"][data-slot="guide1"]');
+        const guide2Sel = document.querySelector('[data-idx="' + i + '"][data-slot="guide2"]');
+        return {
+          studentName: g.studentName,
+          guide1: guide1Sel ? guide1Sel.value : '',
+          guide2: guide2Sel ? guide2Sel.value : ''
+        };
+      });
+
+      const selections = {
+        panelist: document.getElementById('panelist').value,
+        lobbyGreeter: document.getElementById('lobbyGreeter').value,
+        tableGreeter: document.getElementById('tableGreeter').value,
+        tourGuides: tourGuides
+      };
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          btn.disabled = false;
+          let msg = 'Saved ' + result.created.length + ' assignment(s).';
+          if (result.errors.length > 0) {
+            msg += '\n\nCouldn’t save ' + result.errors.length + ':\n' +
+              result.errors.map(function (e) { return '• ' + e.ambassador + ' (' + e.job + '): ' + e.message; }).join('\n');
+            status.className = 'error';
+          } else {
+            status.className = 'success';
+          }
+          status.textContent = msg;
+        })
+        .withFailureHandler(function (err) {
+          status.className = 'error';
+          status.textContent = err.message || String(err);
+          btn.disabled = false;
+        })
+        .api_confirmTourStaffing(tourId, selections);
+    });
+  </script>
+</body>
+</html>

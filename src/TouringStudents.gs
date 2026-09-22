@@ -14,6 +14,8 @@ function addTouringStudent(data) {
       case 'First Name': return data.firstName || '';
       case 'Last Name': return data.lastName || '';
       case 'Grade': return data.grade || '';
+      case 'Borough': return data.borough || '';
+      case 'Gender': return data.gender || '';
       case 'School': return data.school || '';
       case 'Allergies / Medical Notes': return data.medicalNotes || '';
       case 'Chaperone Name': return data.chaperoneName || '';
