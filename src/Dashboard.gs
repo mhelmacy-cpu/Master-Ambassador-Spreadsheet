@@ -45,16 +45,16 @@ function refreshDashboard() {
   const startingSoon = todayRows.filter(r => r.start > now && r.start <= soonCutoff && r.status !== 'Cancelled' && r.status !== 'No-Show');
 
   let row = 1;
-  row = writeTitle_(sheet, row, '📍 Live Ambassador Dashboard', '#1c4587');
+  row = writeTitle_(sheet, row, 'Live Ambassador Dashboard', '#1c4587');
   sheet.getRange(row, 1).setValue('Last refreshed: ' + Utilities.formatDate(now, tz, 'EEE, MMM d, yyyy h:mm:ss a'))
     .setFontStyle('italic').setFontColor('#666666');
   row += 2;
 
-  row = writeSection_(sheet, row, '🔴 Happening Now — go pull these students', happeningNow, '#cc0000', '#fce8e6');
+  row = writeSection_(sheet, row, 'Happening Now - go pull these students', happeningNow, '#cc0000', '#fce8e6');
   row += 1;
-  row = writeSection_(sheet, row, '🟡 Starting Soon (next ' + soonWindowMin + ' min)', startingSoon, '#e69138', '#fff2cc');
+  row = writeSection_(sheet, row, 'Starting Soon (next ' + soonWindowMin + ' min)', startingSoon, '#e69138', '#fff2cc');
   row += 1;
-  row = writeSection_(sheet, row, '📅 Today’s Full Schedule', todayRows, '#1c4587', '#e8f0fe');
+  row = writeSection_(sheet, row, "Today's Full Schedule", todayRows, '#1c4587', '#e8f0fe');
 
   sheet.autoResizeColumns(1, 6);
   sheet.setColumnWidth(1, 150);
@@ -75,7 +75,7 @@ function writeSection_(sheet, row, title, items, headerColor, bandColor) {
   row += 1;
 
   if (items.length === 0) {
-    sheet.getRange(row, 1).setValue('— none —').setFontStyle('italic').setFontColor('#999999');
+    sheet.getRange(row, 1).setValue(' - none - ').setFontStyle('italic').setFontColor('#999999');
     return row + 1;
   }
 

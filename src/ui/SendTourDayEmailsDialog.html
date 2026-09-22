@@ -16,7 +16,7 @@
 </head>
 <body>
   <p>Sends 3 rounds of email for the selected tour's confirmed assignments (from
-  "Staff This Tour…"): each participating ambassador gets their own schedule; each
+  "Staff This Tour..."): each participating ambassador gets their own schedule; each
   ambassador's teacher is told which student(s) they'll miss; each teacher receiving
   touring visitors is told how many to expect (no names).</p>
 
@@ -53,7 +53,7 @@
       const tourId = document.getElementById('tourId').value;
       btn.disabled = true;
       status.className = '';
-      status.textContent = 'Sending…';
+      status.textContent = 'Sending...';
 
       google.script.run
         .withSuccessHandler(function (result) {

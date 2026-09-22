@@ -2,7 +2,7 @@
  * Paste-to-import for the Ambassadors roster, so staff can update the
  * list themselves (e.g. a new master roster export) without editing code.
  *
- * Upserts by (Name, Borough) — not name alone — since the same student
+ * Upserts by (Name, Borough) - not name alone - since the same student
  * can legitimately appear twice under different boroughs (see Blake
  * Glenn). Re-pasting the same list is safe: matching rows are updated
  * in place (grade + parent info only; Teacher/Student Email/Active/Notes

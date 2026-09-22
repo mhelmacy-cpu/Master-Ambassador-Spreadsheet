@@ -37,7 +37,7 @@ function setupTeachersSheet_() {
   if (sheet.getLastRow() < 2) {
     const advisorNames = getAllAdvisorNames_();
     sheet.getRange(2, 1, advisorNames.length, 1).setValues(advisorNames.map(n => [n]));
-    sheet.getRange(2, 3, advisorNames.length, 1).setValue('Advisor — add email + room; from 2026-27 MS Homeroom/Advisories.');
+    sheet.getRange(2, 3, advisorNames.length, 1).setValue('Advisor - add email + room; from 2026-27 MS Homeroom/Advisories.');
   }
   sheet.autoResizeColumns(1, 3);
 }
@@ -70,8 +70,8 @@ function setupAmbassadorsSheet_() {
   sheet.getRange(1, colNum_(headers, 'Borough')).setNote(BOROUGH_LEGEND);
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Gender'), GENDER_OPTIONS, true);
   applyTeacherDropdown_(sheet, lastRow, colNum_(headers, 'Teacher'));
-  sheet.getRange(1, colNum_(headers, 'Total Tours')).setNote('Computed automatically — do not edit by hand. Refreshed whenever assignments change.');
-  sheet.getRange(1, colNum_(headers, 'Last Tour Date')).setNote('Computed automatically — do not edit by hand. Refreshed whenever assignments change.');
+  sheet.getRange(1, colNum_(headers, 'Total Tours')).setNote('Computed automatically - do not edit by hand. Refreshed whenever assignments change.');
+  sheet.getRange(1, colNum_(headers, 'Last Tour Date')).setNote('Computed automatically - do not edit by hand. Refreshed whenever assignments change.');
   sheet.autoResizeColumns(1, headers.length);
 }
 

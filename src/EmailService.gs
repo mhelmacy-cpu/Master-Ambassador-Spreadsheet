@@ -55,13 +55,13 @@ function sendWeeklyTeacherEmails() {
     if (!email) { skipped.push(teacher); return; }
 
     const items = byTeacher[teacher].sort((a, b) => a.start - b.start);
-    const rangeLabel = Utilities.formatDate(today, tz, 'MMM d') + ' – ' + Utilities.formatDate(new Date(rangeEnd.getTime() - 86400000), tz, 'MMM d');
-    const subject = 'Ambassador Schedule This Week (' + rangeLabel + ') — ' + teacher;
+    const rangeLabel = Utilities.formatDate(today, tz, 'MMM d') + ' - ' + Utilities.formatDate(new Date(rangeEnd.getTime() - 86400000), tz, 'MMM d');
+    const subject = 'Ambassador Schedule This Week (' + rangeLabel + ') - ' + teacher;
 
     const rowsHtml = items.map(it =>
       '<tr>' +
       '<td style="padding:4px 8px;border:1px solid #ddd;">' + formatDate_(it.date) + '</td>' +
-      '<td style="padding:4px 8px;border:1px solid #ddd;">' + formatTime_(it.start) + '–' + formatTime_(it.end) + '</td>' +
+      '<td style="padding:4px 8px;border:1px solid #ddd;">' + formatTime_(it.start) + '-' + formatTime_(it.end) + '</td>' +
       '<td style="padding:4px 8px;border:1px solid #ddd;">' + escapeHtml_(it.ambassador) + '</td>' +
       '<td style="padding:4px 8px;border:1px solid #ddd;">' + escapeHtml_(it.job) + '</td>' +
       '<td style="padding:4px 8px;border:1px solid #ddd;">' + escapeHtml_(it.tour) + '</td>' +
@@ -69,7 +69,7 @@ function sendWeeklyTeacherEmails() {
 
     const htmlBody =
       '<p>Hi ' + escapeHtml_(teacher) + ',</p>' +
-      '<p>Here is this week’s ambassador schedule for your student(s) at ' + escapeHtml_(schoolName) + '. ' +
+      "<p>Here is this week's ambassador schedule for your student(s) at " + escapeHtml_(schoolName) + '. ' +
       'Please expect them to step out of class at the times below.</p>' +
       '<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px;">' +
       '<tr style="background:#4a86e8;color:#fff;">' +

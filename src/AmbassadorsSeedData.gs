@@ -1,9 +1,9 @@
 /**
  * Real starter roster, parsed from the school's master ambassador list.
  * Each tuple: [Full Name, Grade, Borough, Parent 1 Name, Parent 1 Email,
- *              Parent 2 Name, Parent 2 Email, Notes (optional)]
+ * Parent 2 Name, Parent 2 Email, Notes (optional)]
  *
- * Blake Glenn intentionally appears twice (once per borough) — that's how
+ * Blake Glenn intentionally appears twice (once per borough) - that's how
  * the source list pairs him with tours from either borough, not a data
  * error.
  */
@@ -59,7 +59,7 @@ const AMBASSADOR_SEED_TUPLES_ = [
   ['Hannah Small', '8th', 'B', 'Lunie Small', 'lunie.small@gmail.com', 'Ramel Small', 'ramel.small36@gmail.com'],
   ['Lazer Grover-Scher', '8th', 'M', 'Allison Grover', 'algrover78@gmail.com', 'Susie Scher', 'susie.scher@mac.com'],
   ['Scarlett Zahedi', '8th', 'B', 'Amanda Field', 'amandakfield@gmail.com', 'Caveh Zahedi', 'cavehzahedi@gmail.com'],
-  ['Hal Cohen', '8th', 'M', 'Cristi Andrews', 'candrewscohen@gmail.com', 'David Oliver Cohen', 'davidolivercohen@gmail.com', 'Flagged "**" in the source list — meaning unspecified, check with the office.']
+  ['Hal Cohen', '8th', 'M', 'Cristi Andrews', 'candrewscohen@gmail.com', 'David Oliver Cohen', 'davidolivercohen@gmail.com', 'Flagged "**" in the source list - meaning unspecified, check with the office.']
 ];
 
 function buildAmbassadorSeedRows_() {

@@ -1,5 +1,5 @@
 /**
- * Assigning ambassadors to tours/jobs — the master schedule.
+ * Assigning ambassadors to tours/jobs - the master schedule.
  * Enforces: ambassador is Active, ambassador is Eligible for the job,
  * and no double-booking (overlapping time on the same date).
  */
@@ -50,7 +50,7 @@ function assignAmbassador(data) {
   });
   if (conflict) {
     throw new Error(data.ambassador + ' is already scheduled for ' +
-      formatTime_(conflict[aCols.start]) + '–' + formatTime_(conflict[aCols.end]) + ' that day.');
+      formatTime_(conflict[aCols.start]) + '-' + formatTime_(conflict[aCols.end]) + ' that day.');
   }
 
   const sheet = getOrCreateSheet(SHEETS.ASSIGNMENTS);

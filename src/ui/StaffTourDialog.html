@@ -38,7 +38,7 @@
     <h3>Table Greeter</h3>
     <select id="tableGreeter"></select>
 
-    <h3>Tour Guides <span class="hint">— 2 per touring student; at least one guide matches applying grade and (when possible) gender</span></h3>
+    <h3>Tour Guides <span class="hint"> - 2 per touring student; at least one guide matches applying grade and (when possible) gender</span></h3>
     <div id="guideRows"></div>
 
     <button type="button" id="confirmBtn">Confirm &amp; Save</button>
@@ -71,14 +71,14 @@
     function fillSelect(sel, alternates, chosen) {
       sel.innerHTML = '';
       if (!alternates || alternates.length === 0) {
-        sel.innerHTML = '<option value="">— no eligible/available ambassador —</option>';
+        sel.innerHTML = '<option value=""> - no eligible/available ambassador - </option>';
         sel.disabled = true;
         return;
       }
       sel.disabled = false;
       const blank = document.createElement('option');
       blank.value = '';
-      blank.textContent = '— none —';
+      blank.textContent = ' - none - ';
       sel.appendChild(blank);
       alternates.forEach(function (name) {
         const opt = document.createElement('option');
@@ -100,7 +100,7 @@
       const guideRows = document.getElementById('guideRows');
       guideRows.innerHTML = '';
       if (suggestion.tourGuides.length === 0) {
-        guideRows.innerHTML = '<p class="empty">No touring students added for this tour yet — add some via "Add Touring Student…" first.</p>';
+        guideRows.innerHTML = '<p class="empty">No touring students added for this tour yet - add some via "Add Touring Student..." first.</p>';
         return;
       }
       suggestion.tourGuides.forEach(function (g, i) {
@@ -108,7 +108,7 @@
         div.className = 'guide-row';
         div.innerHTML =
           '<div class="student-name">' + g.studentName +
-          (g.route ? ' <span class="hint">— Route ' + g.route + '</span>' : ' <span class="hint">— no route assigned</span>') +
+          (g.route ? ' <span class="hint"> - Route ' + g.route + '</span>' : ' <span class="hint"> - no route assigned</span>') +
           '</div>' +
           '<div class="row">' +
           '<div><label>Guide 1</label><select data-idx="' + i + '" data-slot="guide1"></select></div>' +
@@ -121,13 +121,13 @@
         const classDiv = document.createElement('div');
         if (g.classWith) {
           classDiv.className = 'class-visit' + (g.classOverCap ? ' warn' : '');
-          classDiv.textContent = 'Class visit: with ' + g.classWith.guide + '’s class (' +
-            g.classWith.pod + (g.classWith.teacher ? ' — ' + g.classWith.teacher : '') + ')' +
-            (g.classOverCap ? ' — already has 3+ visitors, rebalance by hand if needed' : '') +
-            '. Verify it isn’t PE, Music, or Choices before heading over.';
+          classDiv.textContent = 'Class visit: with ' + g.classWith.guide + "'s class (" +
+            g.classWith.pod + (g.classWith.teacher ? ' - ' + g.classWith.teacher : '') + ')' +
+            (g.classOverCap ? ' - already has 3+ visitors, rebalance by hand if needed' : '') +
+            ". Verify it isn't PE, Music, or Choices before heading over.";
         } else {
           classDiv.className = 'class-visit warn';
-          classDiv.textContent = 'No guide of this student’s applying grade was available — pick a class visit manually.';
+          classDiv.textContent = "No guide of this student's applying grade was available - pick a class visit manually.";
         }
         div.appendChild(classDiv);
       });
@@ -138,7 +138,7 @@
       const status = document.getElementById('status');
       if (!tourId) { status.className = 'error'; status.textContent = 'Choose a tour first.'; return; }
       status.className = '';
-      status.textContent = 'Working out the best fit…';
+      status.textContent = 'Working out the best fit...';
       document.getElementById('suggestBtn').disabled = true;
 
       google.script.run
@@ -164,7 +164,7 @@
       const btn = document.getElementById('confirmBtn');
       btn.disabled = true;
       status.className = '';
-      status.textContent = 'Saving…';
+      status.textContent = 'Saving...';
 
       const tourGuides = lastSuggestion.tourGuides.map(function (g, i) {
         const guide1Sel = document.querySelector('[data-idx="' + i + '"][data-slot="guide1"]');
@@ -188,8 +188,8 @@
           btn.disabled = false;
           let msg = 'Saved ' + result.created.length + ' assignment(s).';
           if (result.errors.length > 0) {
-            msg += '\n\nCouldn’t save ' + result.errors.length + ':\n' +
-              result.errors.map(function (e) { return '• ' + e.ambassador + ' (' + e.job + '): ' + e.message; }).join('\n');
+            msg += "\n\nCouldn't save " + result.errors.length + ':\n' +
+              result.errors.map(function (e) { return '- ' + e.ambassador + ' (' + e.job + '): ' + e.message; }).join('\n');
             status.className = 'error';
           } else {
             status.className = 'success';

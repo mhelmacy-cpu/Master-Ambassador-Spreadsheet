@@ -38,21 +38,21 @@
         <input type="text" id="grade" placeholder="e.g. 6th">
       </div>
       <div>
-        <label>Borough <span class="hint">— used to match a guide</span></label>
+        <label>Borough <span class="hint"> - used to match a guide</span></label>
         <select id="borough">
-          <option value="">—</option>
-          <option value="M">M — Manhattan</option>
-          <option value="B">B — Brooklyn</option>
-          <option value="Q">Q — Queens</option>
-          <option value="X">X — Bronx</option>
-          <option value="S">S — Staten Island</option>
-          <option value="J">J — New Jersey</option>
+          <option value=""> - </option>
+          <option value="M">M - Manhattan</option>
+          <option value="B">B - Brooklyn</option>
+          <option value="Q">Q - Queens</option>
+          <option value="X">X - Bronx</option>
+          <option value="S">S - Staten Island</option>
+          <option value="J">J - New Jersey</option>
         </select>
       </div>
       <div>
         <label>Gender</label>
         <select id="gender">
-          <option value="">—</option>
+          <option value=""> - </option>
           <option value="Female">Female</option>
           <option value="Male">Male</option>
           <option value="Non-binary">Non-binary</option>
@@ -61,7 +61,7 @@
       </div>
     </div>
 
-    <label>Route <span class="hint">— which of the 7 walking tours they're on; taken routes are disabled</span></label>
+    <label>Route <span class="hint"> - which of the 7 walking tours they're on; taken routes are disabled</span></label>
     <select id="route"></select>
 
     <label>Current School</label>
@@ -111,9 +111,9 @@
     function loadRoutes() {
       const tourId = document.getElementById('tourId').value;
       const sel = document.getElementById('route');
-      if (!tourId) { sel.innerHTML = '<option value="">—</option>'; return; }
+      if (!tourId) { sel.innerHTML = '<option value=""> - </option>'; return; }
       google.script.run.withSuccessHandler(function (availability) {
-        sel.innerHTML = '<option value="">—</option>';
+        sel.innerHTML = '<option value=""> - </option>';
         availability.forEach(function (a) {
           const opt = document.createElement('option');
           opt.value = a.route;
@@ -131,7 +131,7 @@
       const status = document.getElementById('status');
       btn.disabled = true;
       status.className = '';
-      status.textContent = 'Saving…';
+      status.textContent = 'Saving...';
 
       const data = {
         tourId: document.getElementById('tourId').value,

@@ -21,7 +21,7 @@
     <label>Tour *</label>
     <select id="tourId" required></select>
 
-    <label>Job <span class="hint">— only ambassadors marked eligible will be selectable</span></label>
+    <label>Job <span class="hint"> - only ambassadors marked eligible will be selectable</span></label>
     <select id="job" required></select>
 
     <div class="row">
@@ -41,7 +41,7 @@
       </div>
     </div>
 
-    <label>Ambassador * <span class="hint">— grayed out = already booked at that time</span></label>
+    <label>Ambassador * <span class="hint"> - grayed out = already booked at that time</span></label>
     <select id="ambassador" required></select>
 
     <label>Notes</label>
@@ -74,7 +74,7 @@
         const sel = document.getElementById('job');
         sel.innerHTML = '';
         if (jobs.length === 0) {
-          sel.innerHTML = '<option value="">No active jobs — add one on the Jobs sheet</option>';
+          sel.innerHTML = '<option value="">No active jobs - add one on the Jobs sheet</option>';
           return;
         }
         jobs.forEach(function (j) {
@@ -124,7 +124,7 @@
       const status = document.getElementById('status');
       btn.disabled = true;
       status.className = '';
-      status.textContent = 'Saving…';
+      status.textContent = 'Saving...';
 
       const data = {
         tourId: document.getElementById('tourId').value,

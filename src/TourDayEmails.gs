@@ -1,13 +1,13 @@
 /**
  * Per-tour emails, sent once a tour's Staff This Tour slate is
  * confirmed. Three separate audiences:
- *  A) Each participating ambassador — their own job(s)/time(s).
- *  B) Each ambassador's Teacher — which of their student(s) will be
- *     pulled out, when, for what job (same idea as the weekly digest,
- *     scoped to just this one tour).
- *  C) Each teacher whose class is receiving touring visitors (the
- *     grade-matched Tour Guide's own class, per the staffing algorithm)
- *     — just the headcount, no student names, per instruction.
+ * A) Each participating ambassador - their own job(s)/time(s).
+ * B) Each ambassador's Teacher - which of their student(s) will be
+ * pulled out, when, for what job (same idea as the weekly digest,
+ * scoped to just this one tour).
+ * C) Each teacher whose class is receiving touring visitors (the
+ * grade-matched Tour Guide's own class, per the staffing algorithm)
+ * - just the headcount, no student names, per instruction.
  */
 
 function sendTourDayEmails(tourId) {
@@ -30,7 +30,7 @@ function sendTourDayEmails(tourId) {
 
   const tourRows = rows.filter(r => r[cols.tourId] === tourId && String(r[cols.status]).trim() !== 'Cancelled');
   if (tourRows.length === 0) {
-    throw new Error('No assignments found for this tour yet — use "Staff This Tour…" first.');
+    throw new Error('No assignments found for this tour yet - use "Staff This Tour..." first.');
   }
 
   const schoolName = getSetting('School Name', 'Our School');
@@ -53,13 +53,13 @@ function sendTourDayEmails(tourId) {
     const email = ambassadorEmails[normalizeName_(name)];
     if (!email) { ambassadorsSkipped.push(name); return; }
     const items = byAmbassador[name].sort((a, b) => a[cols.start] - b[cols.start]);
-    const listHtml = items.map(r => '<li>' + escapeHtml_(r[cols.job]) + ' — ' +
-      formatTime_(r[cols.start]) + '–' + formatTime_(r[cols.end]) + '</li>').join('');
+    const listHtml = items.map(r => '<li>' + escapeHtml_(r[cols.job]) + ' - ' +
+      formatTime_(r[cols.start]) + '-' + formatTime_(r[cols.end]) + '</li>').join('');
     const html = '<p>Hi ' + escapeHtml_(String(name).split(' ')[0]) + ',</p>' +
-      '<p>You’re on the schedule for the tour on ' + dateLabel + ' at ' + escapeHtml_(schoolName) + ':</p>' +
+      "<p>You're on the schedule for the tour on " + dateLabel + ' at ' + escapeHtml_(schoolName) + ':</p>' +
       '<ul>' + listHtml + '</ul>' +
       '<p>Thanks for being an ambassador!<br>' + escapeHtml_(senderName) + '</p>';
-    MailApp.sendEmail({ to: email, subject: 'Your Tour Duty — ' + dateLabel, htmlBody: html, name: senderName });
+    MailApp.sendEmail({ to: email, subject: 'Your Tour Duty - ' + dateLabel, htmlBody: html, name: senderName });
     ambassadorsSent++;
   });
 
@@ -78,7 +78,7 @@ function sendTourDayEmails(tourId) {
     const items = byTeacher[teacher].sort((a, b) => a[cols.start] - b[cols.start]);
     const rowsHtml = items.map(r =>
       '<tr><td style="padding:4px 8px;border:1px solid #ddd;">' + escapeHtml_(r[cols.ambassador]) + '</td>' +
-      '<td style="padding:4px 8px;border:1px solid #ddd;">' + formatTime_(r[cols.start]) + '–' + formatTime_(r[cols.end]) + '</td>' +
+      '<td style="padding:4px 8px;border:1px solid #ddd;">' + formatTime_(r[cols.start]) + '-' + formatTime_(r[cols.end]) + '</td>' +
       '<td style="padding:4px 8px;border:1px solid #ddd;">' + escapeHtml_(r[cols.job]) + '</td></tr>').join('');
     const html = '<p>Hi ' + escapeHtml_(teacher) + ',</p>' +
       '<p>Your student(s) will be out for ambassador duty on ' + dateLabel + ':</p>' +
@@ -87,7 +87,7 @@ function sendTourDayEmails(tourId) {
       '<th style="padding:4px 8px;">Student</th><th style="padding:4px 8px;">Time</th><th style="padding:4px 8px;">Job</th></tr>' +
       rowsHtml + '</table>' +
       '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p>';
-    MailApp.sendEmail({ to: email, subject: 'Ambassador Duty Today — ' + dateLabel, htmlBody: html, name: senderName });
+    MailApp.sendEmail({ to: email, subject: 'Ambassador Duty Today - ' + dateLabel, htmlBody: html, name: senderName });
     teachersMissingSent++;
   });
 
@@ -132,11 +132,11 @@ function sendTourDayEmails(tourId) {
     if (!email) { receivingSkipped.push(teacher); return; }
     const count = receivingCounts[key];
     const html = '<p>Hi ' + escapeHtml_(teacher) + ',</p>' +
-      '<p>Heads up — expect ' + count + ' prospective student visitor' + (count === 1 ? '' : 's') +
-      ' sitting in on your class (' + escapeHtml_(pod) + ') during today’s tour, ' + dateLabel +
+      '<p>Heads up - expect ' + count + ' prospective student visitor' + (count === 1 ? '' : 's') +
+      " sitting in on your class (" + escapeHtml_(pod) + ") during today's tour, " + dateLabel +
       (tourEndLabel ? ' (wrapping up around ' + tourEndLabel + ')' : '') + '.</p>' +
       '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p>';
-    MailApp.sendEmail({ to: email, subject: 'Prospective Family Visit Today — ' + dateLabel, htmlBody: html, name: senderName });
+    MailApp.sendEmail({ to: email, subject: 'Prospective Family Visit Today - ' + dateLabel, htmlBody: html, name: senderName });
     receivingSent++;
   });
 

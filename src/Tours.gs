@@ -52,7 +52,7 @@ function listTours() {
     .filter(r => String(r[statusCol]).trim() !== 'Cancelled')
     .map(r => ({
       id: r[idCol],
-      label: r[idCol] + ' — ' + formatDate_(r[dateCol]) + ' — ' + r[groupCol]
+      label: r[idCol] + ' - ' + formatDate_(r[dateCol]) + ' - ' + r[groupCol]
     }))
     .sort((a, b) => a.id < b.id ? 1 : -1);
 }

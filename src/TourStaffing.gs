@@ -9,7 +9,7 @@
  * Tour Guide: 2 picks per touring student, ranked by grade fit + borough
  * fit, then fairness. Grade and Gender are hard constraints, not just
  * weighted scores: at least one of the 2 guides must be the exact same
- * grade as the grade the student is applying to (this is generalized —
+ * grade as the grade the student is applying to (this is generalized -
  * it isn't specific to any one grade), and at least one must match
  * Gender, whenever the eligible/available pool allows it. A single
  * guide covering both is preferred; otherwise the two constraints are
@@ -19,13 +19,13 @@
  * two guides picked without checking for at least one grade match and
  * at least one gender match first.
  *
- * The "bring visitors to class" step isn't a separately-computed room —
+ * The "bring visitors to class" step isn't a separately-computed room -
  * it's simply whichever guide covers the grade match, at wherever their
  * own class already is (their Homeroom Pod + Teacher). Up to 3 touring
  * students are steered toward the same class before spreading to
  * another one of that grade's classes; if there aren't enough
  * grade-matched guides to stay under that, it goes over rather than
- * leaving a student without a grade match — that's flagged for staff to
+ * leaving a student without a grade match - that's flagged for staff to
  * rebalance by hand.
  */
 
@@ -34,7 +34,7 @@ function suggestStaffingForTour(tourId) {
   if (!tour) throw new Error('Tour not found.');
   const dateVal = toDate_(tour.date);
   if (!dateVal || !tour.startTime || !tour.endTime) {
-    throw new Error('This tour is missing a date/start/end time — add one on the Tours sheet first.');
+    throw new Error('This tour is missing a date/start/end time - add one on the Tours sheet first.');
   }
   const start = combineDateAndTime_(dateVal, tour.startTime);
   const end = combineDateAndTime_(dateVal, tour.endTime);
@@ -102,7 +102,7 @@ function suggestStaffingForTour(tourId) {
     // allows it. A single guide covering both is preferred; otherwise
     // split the two constraints across guide1/guide2. Among grade
     // matches, prefer whichever one's class hasn't hit the 3-visitor
-    // cap yet — but never exclude someone just for being over it (the
+    // cap yet - but never exclude someone just for being over it (the
     // grade match is the hard constraint; the cap is a soft, rebalance-
     // it-by-hand preference).
     const gradeMatches = (s.grade != null ? ranked.filter(a => a.grade === s.grade) : [])
@@ -150,7 +150,7 @@ function suggestStaffingForTour(tourId) {
 
   return {
     tourId: tourId,
-    tourLabel: tour.group + ' — ' + formatDate_(dateVal) + ' ' + formatTime_(start) + '–' + formatTime_(end),
+    tourLabel: tour.group + ' - ' + formatDate_(dateVal) + ' ' + formatTime_(start) + '-' + formatTime_(end),
     singleRoles: singleRoles,
     tourGuides: tourGuides
   };
