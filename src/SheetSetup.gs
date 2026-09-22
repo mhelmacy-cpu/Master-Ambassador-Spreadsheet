@@ -13,6 +13,7 @@ function setupSpreadsheet() {
   setupAssignmentsSheet_();
   setupTeachersSheet_();
   setupSettingsSheet_();
+  syncAmbassadorHomerooms();
   rebuildEligibilityMatrix();
   refreshDashboard();
 
@@ -33,10 +34,9 @@ function setupSpreadsheet() {
 function setupTeachersSheet_() {
   const sheet = getOrCreateSheet(SHEETS.TEACHERS);
   if (sheet.getLastRow() < 2) {
-    sheet.getRange(2, 1, 2, 3).setValues([
-      ['Ms. Rivera', 'rivera@example.org', 'Room 12'],
-      ['Mr. Chen', 'chen@example.org', 'Room 8']
-    ]);
+    const advisorNames = getAllAdvisorNames_();
+    sheet.getRange(2, 1, advisorNames.length, 1).setValues(advisorNames.map(n => [n]));
+    sheet.getRange(2, 3, advisorNames.length, 1).setValue('Advisor — add email + room; from 2026-27 MS Homeroom/Advisories.');
   }
   sheet.autoResizeColumns(1, 3);
 }

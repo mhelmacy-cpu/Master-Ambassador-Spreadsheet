@@ -11,6 +11,7 @@ function onOpen() {
     .addItem('👩‍🎓 Add Touring Student…', 'showAddTouringStudentDialog')
     .addItem('🗓️ Assign Ambassador…', 'showAssignAmbassadorDialog')
     .addItem('📋 Import / Update Ambassadors…', 'showImportAmbassadorsDialog')
+    .addItem('🏫 Sync Homerooms / Advisors', 'syncAmbassadorHomeroomsFromMenu_')
     .addSeparator()
     .addItem('🔁 Rebuild Eligibility Matrix', 'rebuildEligibilityMatrix')
     .addItem('📍 Refresh Dashboard Now', 'refreshDashboard')

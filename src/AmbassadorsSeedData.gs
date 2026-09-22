@@ -32,7 +32,7 @@ const AMBASSADOR_SEED_TUPLES_ = [
   ['Emilio Hernandez', '6th', 'J', 'Luis Hernandez', 'lhernandez@lrei.org', 'Tasha Hernandez', 'thernandez@lrei.org'],
   ['Ama Bediako Whyte', '6th', 'Q', 'Afia Bediako', 'afiabe@gmail.com', '', ''],
   ['Michelle Denson', '6th', 'B', 'Annie Denson', 'annemariedenson@gmail.com', 'Lawrence Denson', 'lawrence.denson@gmail.com'],
-  ['Afia Twumasi', '6th', 'Q', 'Nana Serwah Adom', 'nana.adon11@gmail.com', 'Kwame Twumasi', 'twumasiakwame@gmail.com'],
+  ['Afia-Kusiwaa Twumasi', '6th', 'Q', 'Nana Serwah Adom', 'nana.adon11@gmail.com', 'Kwame Twumasi', 'twumasiakwame@gmail.com'],
   ['Blake Glenn', '6th', 'M', 'Paula Davis', 'Pauladavis018@gmail.com', 'William Glenn', 'wglenn31186@Gmail.com'],
   ['Reagan Rhau', '6th', 'B', 'Hernandez Rhau', 'hrhau@hotmail.com', 'Karen Rhau', 'karen.rhau@gmail.com'],
   ['Blake Glenn', '6th', 'B', 'Paula Davis', 'Pauladavis018@gmail.com', 'William Glenn', 'wglenn31186@Gmail.com'],
