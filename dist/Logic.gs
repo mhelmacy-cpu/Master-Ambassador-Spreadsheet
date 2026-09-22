@@ -1311,6 +1311,10 @@ const SEEDED_TEACHER_INITIALS_ = {
   'Carrie': 'CN',
   'Mo': 'MN',
   'Oliver': 'OC',
+  'Sherezada': 'SA',
+  'Momii': 'SMR',
+  'Suzanne': 'SC',
+  'Eliza': 'EZ',
   'Sharyn': 'M207',
   'Janet': 'M208',
   'Mary Katherine': 'M209'
@@ -1320,7 +1324,7 @@ const SEEDED_TEACHER_INITIALS_ = {
 const EXTRA_TEACHERS_ = [
   { name: 'Layla Alter', initials: 'LA', note: 'Choices.' },
   { name: 'Brian', initials: 'BR', note: 'PE.' },
-  { name: 'Lila', initials: '', note: "Maternity sub for Eliza - move Eliza's initials onto this row while she is covering." }
+  { name: 'Lila', initials: 'LL', note: "Subbing for Eliza (EZ) through the first half of the year; the schedule lists them together, so both are emailed." }
 ];
 
 const ROOM_CODE_ = /^(M\d{3}|L\d{3}|TSAC|PAPAS|Charlton|Thompson|Auditorium)$/;
