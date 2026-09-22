@@ -33,7 +33,7 @@ BUNDLES = {
     'Menu.gs': (
         'Menu wiring, the bridges the dialogs call, email sending, and\n'
         ' * the automatic triggers.',
-        ['Code.gs', 'EmailService.gs', 'TourDayEmails.gs', 'Triggers.gs'],
+        ['Code.gs', 'EmailService.gs', 'TourDayEmails.gs', 'LockerSlips.gs', 'Triggers.gs'],
     ),
 }
 

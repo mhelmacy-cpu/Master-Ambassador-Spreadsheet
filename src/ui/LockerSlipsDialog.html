@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #333; padding: 4px 8px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    select { width: 100%; box-sizing: border-box; padding: 6px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    button { margin-top: 16px; padding: 8px 16px; background: #4a86e8; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    button:disabled { background: #aaa; }
+    #status { margin-top: 10px; font-style: italic; white-space: pre-wrap; }
+    .error { color: #cc0000; }
+    .success { color: #137333; }
+    p { color: #555; }
+    ol { color: #555; padding-left: 20px; }
+  </style>
+</head>
+<body>
+  <p>Builds one slip per ambassador on the <b>Locker Slips</b> tab, saying what their
+  tour email says. Print that tab and cut along the lines.</p>
+
+  <form id="form">
+    <label>Tour *</label>
+    <select id="tourId" required></select>
+    <button type="submit" id="submitBtn">Build Slips</button>
+    <div id="status"></div>
+  </form>
+
+  <script>
+    function loadTours() {
+      google.script.run.withSuccessHandler(function (tours) {
+        const sel = document.getElementById('tourId');
+        sel.innerHTML = '';
+        if (tours.length === 0) {
+          sel.innerHTML = '<option value="">No tours scheduled yet</option>';
+          return;
+        }
+        tours.forEach(function (t) {
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.label;
+          sel.appendChild(opt);
+        });
+      }).api_getTours();
+    }
+    loadTours();
+
+    document.getElementById('form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const status = document.getElementById('status');
+      btn.disabled = true;
+      status.className = '';
+      status.textContent = 'Building...';
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          btn.disabled = false;
+          status.className = 'success';
+          status.innerHTML = 'Built ' + result.count + ' slip(s) for ' + result.date +
+            ' on the <b>Locker Slips</b> tab.<br><br>To print: open that tab, then ' +
+            'File - Print, set Print to <b>Current sheet</b>, and Scale to <b>Fit to width</b>.';
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false;
+          status.className = 'error';
+          status.textContent = err.message || String(err);
+        })
+        .api_buildLockerSlips(document.getElementById('tourId').value);
+    });
+  </script>
+</body>
+</html>

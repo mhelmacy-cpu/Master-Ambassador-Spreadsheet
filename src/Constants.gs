@@ -15,6 +15,7 @@ const SHEETS = {
   TEACHERS: 'Teachers',
   BELL_SCHEDULE: 'Bell Schedule',
   MEETINGS: 'Meetings',
+  LOCKER_SLIPS: 'Locker Slips',
   DASHBOARD: 'Dashboard',
   SETTINGS: 'Settings'
 };

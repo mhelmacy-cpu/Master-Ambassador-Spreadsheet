@@ -22,6 +22,7 @@ function onOpen() {
     .addItem('Refresh Dashboard Now', 'refreshDashboard')
     .addSeparator()
     .addItem('Send Tour Day Emails...', 'showSendTourDayEmailsDialog')
+    .addItem('Print Locker Slips...', 'showLockerSlipsDialog')
     .addItem('Send Weekly Teacher Emails Now', 'sendWeeklyTeacherEmailsFromMenu_')
     .addSubMenu(SpreadsheetApp.getUi().createMenu('Automation')
       .addItem('Turn ON weekly teacher emails', 'enableWeeklyEmailTrigger')
