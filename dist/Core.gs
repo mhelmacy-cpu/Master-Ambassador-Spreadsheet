@@ -272,7 +272,7 @@ function setupSpreadsheet() {
   // Order the tabs logically.
   const order = [SHEETS.DASHBOARD, SHEETS.TOURS, SHEETS.TOUR_ROUTES, SHEETS.TOURING_STUDENTS, SHEETS.ASSIGNMENTS,
     SHEETS.MEETINGS, SHEETS.AMBASSADORS, SHEETS.ELIGIBILITY, SHEETS.JOBS, SHEETS.TEACHERS,
-    SHEETS.BELL_SCHEDULE, SHEETS.SETTINGS];
+    SHEETS.BELL_SCHEDULE, SHEETS.LOCKER_SLIPS, SHEETS.SETTINGS];
   order.forEach((name, i) => {
     const sheet = ss_().getSheetByName(name);
     if (sheet) ss_().setActiveSheet(sheet).moveActiveSheet(i + 1);
