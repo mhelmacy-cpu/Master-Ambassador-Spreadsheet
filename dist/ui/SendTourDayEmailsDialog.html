@@ -59,11 +59,15 @@
         .withSuccessHandler(function (result) {
           btn.disabled = false;
           let msg = 'Ambassadors notified: ' + result.ambassadorsSent +
-            '\nTeachers (missing a student) notified: ' + result.teachersMissingSent +
+            '\nAdvisors notified: ' + result.teachersMissingSent +
+            '\nClass teachers (whose class they miss) notified: ' + result.classTeachersSent +
             '\nTeachers (receiving visitors) notified: ' + result.receivingSent;
           const problems = [];
           if (result.ambassadorsSkipped.length) problems.push('No Student Email on file: ' + result.ambassadorsSkipped.join(', '));
           if (result.teachersMissingSkipped.length) problems.push('No Teacher Email on file: ' + result.teachersMissingSkipped.join(', '));
+          if (result.classTeachersNeedsCheck && result.classTeachersNeedsCheck.length) {
+            problems.push('Needs your call (nobody emailed):\n  - ' + result.classTeachersNeedsCheck.join('\n  - '));
+          }
           if (result.receivingSkipped.length) problems.push('Receiving-class email(s) not sent: ' + result.receivingSkipped.join(', '));
           if (result.unmatchedStudents.length) problems.push('No grade-matched guide found for: ' + result.unmatchedStudents.join(', '));
           if (problems.length) {

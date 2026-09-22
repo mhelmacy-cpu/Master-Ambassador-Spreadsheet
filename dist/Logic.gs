@@ -1058,15 +1058,27 @@ function minutesToLabel_(mins) {
   return hh + ':' + String(mm).padStart(2, '0') + ' ' + ampm;
 }
 
-const SPLIT_MARKERS_ = ['French', 'Mandarin', 'Spanish', 'Majors', 'Electives',
-  'confirm which', 'Choices', 'unclear', 'verify'];
+const SUBJECT_WORDS_ = ['Hum', 'Math', 'Science', 'PE', 'Art', 'Music', 'Choices',
+  'French', 'Mandarin', 'Spanish'];
 
-/** True when the block names parallel groups instead of one definite class. */
+/**
+ * True when the block names parallel options rather than one class the
+ * whole pod attends together.
+ *
+ * A lettered section on its own ("Math A", "Music B") is not a split:
+ * each pod gets exactly one entry per time slot, so the letter says
+ * which section that pod attends, and there is one teacher to notify.
+ * What does make a block ambiguous is two or more different subjects in
+ * the same cell - the language choice, or a period where half the pod
+ * has Math and half has Humanities - plus the student-chosen blocks and
+ * anything the PDF transcription could not read.
+ */
 function isSplitBlock_(text) {
   const t = String(text || '');
-  if (SPLIT_MARKERS_.some(m => t.indexOf(m) !== -1)) return true;
-  // "Math A", "Science B", "Hum As" - a lettered section of a larger course.
-  return /\b(Math|Science|Hum|PE|Art|Music|Choices)\s+[ABC]s?\b/.test(t);
+  if (t.indexOf('Majors') !== -1 || t.indexOf('Electives') !== -1) return true;
+  if (t.indexOf('unclear from PDF') !== -1) return true;
+  const distinctSubjects = SUBJECT_WORDS_.filter(s => new RegExp('\\b' + s + '\\b').test(t));
+  return distinctSubjects.length >= 2;
 }
 
 /**
@@ -1075,13 +1087,18 @@ function isSplitBlock_(text) {
  */
 function getBellSchedule_() {
   const byDayPod = {};
-  const add = (day, pod, start, end, text) => {
+  const add = (day, pod, start, end, text, initials) => {
     const dayKey = String(day).trim();
     const podKey = String(pod).trim();
     if (!dayKey || !podKey) return;
     if (!byDayPod[dayKey]) byDayPod[dayKey] = {};
     if (!byDayPod[dayKey][podKey]) byDayPod[dayKey][podKey] = [];
-    byDayPod[dayKey][podKey].push({ start: start, end: end, text: text });
+    byDayPod[dayKey][podKey].push({
+      start: start,
+      end: end,
+      text: text,
+      initials: String(initials || '').split(',').map(s => s.trim()).filter(Boolean)
+    });
   };
 
   const sheet = ss_().getSheetByName(SHEETS.BELL_SCHEDULE);
@@ -1093,7 +1110,8 @@ function getBellSchedule_() {
     const startCol = colNum_(headers, 'Start') - 1;
     const endCol = colNum_(headers, 'End') - 1;
     const whatCol = colNum_(headers, 'What / Teacher / Room') - 1;
-    rows.forEach(r => add(r[dayCol], r[podCol], r[startCol], r[endCol], r[whatCol]));
+    const initialsCol = colNum_(headers, 'Teacher Initials') - 1;
+    rows.forEach(r => add(r[dayCol], r[podCol], r[startCol], r[endCol], r[whatCol], r[initialsCol]));
     return byDayPod;
   }
 
@@ -1197,6 +1215,139 @@ function scheduleMeeting(data) {
   sheet.getRange(lastRow, colNum_(headers, 'Classes Missed')).setWrap(true);
 
   return { meetingId: meetingId, lookup: lookup };
+}
+
+/* ==========================================================
+ * TeacherInitials
+ * ========================================================== */
+
+/**
+ * The bell schedule writes teachers as initials ("Math A CB M311"), so
+ * emailing the teacher whose class an ambassador is actually missing
+ * means resolving CB -> a person -> an address.
+ *
+ * Two halves:
+ * 1. Pulling the initials out of each schedule block, which happens once
+ *    at setup and lands in the Teacher Initials column so it can be
+ *    corrected by hand rather than re-guessed on every run.
+ * 2. Mapping initials to a teacher via the Initials column on the
+ *    Teachers sheet.
+ *
+ * Nothing here guesses at an unknown set of initials. An unresolved one
+ * is reported back to whoever sent the emails, so a teacher is never
+ * silently skipped.
+ */
+
+/** Initials known from the schedule PDF and confirmed by the office. */
+const SEEDED_TEACHER_INITIALS_ = {
+  'Chantilly': 'CB',
+  'Carrie': 'CN',
+  'Mo': 'MN',
+  'Oliver': 'OC',
+  'Sharyn': 'SHA',
+  'Janet': 'JAN',
+  'Mary Katherine': 'MK'
+};
+
+/** Rooms, not people - these look like initials but never are. */
+const NOT_INITIALS_ = /^(M\d{3}|L\d{3}|TSAC|PAPAS|Charlton|Thompson|Auditorium)$/;
+
+const SCHEDULE_WORDS_ = ['Hum', 'Math', 'Science', 'PE', 'Art', 'Music', 'Choices', 'Lunch', 'Recess',
+  'Morning', 'Homeroom', 'MS', 'Meeting', 'IWP', 'Majors', 'Electives', 'Affinity', 'Groups', 'Olympic',
+  'Teams', 'Dance', 'Drama', 'Instrumental', 'Portfolio', 'Vocal', 'Room', 'Modern', 'Band', 'Animation',
+  'Ensemble', 'Movement', 'Lab', 'Storytelling', 'Mix', 'Up', 'Ceramics', 'Photography', 'Production',
+  'French', 'Mandarin', 'Spanish', 'A', 'B', 'C', 'As', 'Bs', 'Cs', 'CAP', 'Period', 'Activity',
+  'unclear', 'from', 'PDF', 'verify', 'locally', 'long', 'block', 'student', 'choice', 'confirm', 'which'];
+
+/**
+ * Teacher initials inside one schedule block, e.g. "Hum As ES+SdB
+ * M107+M108" -> ['ES', 'SdB']. Co-taught blocks join them with + or /.
+ */
+function extractInitials_(text) {
+  const found = [];
+  String(text || '').split(/[\s(),:]+/).forEach(token => {
+    const trimmed = token.trim();
+    if (!trimmed || NOT_INITIALS_.test(trimmed) || SCHEDULE_WORDS_.indexOf(trimmed) !== -1) return;
+    trimmed.split(/[+\/]/).forEach(part => {
+      if (/^[A-Z][A-Za-z]{0,3}$/.test(part) &&
+          SCHEDULE_WORDS_.indexOf(part) === -1 &&
+          found.indexOf(part) === -1) {
+        found.push(part);
+      }
+    });
+  });
+  return found;
+}
+
+/** Map of initials -> {name, email} from the Teachers sheet. */
+function getTeacherByInitials_() {
+  const { rows } = readSheet(SHEETS.TEACHERS);
+  const headers = HEADERS[SHEETS.TEACHERS];
+  const nameCol = colNum_(headers, 'Teacher Name') - 1;
+  const initialsCol = colNum_(headers, 'Initials') - 1;
+  const emailCol = colNum_(headers, 'Teacher Email') - 1;
+
+  const map = {};
+  rows.forEach(r => {
+    const name = String(r[nameCol] || '').trim();
+    if (!name) return;
+    // One teacher can carry several sets of initials, comma separated.
+    String(r[initialsCol] || '').split(',').forEach(raw => {
+      const initials = raw.trim();
+      if (initials) map[initials.toUpperCase()] = { name: name, email: String(r[emailCol] || '').trim() };
+    });
+  });
+  return map;
+}
+
+/**
+ * Which class an ambassador is missing during a tour, and who teaches it.
+ *
+ * Returns {block, teachers: [{initials, name, email}], unresolved: [initials],
+ * ambiguous: bool}. Ambiguous means the block is a parallel-group period,
+ * so the teachers listed are candidates rather than one answer.
+ */
+function findMissedClass_(pod, dateVal, startMin, endMin) {
+  const dayName = WEEKDAY_NAMES_[dateVal.getDay()];
+  const schedule = getBellSchedule_();
+  const daySchedule = schedule[dayName];
+  if (!daySchedule || !daySchedule[pod]) return null;
+
+  const overlapping = daySchedule[pod]
+    .map(b => ({ b: b, s: timeToMinutes_(b.start), e: timeToMinutes_(b.end) }))
+    .filter(x => x.s != null && x.e != null && x.s < endMin && startMin < x.e)
+    .sort((x, y) => x.s - y.s);
+  if (overlapping.length === 0) return null;
+
+  const byInitials = getTeacherByInitials_();
+  const results = [];
+  overlapping.forEach(x => {
+    const text = x.b.text;
+    // Homeroom, lunch and recess have no class teacher to notify.
+    if (/Morning Homeroom|MS Meeting|Lunch|Recess|IWP/.test(text)) return;
+
+    const initialsList = x.b.initials && x.b.initials.length
+      ? x.b.initials
+      : extractInitials_(text);
+    const teachers = [];
+    const unresolved = [];
+    initialsList.forEach(i => {
+      const hit = byInitials[i.toUpperCase()];
+      if (hit && hit.email) teachers.push({ initials: i, name: hit.name, email: hit.email });
+      else unresolved.push(i);
+    });
+
+    results.push({
+      what: text,
+      start: minutesToLabel_(x.s),
+      end: minutesToLabel_(x.e),
+      teachers: teachers,
+      unresolved: unresolved,
+      ambiguous: isSplitBlock_(text)
+    });
+  });
+
+  return results.length ? results : null;
 }
 
 /* ==========================================================

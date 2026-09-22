@@ -37,12 +37,21 @@ function setupSpreadsheet() {
 
 function setupTeachersSheet_() {
   const sheet = getOrCreateSheet(SHEETS.TEACHERS);
+  const headers = HEADERS[SHEETS.TEACHERS];
   if (sheet.getLastRow() < 2) {
     const advisorNames = getAllAdvisorNames_();
     sheet.getRange(2, 1, advisorNames.length, 1).setValues(advisorNames.map(n => [n]));
-    sheet.getRange(2, 3, advisorNames.length, 1).setValue('Advisor - add email + room; from 2026-27 MS Homeroom/Advisories.');
+    sheet.getRange(2, colNum_(headers, 'Initials'), advisorNames.length, 1)
+      .setValues(advisorNames.map(n => [SEEDED_TEACHER_INITIALS_[n] || '']));
+    sheet.getRange(2, colNum_(headers, 'Room / Notes'), advisorNames.length, 1)
+      .setValue('Advisor - add email + room; from 2026-27 MS Homeroom/Advisories.');
   }
-  sheet.autoResizeColumns(1, 3);
+  sheet.getRange(1, colNum_(headers, 'Initials')).setNote(
+    'The initials this teacher appears under on the Bell Schedule (e.g. CB, LH, SdB).\n' +
+    'This is how the tool works out who teaches the class an ambassador is missing, ' +
+    'so a blank here means that teacher never gets a heads-up email.\n' +
+    'Several sets of initials for one person: separate with commas.');
+  sheet.autoResizeColumns(1, headers.length);
 }
 
 function setupJobsSheet_() {
@@ -129,14 +138,20 @@ function setupAssignmentsSheet_() {
 
 function setupBellScheduleSheet_() {
   const sheet = getOrCreateSheet(SHEETS.BELL_SCHEDULE);
+  const headers = HEADERS[SHEETS.BELL_SCHEDULE];
   if (sheet.getLastRow() < 2) {
-    const rows = buildBellScheduleRows_();
-    sheet.getRange(2, 1, rows.length, 5).setValues(rows);
-    sheet.getRange(1, 5).setNote('Auto-transcribed from the 2026-27 MS Schedule PDF. ' +
-      'Edit any row here to correct it - the meeting lookup reads this sheet, not the code.');
+    const rows = buildBellScheduleRows_().map(r => r.concat([extractInitials_(r[4]).join(', ')]));
+    sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+    sheet.getRange(1, colNum_(headers, 'What / Teacher / Room')).setNote(
+      'Auto-transcribed from the 2026-27 MS Schedule PDF. ' +
+      'Edit any row here to correct it - the lookups read this sheet, not the code.');
+    sheet.getRange(1, colNum_(headers, 'Teacher Initials')).setNote(
+      'Pulled out of the block text so it can be corrected by hand. ' +
+      'Match these against the Initials column on the Teachers sheet.');
   }
   sheet.autoResizeColumns(1, 4);
-  sheet.setColumnWidth(5, 420);
+  sheet.setColumnWidth(colNum_(headers, 'What / Teacher / Room'), 420);
+  sheet.autoResizeColumns(colNum_(headers, 'Teacher Initials'), 1);
 }
 
 function setupMeetingsSheet_() {

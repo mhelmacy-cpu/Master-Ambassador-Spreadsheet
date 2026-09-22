@@ -28,8 +28,8 @@ HEADERS[SHEETS.TOURS] = ['Tour ID', 'Date', 'Start Time', 'End Time', 'Visiting 
 HEADERS[SHEETS.TOUR_ROUTES] = ['Route', 'Direction', 'Humanities Teacher', 'Language', 'Itinerary'];
 HEADERS[SHEETS.TOURING_STUDENTS] = ['Tour ID', 'First Name', 'Last Name', 'Grade', 'Borough', 'Gender', 'Route', 'School', 'Allergies / Medical Notes', 'Chaperone Name', 'Chaperone Contact', 'Notes'];
 HEADERS[SHEETS.ASSIGNMENTS] = ['Assignment ID', 'Tour ID', 'Date', 'Start Time', 'End Time', 'Job', 'Ambassador', 'Ambassador Teacher', 'Touring Student', 'Status', 'Notes'];
-HEADERS[SHEETS.TEACHERS] = ['Teacher Name', 'Teacher Email', 'Room / Notes'];
-HEADERS[SHEETS.BELL_SCHEDULE] = ['Day', 'Homeroom Pod', 'Start', 'End', 'What / Teacher / Room'];
+HEADERS[SHEETS.TEACHERS] = ['Teacher Name', 'Initials', 'Teacher Email', 'Room / Notes'];
+HEADERS[SHEETS.BELL_SCHEDULE] = ['Day', 'Homeroom Pod', 'Start', 'End', 'What / Teacher / Room', 'Teacher Initials'];
 HEADERS[SHEETS.MEETINGS] = ['Meeting ID', 'Date', 'Start Time', 'End Time', 'Students', 'Purpose', 'Location', 'Classes Missed', 'Status', 'Notes'];
 HEADERS[SHEETS.SETTINGS] = ['Setting', 'Value'];
 

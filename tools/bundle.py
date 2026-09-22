@@ -28,7 +28,7 @@ BUNDLES = {
         'Everything that decides something: eligibility, scheduling,\n'
         ' * conflict checks, staffing suggestions, tallies, and the live dashboard.',
         ['Eligibility.gs', 'Tours.gs', 'TouringStudents.gs', 'Assignments.gs', 'AmbassadorStats.gs',
-         'TourStaffing.gs', 'HomeroomSync.gs', 'AmbassadorsImport.gs', 'StudentSchedule.gs', 'Dashboard.gs'],
+         'TourStaffing.gs', 'HomeroomSync.gs', 'AmbassadorsImport.gs', 'StudentSchedule.gs', 'TeacherInitials.gs', 'Dashboard.gs'],
     ),
     'Menu.gs': (
         'Menu wiring, the bridges the dialogs call, email sending, and\n'

@@ -91,6 +91,11 @@ function sendTourDayEmails(tourId) {
     teachersMissingSent++;
   });
 
+  // ---------- B2: the teacher whose class they are actually missing ----------
+  // The advisor round above is pastoral; this one is the class the student
+  // walks out of, worked out from their pod's bell schedule at the tour's time.
+  const classTeacherResult = sendMissedClassEmails_(tourRows, cols, ambassadorByName, dateLabel, senderName);
+
   // ---------- C: teachers receiving touring visitors (count only) ----------
   const touringStudents = listTouringStudentsForTour(tourId);
   const tsHeaders = HEADERS[SHEETS.TOURING_STUDENTS];
@@ -144,8 +149,88 @@ function sendTourDayEmails(tourId) {
     ambassadorsSent: ambassadorsSent, ambassadorsSkipped: ambassadorsSkipped,
     teachersMissingSent: teachersMissingSent, teachersMissingSkipped: teachersMissingSkipped,
     receivingSent: receivingSent, receivingSkipped: receivingSkipped,
-    unmatchedStudents: unmatchedStudents
+    unmatchedStudents: unmatchedStudents,
+    classTeachersSent: classTeacherResult.sent,
+    classTeachersNeedsCheck: classTeacherResult.needsCheck
   };
+}
+
+/**
+ * Emails the teacher whose class each ambassador walks out of, worked
+ * out from their pod's bell schedule at the tour's time.
+ *
+ * A parallel-group period (Math A/B/C, the language choice, Choices)
+ * has several possible teachers and the schedule never says which one
+ * this student has, so nobody is emailed on a guess - those come back
+ * in needsCheck for a human to forward. Same for initials with no
+ * matching row on the Teachers sheet.
+ */
+function sendMissedClassEmails_(tourRows, cols, ambassadorByName, dateLabel, senderName) {
+  const byTeacherEmail = {};   // email -> {name, students: [{student, what, start, end}]}
+  const needsCheck = [];
+
+  tourRows.forEach(r => {
+    const name = r[cols.ambassador];
+    const ambassador = ambassadorByName[normalizeName_(name)];
+    if (!ambassador || !ambassador.homeroomPod) return;
+
+    const dateVal = toDate_(r[cols.date]);
+    const startMin = timeToMinutes_(formatTime_(r[cols.start]));
+    const endMin = timeToMinutes_(formatTime_(r[cols.end]));
+    if (!dateVal || startMin == null || endMin == null) return;
+
+    const blocks = findMissedClass_(ambassador.homeroomPod, dateVal, startMin, endMin);
+    if (!blocks) return;
+
+    blocks.forEach(block => {
+      if (block.ambiguous) {
+        const options = block.teachers.map(t => t.name + ' (' + t.initials + ')')
+          .concat(block.unresolved.map(i => i + ' - not on the Teachers sheet'));
+        needsCheck.push(name + ' misses "' + block.what + '" (' + block.start + '-' + block.end +
+          '), which splits into parallel groups. Could be: ' +
+          (options.length ? options.join(' / ') : 'no teacher identified') +
+          '. Nobody was emailed - forward it yourself once you know which group they are in.');
+        return;
+      }
+      if (block.teachers.length === 0) {
+        needsCheck.push(name + ' misses "' + block.what + '" (' + block.start + '-' + block.end + ')' +
+          (block.unresolved.length
+            ? ', taught by ' + block.unresolved.join('/') + ' - add those initials and an email on the Teachers sheet.'
+            : ' - no teacher initials on that Bell Schedule row.'));
+        return;
+      }
+      block.teachers.forEach(t => {
+        if (!byTeacherEmail[t.email]) byTeacherEmail[t.email] = { name: t.name, students: [] };
+        byTeacherEmail[t.email].students.push({
+          student: name, what: block.what, start: block.start, end: block.end, job: r[cols.job]
+        });
+      });
+    });
+  });
+
+  let sent = 0;
+  Object.keys(byTeacherEmail).forEach(email => {
+    const entry = byTeacherEmail[email];
+    const rowsHtml = entry.students.map(s =>
+      '<tr><td style="padding:4px 8px;border:1px solid #ddd;">' + escapeHtml_(s.student) + '</td>' +
+      '<td style="padding:4px 8px;border:1px solid #ddd;">' + s.start + '-' + s.end + '</td>' +
+      '<td style="padding:4px 8px;border:1px solid #ddd;">' + escapeHtml_(s.what) + '</td>' +
+      '<td style="padding:4px 8px;border:1px solid #ddd;">' + escapeHtml_(s.job) + '</td></tr>').join('');
+    const html = '<p>Hi ' + escapeHtml_(entry.name) + ',</p>' +
+      '<p>The student(s) below will be out of your class on ' + dateLabel +
+      ' for a school tour:</p>' +
+      '<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px;">' +
+      '<tr style="background:#4a86e8;color:#fff;">' +
+      '<th style="padding:4px 8px;">Student</th><th style="padding:4px 8px;">Time</th>' +
+      '<th style="padding:4px 8px;">Class</th><th style="padding:4px 8px;">Tour Job</th></tr>' +
+      rowsHtml + '</table>' +
+      '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p>';
+    MailApp.sendEmail({ to: email, subject: 'Student Out of Your Class - ' + dateLabel,
+      htmlBody: html, name: senderName });
+    sent++;
+  });
+
+  return { sent: sent, needsCheck: needsCheck };
 }
 
 function getAmbassadorStudentEmailMap_() {

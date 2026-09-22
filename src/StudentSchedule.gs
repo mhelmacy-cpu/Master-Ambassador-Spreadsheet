@@ -57,15 +57,27 @@ function minutesToLabel_(mins) {
   return hh + ':' + String(mm).padStart(2, '0') + ' ' + ampm;
 }
 
-const SPLIT_MARKERS_ = ['French', 'Mandarin', 'Spanish', 'Majors', 'Electives',
-  'confirm which', 'Choices', 'unclear', 'verify'];
+const SUBJECT_WORDS_ = ['Hum', 'Math', 'Science', 'PE', 'Art', 'Music', 'Choices',
+  'French', 'Mandarin', 'Spanish'];
 
-/** True when the block names parallel groups instead of one definite class. */
+/**
+ * True when the block names parallel options rather than one class the
+ * whole pod attends together.
+ *
+ * A lettered section on its own ("Math A", "Music B") is not a split:
+ * each pod gets exactly one entry per time slot, so the letter says
+ * which section that pod attends, and there is one teacher to notify.
+ * What does make a block ambiguous is two or more different subjects in
+ * the same cell - the language choice, or a period where half the pod
+ * has Math and half has Humanities - plus the student-chosen blocks and
+ * anything the PDF transcription could not read.
+ */
 function isSplitBlock_(text) {
   const t = String(text || '');
-  if (SPLIT_MARKERS_.some(m => t.indexOf(m) !== -1)) return true;
-  // "Math A", "Science B", "Hum As" - a lettered section of a larger course.
-  return /\b(Math|Science|Hum|PE|Art|Music|Choices)\s+[ABC]s?\b/.test(t);
+  if (t.indexOf('Majors') !== -1 || t.indexOf('Electives') !== -1) return true;
+  if (t.indexOf('unclear from PDF') !== -1) return true;
+  const distinctSubjects = SUBJECT_WORDS_.filter(s => new RegExp('\\b' + s + '\\b').test(t));
+  return distinctSubjects.length >= 2;
 }
 
 /**
@@ -74,13 +86,18 @@ function isSplitBlock_(text) {
  */
 function getBellSchedule_() {
   const byDayPod = {};
-  const add = (day, pod, start, end, text) => {
+  const add = (day, pod, start, end, text, initials) => {
     const dayKey = String(day).trim();
     const podKey = String(pod).trim();
     if (!dayKey || !podKey) return;
     if (!byDayPod[dayKey]) byDayPod[dayKey] = {};
     if (!byDayPod[dayKey][podKey]) byDayPod[dayKey][podKey] = [];
-    byDayPod[dayKey][podKey].push({ start: start, end: end, text: text });
+    byDayPod[dayKey][podKey].push({
+      start: start,
+      end: end,
+      text: text,
+      initials: String(initials || '').split(',').map(s => s.trim()).filter(Boolean)
+    });
   };
 
   const sheet = ss_().getSheetByName(SHEETS.BELL_SCHEDULE);
@@ -92,7 +109,8 @@ function getBellSchedule_() {
     const startCol = colNum_(headers, 'Start') - 1;
     const endCol = colNum_(headers, 'End') - 1;
     const whatCol = colNum_(headers, 'What / Teacher / Room') - 1;
-    rows.forEach(r => add(r[dayCol], r[podCol], r[startCol], r[endCol], r[whatCol]));
+    const initialsCol = colNum_(headers, 'Teacher Initials') - 1;
+    rows.forEach(r => add(r[dayCol], r[podCol], r[startCol], r[endCol], r[whatCol], r[initialsCol]));
     return byDayPod;
   }
 
