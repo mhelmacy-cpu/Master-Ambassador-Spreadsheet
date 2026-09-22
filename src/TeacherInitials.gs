@@ -15,36 +15,70 @@
  * silently skipped.
  */
 
-/** Initials known from the schedule PDF and confirmed by the office. */
+/**
+ * Initials confirmed by the office, keyed by the name on the Teachers
+ * sheet. The World Language teachers are keyed by room instead: those
+ * blocks print as "French - M207 Mandarin - M208 Spanish - M209" with
+ * no initials at all, so the room is the only handle on who teaches it.
+ */
 const SEEDED_TEACHER_INITIALS_ = {
+  'Chris': 'CK',
+  'Molly': 'MD',
+  'Amanda': 'AG',
+  'Dan': 'DR',
+  'Marco': 'MS',
+  'Luis': 'LH',
+  'Elizabeth': 'ES',
+  'Sabrina': 'SdB',
   'Chantilly': 'CB',
   'Carrie': 'CN',
   'Mo': 'MN',
   'Oliver': 'OC',
-  'Sharyn': 'SHA',
-  'Janet': 'JAN',
-  'Mary Katherine': 'MK'
+  'Sharyn': 'M207',
+  'Janet': 'M208',
+  'Mary Katherine': 'M209'
 };
 
-/** Rooms, not people - these look like initials but never are. */
-const NOT_INITIALS_ = /^(M\d{3}|L\d{3}|TSAC|PAPAS|Charlton|Thompson|Auditorium)$/;
+/** Teachers who run classes but do not hold an advisory, so aren't on the roster. */
+const EXTRA_TEACHERS_ = [
+  { name: 'Layla Alter', initials: 'LA', note: 'Choices.' },
+  { name: 'Brian', initials: 'BR', note: 'PE.' },
+  { name: 'Lila', initials: '', note: "Maternity sub for Eliza - move Eliza's initials onto this row while she is covering." }
+];
 
+const ROOM_CODE_ = /^(M\d{3}|L\d{3}|TSAC|PAPAS|Charlton|Thompson|Auditorium)$/;
+
+// "MS" is deliberately absent - it is Marco Sanchez. The "MS Meeting"
+// banner is skipped by phrase where blocks are read, not by dropping the
+// token here, which would lose every class he teaches.
 const SCHEDULE_WORDS_ = ['Hum', 'Math', 'Science', 'PE', 'Art', 'Music', 'Choices', 'Lunch', 'Recess',
-  'Morning', 'Homeroom', 'MS', 'Meeting', 'IWP', 'Majors', 'Electives', 'Affinity', 'Groups', 'Olympic',
+  'Morning', 'Homeroom', 'Meeting', 'IWP', 'Majors', 'Electives', 'Affinity', 'Groups', 'Olympic',
   'Teams', 'Dance', 'Drama', 'Instrumental', 'Portfolio', 'Vocal', 'Room', 'Modern', 'Band', 'Animation',
   'Ensemble', 'Movement', 'Lab', 'Storytelling', 'Mix', 'Up', 'Ceramics', 'Photography', 'Production',
   'French', 'Mandarin', 'Spanish', 'A', 'B', 'C', 'As', 'Bs', 'Cs', 'CAP', 'Period', 'Activity',
   'unclear', 'from', 'PDF', 'verify', 'locally', 'long', 'block', 'student', 'choice', 'confirm', 'which'];
 
+/** Room codes in a block, e.g. "Hum As ES+SdB M107 M108" -> ['M107', 'M108']. */
+function extractRooms_(text) {
+  const found = [];
+  String(text || '').split(/[\s(),:+\/]+/).forEach(token => {
+    const t = token.trim();
+    if (ROOM_CODE_.test(t) && found.indexOf(t) === -1) found.push(t);
+  });
+  return found;
+}
+
 /**
- * Teacher initials inside one schedule block, e.g. "Hum As ES+SdB
- * M107+M108" -> ['ES', 'SdB']. Co-taught blocks join them with + or /.
+ * Teacher handles for one schedule block: initials where the block has
+ * them, falling back to room codes where it doesn't. World Language is
+ * the reason for the fallback - those blocks name three rooms and no
+ * people, so the room is what identifies the teacher.
  */
 function extractInitials_(text) {
   const found = [];
   String(text || '').split(/[\s(),:]+/).forEach(token => {
     const trimmed = token.trim();
-    if (!trimmed || NOT_INITIALS_.test(trimmed) || SCHEDULE_WORDS_.indexOf(trimmed) !== -1) return;
+    if (!trimmed || ROOM_CODE_.test(trimmed) || SCHEDULE_WORDS_.indexOf(trimmed) !== -1) return;
     trimmed.split(/[+\/]/).forEach(part => {
       if (/^[A-Z][A-Za-z]{0,3}$/.test(part) &&
           SCHEDULE_WORDS_.indexOf(part) === -1 &&
@@ -53,7 +87,7 @@ function extractInitials_(text) {
       }
     });
   });
-  return found;
+  return found.length ? found : extractRooms_(text);
 }
 
 /** Map of initials -> {name, email} from the Teachers sheet. */

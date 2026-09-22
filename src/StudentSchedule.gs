@@ -65,19 +65,25 @@ const SUBJECT_WORDS_ = ['Hum', 'Math', 'Science', 'PE', 'Art', 'Music', 'Choices
  * whole pod attends together.
  *
  * A lettered section on its own ("Math A", "Music B") is not a split:
- * each pod gets exactly one entry per time slot, so the letter says
- * which section that pod attends, and there is one teacher to notify.
- * What does make a block ambiguous is two or more different subjects in
- * the same cell - the language choice, or a period where half the pod
- * has Math and half has Humanities - plus the student-chosen blocks and
- * anything the PDF transcription could not read.
+ * each pod gets one entry per time slot, so the letter says which
+ * section that pod attends and there is a single teacher to notify.
+ *
+ * Several teachers can mean either thing, and the rooms tell them apart.
+ * Two teachers in one room ("Science A LL/EZ M307") are co-teaching one
+ * class, so both should hear about it. Two teachers across two rooms
+ * ("Hum As ES+SdB M107 M108") are separate sections running at the same
+ * time, and nothing here says which one a given student sits in.
+ *
+ * Also ambiguous: two different subjects in one cell, the student-chosen
+ * blocks, and anything the PDF transcription could not read.
  */
 function isSplitBlock_(text) {
   const t = String(text || '');
   if (t.indexOf('Majors') !== -1 || t.indexOf('Electives') !== -1) return true;
   if (t.indexOf('unclear from PDF') !== -1) return true;
   const distinctSubjects = SUBJECT_WORDS_.filter(s => new RegExp('\\b' + s + '\\b').test(t));
-  return distinctSubjects.length >= 2;
+  if (distinctSubjects.length >= 2) return true;
+  return extractInitials_(t).length >= 2 && extractRooms_(t).length >= 2;
 }
 
 /**

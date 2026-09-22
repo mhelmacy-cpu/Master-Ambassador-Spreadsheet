@@ -268,12 +268,13 @@ function setupTeachersSheet_() {
   const sheet = getOrCreateSheet(SHEETS.TEACHERS);
   const headers = HEADERS[SHEETS.TEACHERS];
   if (sheet.getLastRow() < 2) {
-    const advisorNames = getAllAdvisorNames_();
-    sheet.getRange(2, 1, advisorNames.length, 1).setValues(advisorNames.map(n => [n]));
-    sheet.getRange(2, colNum_(headers, 'Initials'), advisorNames.length, 1)
-      .setValues(advisorNames.map(n => [SEEDED_TEACHER_INITIALS_[n] || '']));
-    sheet.getRange(2, colNum_(headers, 'Room / Notes'), advisorNames.length, 1)
-      .setValue('Advisor - add email + room; from 2026-27 MS Homeroom/Advisories.');
+    const rows = getAllAdvisorNames_().map(n => [
+      n,
+      SEEDED_TEACHER_INITIALS_[n] || '',
+      '',
+      'Advisor - add email + room; from 2026-27 MS Homeroom/Advisories.'
+    ]).concat(EXTRA_TEACHERS_.map(t => [t.name, t.initials, '', t.note + ' Teaches but holds no advisory.']));
+    sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
   }
   sheet.getRange(1, colNum_(headers, 'Initials')).setNote(
     'The initials this teacher appears under on the Bell Schedule (e.g. CB, LH, SdB).\n' +
