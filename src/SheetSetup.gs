@@ -13,6 +13,8 @@ function setupSpreadsheet() {
   setupTouringStudentsSheet_();
   setupAssignmentsSheet_();
   setupTeachersSheet_();
+  setupBellScheduleSheet_();
+  setupMeetingsSheet_();
   setupSettingsSheet_();
   syncAmbassadorHomerooms();
   rebuildEligibilityMatrix();
@@ -20,7 +22,8 @@ function setupSpreadsheet() {
 
   // Order the tabs logically.
   const order = [SHEETS.DASHBOARD, SHEETS.TOURS, SHEETS.TOUR_ROUTES, SHEETS.TOURING_STUDENTS, SHEETS.ASSIGNMENTS,
-    SHEETS.AMBASSADORS, SHEETS.ELIGIBILITY, SHEETS.JOBS, SHEETS.TEACHERS, SHEETS.SETTINGS];
+    SHEETS.MEETINGS, SHEETS.AMBASSADORS, SHEETS.ELIGIBILITY, SHEETS.JOBS, SHEETS.TEACHERS,
+    SHEETS.BELL_SCHEDULE, SHEETS.SETTINGS];
   order.forEach((name, i) => {
     const sheet = ss_().getSheetByName(name);
     if (sheet) ss_().setActiveSheet(sheet).moveActiveSheet(i + 1);
@@ -117,6 +120,30 @@ function setupAssignmentsSheet_() {
   applyTimeFormat_(sheet, lastRow, colNum_(headers, 'End Time'));
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Status'), ASSIGNMENT_STATUSES);
   sheet.autoResizeColumns(1, headers.length);
+}
+
+function setupBellScheduleSheet_() {
+  const sheet = getOrCreateSheet(SHEETS.BELL_SCHEDULE);
+  if (sheet.getLastRow() < 2) {
+    const rows = buildBellScheduleRows_();
+    sheet.getRange(2, 1, rows.length, 5).setValues(rows);
+    sheet.getRange(1, 5).setNote('Auto-transcribed from the 2026-27 MS Schedule PDF. ' +
+      'Edit any row here to correct it - the meeting lookup reads this sheet, not the code.');
+  }
+  sheet.autoResizeColumns(1, 4);
+  sheet.setColumnWidth(5, 420);
+}
+
+function setupMeetingsSheet_() {
+  const sheet = getOrCreateSheet(SHEETS.MEETINGS);
+  const headers = HEADERS[SHEETS.MEETINGS];
+  const lastRow = Math.max(sheet.getLastRow(), 2);
+  applyDateFormat_(sheet, lastRow, colNum_(headers, 'Date'));
+  applyTimeFormat_(sheet, lastRow, colNum_(headers, 'Start Time'));
+  applyTimeFormat_(sheet, lastRow, colNum_(headers, 'End Time'));
+  applyDropdown_(sheet, lastRow, colNum_(headers, 'Status'), TOUR_STATUSES);
+  sheet.autoResizeColumns(1, headers.length);
+  sheet.setColumnWidth(colNum_(headers, 'Classes Missed'), 320);
 }
 
 function setupSettingsSheet_() {

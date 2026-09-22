@@ -12,6 +12,9 @@ function onOpen() {
     .addItem('Add Touring Student...', 'showAddTouringStudentDialog')
     .addItem('Assign Ambassador...', 'showAssignAmbassadorDialog')
     .addItem('Staff This Tour...', 'showStaffTourDialog')
+    .addSeparator()
+    .addItem('Schedule a Meeting with Student(s)...', 'showScheduleMeetingDialog')
+    .addSeparator()
     .addItem('Import / Update Ambassadors...', 'showImportAmbassadorsDialog')
     .addItem('Sync Homerooms / Advisors', 'syncAmbassadorHomeroomsFromMenu_')
     .addSeparator()
@@ -55,6 +58,10 @@ function showStaffTourDialog() {
 
 function showSendTourDayEmailsDialog() {
   showDialog_('ui/SendTourDayEmailsDialog', 'Send Tour Day Emails', 520, 420);
+}
+
+function showScheduleMeetingDialog() {
+  showDialog_('ui/ScheduleMeetingDialog', 'Schedule a Meeting with Student(s)', 620, 640);
 }
 
 /* ---- Data providers for the dialogs (google.script.run) ---- */
@@ -109,4 +116,16 @@ function api_generateWednesdayTours(startDateStr, weeks) {
 
 function api_sendTourDayEmails(tourId) {
   return sendTourDayEmails(tourId);
+}
+
+function api_getAllMsStudents() {
+  return getAllMsStudents();
+}
+
+function api_lookupStudentsAtTime(studentNames, dateStr, startTime, endTime) {
+  return lookupStudentsAtTime(studentNames, dateStr, startTime, endTime);
+}
+
+function api_scheduleMeeting(data) {
+  return scheduleMeeting(data);
 }
