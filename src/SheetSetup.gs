@@ -9,6 +9,7 @@ function setupSpreadsheet() {
   setupAmbassadorsSheet_();
   setupJobsSheet_();
   setupToursSheet_();
+  setupTourRoutesSheet_();
   setupTouringStudentsSheet_();
   setupAssignmentsSheet_();
   setupTeachersSheet_();
@@ -18,7 +19,7 @@ function setupSpreadsheet() {
   refreshDashboard();
 
   // Order the tabs logically.
-  const order = [SHEETS.DASHBOARD, SHEETS.TOURS, SHEETS.TOURING_STUDENTS, SHEETS.ASSIGNMENTS,
+  const order = [SHEETS.DASHBOARD, SHEETS.TOURS, SHEETS.TOUR_ROUTES, SHEETS.TOURING_STUDENTS, SHEETS.ASSIGNMENTS,
     SHEETS.AMBASSADORS, SHEETS.ELIGIBILITY, SHEETS.JOBS, SHEETS.TEACHERS, SHEETS.SETTINGS];
   order.forEach((name, i) => {
     const sheet = ss_().getSheetByName(name);
@@ -85,12 +86,25 @@ function setupToursSheet_() {
   sheet.autoResizeColumns(1, headers.length);
 }
 
+function setupTourRoutesSheet_() {
+  const sheet = getOrCreateSheet(SHEETS.TOUR_ROUTES);
+  if (sheet.getLastRow() < 2) {
+    const rows = TOUR_ROUTE_SEED_.map(r => [r.route, r.direction, r.humanities, r.language, r.itinerary]);
+    sheet.getRange(2, 1, rows.length, 5).setValues(rows);
+    sheet.getRange(2, 5, rows.length, 1).setWrap(true).setVerticalAlignment('top');
+    sheet.setRowHeights(2, rows.length, 180);
+    sheet.setColumnWidth(5, 500);
+  }
+  sheet.autoResizeColumns(1, 4);
+}
+
 function setupTouringStudentsSheet_() {
   const sheet = getOrCreateSheet(SHEETS.TOURING_STUDENTS);
   const headers = HEADERS[SHEETS.TOURING_STUDENTS];
   const lastRow = Math.max(sheet.getLastRow(), 2);
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Borough'), BOROUGH_CODES, true);
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Gender'), GENDER_OPTIONS, true);
+  applyDropdown_(sheet, lastRow, colNum_(headers, 'Route'), TOUR_ROUTE_NUMBERS, true);
   sheet.autoResizeColumns(1, headers.length);
 }
 

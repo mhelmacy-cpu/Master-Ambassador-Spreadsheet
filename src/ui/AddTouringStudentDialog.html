@@ -61,6 +61,9 @@
       </div>
     </div>
 
+    <label>Route <span class="hint">— which of the 7 walking tours they're on; taken routes are disabled</span></label>
+    <select id="route"></select>
+
     <label>Current School</label>
     <input type="text" id="school">
 
@@ -100,9 +103,27 @@
           opt.textContent = t.label;
           sel.appendChild(opt);
         });
+        loadRoutes();
       }).api_getTours();
     }
     loadTours();
+
+    function loadRoutes() {
+      const tourId = document.getElementById('tourId').value;
+      const sel = document.getElementById('route');
+      if (!tourId) { sel.innerHTML = '<option value="">—</option>'; return; }
+      google.script.run.withSuccessHandler(function (availability) {
+        sel.innerHTML = '<option value="">—</option>';
+        availability.forEach(function (a) {
+          const opt = document.createElement('option');
+          opt.value = a.route;
+          opt.textContent = 'Route ' + a.route + (a.taken ? ' (taken by ' + a.takenBy + ')' : '');
+          opt.disabled = a.taken;
+          sel.appendChild(opt);
+        });
+      }).api_getRouteAvailability(tourId);
+    }
+    document.getElementById('tourId').addEventListener('change', loadRoutes);
 
     document.getElementById('form').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -119,6 +140,7 @@
         grade: document.getElementById('grade').value,
         borough: document.getElementById('borough').value,
         gender: document.getElementById('gender').value,
+        route: document.getElementById('route').value,
         school: document.getElementById('school').value,
         medicalNotes: document.getElementById('medicalNotes').value,
         chaperoneName: document.getElementById('chaperoneName').value,

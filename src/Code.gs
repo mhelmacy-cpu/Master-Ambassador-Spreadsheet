@@ -8,6 +8,7 @@ function onOpen() {
     .addItem('▶️ First-Time Setup', 'setupSpreadsheet')
     .addSeparator()
     .addItem('➕ Schedule a Tour…', 'showAddTourDialog')
+    .addItem('📆 Generate Wednesday Tours…', 'showGenerateWednesdayToursDialog')
     .addItem('👩‍🎓 Add Touring Student…', 'showAddTouringStudentDialog')
     .addItem('🗓️ Assign Ambassador…', 'showAssignAmbassadorDialog')
     .addItem('🧑‍🤝‍🧑 Staff This Tour…', 'showStaffTourDialog')
@@ -29,6 +30,10 @@ function onOpen() {
 
 function showAddTourDialog() {
   showDialog_('ui/AddTourDialog', 'Schedule a Tour', 480, 520);
+}
+
+function showGenerateWednesdayToursDialog() {
+  showDialog_('ui/GenerateWednesdayToursDialog', 'Generate Wednesday Tours', 460, 380);
 }
 
 function showAddTouringStudentDialog() {
@@ -87,4 +92,12 @@ function api_suggestStaffingForTour(tourId) {
 
 function api_confirmTourStaffing(tourId, selections) {
   return confirmTourStaffing(tourId, selections);
+}
+
+function api_getRouteAvailability(tourId) {
+  return getRouteAvailability(tourId);
+}
+
+function api_generateWednesdayTours(startDateStr, weeks) {
+  return generateWednesdayTours(startDateStr, weeks);
 }

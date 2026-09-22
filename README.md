@@ -3,8 +3,11 @@
 A Google Apps Script app, bound to a Google Sheet, for running a school's
 visitor-tour and student-ambassador program end to end:
 
-- **Schedule tours** from prospective families / visiting groups.
-- **Record touring-student info** (name, grade, school, allergies, chaperone).
+- **Schedule tours** from prospective families / visiting groups — including
+  a one-click generator for the recurring Wednesday-morning tour slate.
+- **Record touring-student info** (name, grade, borough, gender, school,
+  allergies, chaperone) and assign each one of the 7 fixed walking **Tour
+  Routes**, so no two families collide on the same path at the same time.
 - **Assign student ambassadors** to jobs on those tours — only ambassadors
   who are marked **Active** and **Eligible** for that job are selectable,
   and the tool blocks double-booking.
@@ -36,7 +39,8 @@ Google Sheet (two options: paste into the Apps Script editor, or push with
 |---|---|
 | **Dashboard** | Auto-generated, read-only live view. Don't edit by hand — it's rebuilt on every refresh. |
 | **Tours** | One row per scheduled visit/tour. |
-| **Touring Students** | Visiting students tied to a Tour ID. |
+| **Tour Routes** | Reference sheet: the 7 fixed walking routes (direction, Humanities teacher, language stop, full stop-by-stop itinerary), all running 8:30-9:25. Not edited day-to-day. |
+| **Touring Students** | Visiting students tied to a Tour ID, each optionally assigned one of the 7 Routes (blocked from double-booking a route on the same tour). |
 | **Assignments** | The master schedule: which ambassador is doing which job, for which tour, when. |
 | **Ambassadors** | Your roster of student ambassadors (name, grade, homeroom pod, borough, gender, both parents' contact info, teacher/advisor, active status, and auto-computed Total Tours / Last Tour Date). Ships pre-seeded with the current roster. |
 | **Eligibility** | Checkbox matrix: ambassador rows × job columns. |
@@ -50,6 +54,7 @@ Opening the spreadsheet adds a **🎓 Tour & Ambassador Scheduler** menu with:
 
 - **First-Time Setup** — creates every sheet, headers, dropdowns, and sample rows. Safe to re-run any time.
 - **Schedule a Tour…**, **Add Touring Student…**, **Assign Ambassador…** — form dialogs, so staff never has to hand-edit raw rows.
+- **Generate Wednesday Tours…** — bulk-creates recurring Wednesday-morning tours (8:30-9:25, matching the Tour Routes schedule) for however many weeks you ask for, starting from a given date (default 9/30). Rolls a non-Wednesday date forward and skips any week that already has a tour, so it's safe to re-run.
 - **Staff This Tour…** — pick a tour and it suggests one Panelist, one Lobby Greeter, one Table Greeter, and (for every touring student added to that tour) 2 Tour Guides each. Every dropdown is editable before you click Confirm & Save — nothing is written until you do. See **Staffing algorithm** below for exactly how picks are ranked.
 - **Sync Homerooms / Advisors** — re-matches Ambassadors against the official Homeroom/Advisories roster (`HOMEROOM_DATA_` in `HomeroomSeedData.gs`) by name, refreshing Grade/Homeroom Pod/Teacher. Re-run it after pasting in a new year's roster data. A student who was 8th grade and no longer matches is assumed to have graduated Middle School and is marked Inactive with a note — check and undo if that's wrong.
 - **Import / Update Ambassadors…** — paste a roster (Name, Grade, Borough, Parent 1 Name/Email, Parent 2 Name/Email — tab- or comma-separated, straight out of a spreadsheet) and it upserts the Ambassadors sheet. Matches on name **and** borough, since a student can legitimately have two rows (one per borough they're paired with). Fields you've hand-set per student — Teacher, Student Email, Active, Notes — are never overwritten by an import.
@@ -98,7 +103,11 @@ Tour…** always shows an editable slate first, and only writes to
 Assignments when you click Confirm & Save. If a suggested pick turns out
 to conflict with something saved after the suggestion was generated,
 that one row is skipped with an error shown in the results (the rest of
-the slate still saves).
+the slate still saves). Each touring student's assigned Route (if any) is
+shown alongside their name so guides know which itinerary to walk —
+route matching itself has nothing to do with grade/borough/gender; it's
+purely "which of the 7 physical paths is free," picked when the student
+is added on the **Add Touring Student…** dialog.
 
 ## Notes on the design
 

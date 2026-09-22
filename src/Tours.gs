@@ -57,6 +57,50 @@ function listTours() {
     .sort((a, b) => a.id < b.id ? 1 : -1);
 }
 
+/**
+ * Bulk-creates recurring Wednesday-morning tours (8:30-9:25, matching the
+ * Tour Routes schedule) starting from startDateStr, one per week. Rolls
+ * a non-Wednesday start date forward to the next Wednesday rather than
+ * silently creating a wrong-weekday tour. Skips any week that already
+ * has a non-cancelled tour on that date.
+ */
+function generateWednesdayTours(startDateStr, weeks) {
+  const numWeeks = Math.max(1, Number(weeks) || 1);
+  let start = toDate_(startDateStr);
+  if (!start) throw new Error('A valid start date is required.');
+  const rolledForward = start.getDay() !== 3; // 0=Sun ... 3=Wed
+  while (start.getDay() !== 3) {
+    start = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
+  }
+
+  const { rows } = readSheet(SHEETS.TOURS);
+  const headers = HEADERS[SHEETS.TOURS];
+  const dateCol = colNum_(headers, 'Date') - 1;
+  const statusCol = colNum_(headers, 'Status') - 1;
+  const existingDates = {};
+  rows.forEach(r => {
+    if (String(r[statusCol]).trim() !== 'Cancelled') existingDates[toISODate(r[dateCol])] = true;
+  });
+
+  const created = [];
+  const skipped = [];
+  for (let i = 0; i < numWeeks; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i * 7);
+    const iso = toISODate(d);
+    if (existingDates[iso]) { skipped.push(iso); continue; }
+    const tourId = addTour({
+      date: iso,
+      startTime: '08:30',
+      endTime: '09:25',
+      group: 'Wednesday Morning Tours',
+      notes: ''
+    });
+    created.push({ date: iso, tourId: tourId });
+  }
+
+  return { created: created, skipped: skipped, rolledForward: rolledForward };
+}
+
 function getTourById_(tourId) {
   const headers = HEADERS[SHEETS.TOURS];
   const { rows } = readSheet(SHEETS.TOURS);

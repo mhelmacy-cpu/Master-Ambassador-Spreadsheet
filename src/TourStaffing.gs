@@ -78,7 +78,7 @@ function suggestStaffingForTour(tourId) {
     });
 
     if (ranked.length === 0) {
-      return { studentName: s.name, guide1: null, guide2: null, alternates: [] };
+      return { studentName: s.name, route: s.route, guide1: null, guide2: null, alternates: [] };
     }
 
     const genderMatch = s.gender ? ranked.find(a => a.gender && a.gender === s.gender) : null;
@@ -90,6 +90,7 @@ function suggestStaffingForTour(tourId) {
 
     return {
       studentName: s.name,
+      route: s.route,
       guide1: guide1.name,
       guide2: guide2 ? guide2.name : null,
       alternates: ranked.map(a => a.name)
@@ -169,11 +170,13 @@ function getTouringStudentDirectory_(tourId) {
   const gradeCol = colNum_(headers, 'Grade') - 1;
   const boroughCol = colNum_(headers, 'Borough') - 1;
   const genderCol = colNum_(headers, 'Gender') - 1;
+  const routeCol = colNum_(headers, 'Route') - 1;
 
   return listTouringStudentsForTour(tourId).map(r => ({
     name: fullName_(r[firstCol], r[lastCol]),
     grade: parseGradeNum_(r[gradeCol]),
     borough: String(r[boroughCol] || '').trim().toUpperCase(),
-    gender: String(r[genderCol] || '').trim()
+    gender: String(r[genderCol] || '').trim(),
+    route: String(r[routeCol] || '').trim()
   }));
 }
