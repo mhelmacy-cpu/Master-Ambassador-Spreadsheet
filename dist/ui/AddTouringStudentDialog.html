@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #333; padding: 4px 8px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    input, select, textarea { width: 100%; box-sizing: border-box; padding: 6px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    .row { display: flex; gap: 10px; }
+    .row > div { flex: 1; }
+    button { margin-top: 16px; padding: 8px 16px; background: #4a86e8; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    button:disabled { background: #aaa; }
+    #status { margin-top: 10px; font-style: italic; }
+    .error { color: #cc0000; }
+    .success { color: #137333; }
+    .hint { color: #777; font-weight: normal; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <form id="form">
+    <label>Tour *</label>
+    <select id="tourId" required></select>
+
+    <div class="row">
+      <div>
+        <label>First Name *</label>
+        <input type="text" id="firstName" required>
+      </div>
+      <div>
+        <label>Last Name</label>
+        <input type="text" id="lastName">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Grade</label>
+        <input type="text" id="grade" placeholder="e.g. 6th">
+      </div>
+      <div>
+        <label>Borough <span class="hint"> - used to match a guide</span></label>
+        <select id="borough">
+          <option value=""> - </option>
+          <option value="M">M - Manhattan</option>
+          <option value="B">B - Brooklyn</option>
+          <option value="Q">Q - Queens</option>
+          <option value="X">X - Bronx</option>
+          <option value="S">S - Staten Island</option>
+          <option value="J">J - New Jersey</option>
+        </select>
+      </div>
+      <div>
+        <label>Gender</label>
+        <select id="gender">
+          <option value=""> - </option>
+          <option value="Female">Female</option>
+          <option value="Male">Male</option>
+          <option value="Non-binary">Non-binary</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+    </div>
+
+    <label>Route <span class="hint"> - which of the 7 walking tours they're on; taken routes are disabled</span></label>
+    <select id="route"></select>
+
+    <label>Current School</label>
+    <input type="text" id="school">
+
+    <label>Allergies / Medical Notes</label>
+    <textarea id="medicalNotes" rows="2"></textarea>
+
+    <div class="row">
+      <div>
+        <label>Chaperone Name</label>
+        <input type="text" id="chaperoneName">
+      </div>
+      <div>
+        <label>Chaperone Contact</label>
+        <input type="text" id="chaperoneContact">
+      </div>
+    </div>
+
+    <label>Notes</label>
+    <textarea id="notes" rows="2"></textarea>
+
+    <button type="submit" id="submitBtn">Add Student</button>
+    <div id="status"></div>
+  </form>
+
+  <script>
+    function loadTours() {
+      google.script.run.withSuccessHandler(function (tours) {
+        const sel = document.getElementById('tourId');
+        sel.innerHTML = '';
+        if (tours.length === 0) {
+          sel.innerHTML = '<option value="">No tours scheduled yet</option>';
+          return;
+        }
+        tours.forEach(function (t) {
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.label;
+          sel.appendChild(opt);
+        });
+        loadRoutes();
+      }).api_getTours();
+    }
+    loadTours();
+
+    function loadRoutes() {
+      const tourId = document.getElementById('tourId').value;
+      const sel = document.getElementById('route');
+      if (!tourId) { sel.innerHTML = '<option value=""> - </option>'; return; }
+      google.script.run.withSuccessHandler(function (availability) {
+        sel.innerHTML = '<option value=""> - </option>';
+        availability.forEach(function (a) {
+          const opt = document.createElement('option');
+          opt.value = a.route;
+          opt.textContent = 'Route ' + a.route + (a.taken ? ' (taken by ' + a.takenBy + ')' : '');
+          opt.disabled = a.taken;
+          sel.appendChild(opt);
+        });
+      }).api_getRouteAvailability(tourId);
+    }
+    document.getElementById('tourId').addEventListener('change', loadRoutes);
+
+    document.getElementById('form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const status = document.getElementById('status');
+      btn.disabled = true;
+      status.className = '';
+      status.textContent = 'Saving...';
+
+      const data = {
+        tourId: document.getElementById('tourId').value,
+        firstName: document.getElementById('firstName').value,
+        lastName: document.getElementById('lastName').value,
+        grade: document.getElementById('grade').value,
+        borough: document.getElementById('borough').value,
+        gender: document.getElementById('gender').value,
+        route: document.getElementById('route').value,
+        school: document.getElementById('school').value,
+        medicalNotes: document.getElementById('medicalNotes').value,
+        chaperoneName: document.getElementById('chaperoneName').value,
+        chaperoneContact: document.getElementById('chaperoneContact').value,
+        notes: document.getElementById('notes').value
+      };
+
+      google.script.run
+        .withSuccessHandler(function () {
+          status.className = 'success';
+          status.textContent = 'Student added.';
+          document.getElementById('form').reset();
+          loadTours();
+          btn.disabled = false;
+        })
+        .withFailureHandler(function (err) {
+          status.className = 'error';
+          status.textContent = err.message || String(err);
+          btn.disabled = false;
+        })
+        .api_addTouringStudent(data);
+    });
+  </script>
+</body>
+</html>

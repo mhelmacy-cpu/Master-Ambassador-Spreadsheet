@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #333; padding: 4px 8px; }
+    p { margin: 6px 0; }
+    code { background: #f1f3f4; padding: 1px 4px; border-radius: 3px; }
+    textarea { width: 100%; box-sizing: border-box; padding: 8px; margin-top: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; font-family: monospace; }
+    button { margin-top: 12px; padding: 8px 16px; background: #4a86e8; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    button:disabled { background: #aaa; }
+    #status { margin-top: 10px; font-style: italic; white-space: pre-wrap; }
+    .error { color: #cc0000; }
+    .success { color: #137333; }
+  </style>
+</head>
+<body>
+  <p>Paste rows copied straight from a spreadsheet (tab-separated) or comma-separated,
+  one ambassador per line, in this column order:</p>
+  <p><code>Name, Grade, Borough, Parent 1 Name, Parent 1 Email, Parent 2 Name, Parent 2 Email</code></p>
+  <p>Extra trailing columns are ignored. A student who already exists (matched by name +
+  borough) gets updated in place; everyone else is added. Fields you've hand-edited on the
+  sheet - Teacher, Student Email, Active, Notes - are never touched by an import.</p>
+
+  <form id="form">
+    <textarea id="pasted" rows="12" placeholder="Aurelia Walker&#9;5th&#9;B&#9;Sophia James&#9;sjames@example.com&#9;Michael Walker&#9;mwalker@example.com"></textarea>
+    <button type="submit" id="submitBtn">Import</button>
+    <div id="status"></div>
+  </form>
+
+  <script>
+    document.getElementById('form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const status = document.getElementById('status');
+      const text = document.getElementById('pasted').value;
+      btn.disabled = true;
+      status.className = '';
+      status.textContent = 'Importing...';
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          status.className = 'success';
+          status.textContent = 'Done - ' + result.added + ' added, ' + result.updated +
+            ' updated (of ' + result.total + ' rows read). The Eligibility matrix was refreshed too.';
+          btn.disabled = false;
+        })
+        .withFailureHandler(function (err) {
+          status.className = 'error';
+          status.textContent = err.message || String(err);
+          btn.disabled = false;
+        })
+        .api_importAmbassadors(text);
+    });
+  </script>
+</body>
+</html>

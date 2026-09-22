@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #333; padding: 4px 8px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    input, select, textarea { width: 100%; box-sizing: border-box; padding: 6px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    .row { display: flex; gap: 10px; }
+    .row > div { flex: 1; }
+    button { margin-top: 12px; padding: 8px 16px; background: #4a86e8; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    button.secondary { background: #f1f3f4; color: #333; }
+    button:disabled { background: #aaa; }
+    #status { margin-top: 10px; font-style: italic; white-space: pre-wrap; }
+    .error { color: #cc0000; }
+    .success { color: #137333; }
+    .hint { color: #777; font-weight: normal; font-size: 11px; }
+    #picked { margin-top: 6px; }
+    .chip { display: inline-block; background: #e8f0fe; border: 1px solid #c6dafc; border-radius: 12px; padding: 2px 8px; margin: 2px 4px 2px 0; font-size: 12px; }
+    .chip button { all: unset; cursor: pointer; color: #888; margin-left: 5px; font-weight: bold; }
+    .student-card { border: 1px solid #e0e0e0; border-radius: 4px; padding: 8px; margin-top: 8px; }
+    .student-card h4 { margin: 0 0 4px; font-size: 13px; color: #1c4587; }
+    .block { margin: 3px 0; padding: 4px 6px; background: #f8f9fa; border-left: 3px solid #137333; font-size: 12px; }
+    .block.confirm { border-left-color: #b06000; background: #fff8e1; }
+    .block .why { color: #b06000; font-size: 11px; display: block; margin-top: 2px; }
+    .missing { color: #cc0000; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <label>Students <span class="hint"> - start typing a name; add as many as you like</span></label>
+  <input list="roster" id="studentInput" placeholder="e.g. Aurelia Walker" autocomplete="off">
+  <datalist id="roster"></datalist>
+  <div id="picked"></div>
+
+  <div class="row">
+    <div>
+      <label>Date *</label>
+      <input type="date" id="date" required>
+    </div>
+    <div>
+      <label>Start *</label>
+      <input type="time" id="startTime" value="10:00" required>
+    </div>
+    <div>
+      <label>End *</label>
+      <input type="time" id="endTime" value="10:30" required>
+    </div>
+  </div>
+
+  <button type="button" id="checkBtn">Check what they would miss</button>
+
+  <div id="results"></div>
+
+  <div id="saveArea" style="display:none;">
+    <div class="row">
+      <div>
+        <label>Purpose</label>
+        <input type="text" id="purpose" placeholder="e.g. Ambassador training">
+      </div>
+      <div>
+        <label>Location</label>
+        <input type="text" id="location" placeholder="e.g. Front office">
+      </div>
+    </div>
+    <label>Notes</label>
+    <textarea id="notes" rows="2"></textarea>
+    <button type="button" id="saveBtn">Save Meeting</button>
+  </div>
+
+  <div id="status"></div>
+
+  <script>
+    let picked = [];
+    let allStudents = [];
+
+    google.script.run.withSuccessHandler(function (students) {
+      allStudents = students;
+      const dl = document.getElementById('roster');
+      students.forEach(function (s) {
+        const opt = document.createElement('option');
+        opt.value = s.name;
+        opt.label = s.grade + 'th - ' + s.pod + ' (' + s.advisor + ')';
+        dl.appendChild(opt);
+      });
+    }).api_getAllMsStudents();
+
+    function renderPicked() {
+      const div = document.getElementById('picked');
+      div.innerHTML = '';
+      picked.forEach(function (name, i) {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = name;
+        const x = document.createElement('button');
+        x.textContent = 'x';
+        x.onclick = function () { picked.splice(i, 1); renderPicked(); };
+        chip.appendChild(x);
+        div.appendChild(chip);
+      });
+    }
+
+    document.getElementById('studentInput').addEventListener('change', function () {
+      const val = this.value.trim();
+      if (val && picked.indexOf(val) === -1) {
+        picked.push(val);
+        renderPicked();
+      }
+      this.value = '';
+    });
+
+    document.getElementById('checkBtn').addEventListener('click', function () {
+      const status = document.getElementById('status');
+      if (picked.length === 0) { status.className = 'error'; status.textContent = 'Add at least one student.'; return; }
+      status.className = '';
+      status.textContent = 'Checking the bell schedule...';
+      document.getElementById('results').innerHTML = '';
+
+      google.script.run
+        .withSuccessHandler(function (res) {
+          status.textContent = '';
+          const wrap = document.getElementById('results');
+          const head = document.createElement('p');
+          head.innerHTML = '<b>' + res.day + ', ' + res.window + '</b>';
+          wrap.appendChild(head);
+
+          res.students.forEach(function (s) {
+            const card = document.createElement('div');
+            card.className = 'student-card';
+            let html = '<h4>' + s.name + (s.found ? ' <span class="hint">- grade ' + s.grade +
+              ', ' + s.pod + ' (' + s.advisor + ')</span>' : '') + '</h4>';
+            if (!s.found || s.blocks.length === 0) {
+              html += '<div class="missing">' + s.note + '</div>';
+            } else {
+              s.blocks.forEach(function (b) {
+                html += '<div class="block' + (b.needsConfirmation ? ' confirm' : '') + '">' +
+                  b.start + ' - ' + b.end + ': ' + b.what +
+                  (b.needsConfirmation ? '<span class="why">This period splits into parallel groups - ' +
+                    'the schedule does not say which one this student is in, so confirm before pulling them.</span>' : '') +
+                  '</div>';
+              });
+            }
+            card.innerHTML = html;
+            wrap.appendChild(card);
+          });
+          document.getElementById('saveArea').style.display = 'block';
+        })
+        .withFailureHandler(function (err) {
+          status.className = 'error';
+          status.textContent = err.message || String(err);
+        })
+        .api_lookupStudentsAtTime(picked, document.getElementById('date').value,
+          document.getElementById('startTime').value, document.getElementById('endTime').value);
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', function () {
+      const status = document.getElementById('status');
+      const btn = this;
+      btn.disabled = true;
+      status.className = '';
+      status.textContent = 'Saving...';
+
+      const data = {
+        students: picked,
+        date: document.getElementById('date').value,
+        startTime: document.getElementById('startTime').value,
+        endTime: document.getElementById('endTime').value,
+        purpose: document.getElementById('purpose').value,
+        location: document.getElementById('location').value,
+        notes: document.getElementById('notes').value
+      };
+
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false;
+          status.className = 'success';
+          status.textContent = 'Saved as ' + res.meetingId + ' on the Meetings sheet.';
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false;
+          status.className = 'error';
+          status.textContent = err.message || String(err);
+        })
+        .api_scheduleMeeting(data);
+    });
+  </script>
+</body>
+</html>

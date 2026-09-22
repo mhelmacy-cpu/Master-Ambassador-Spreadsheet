@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #333; padding: 4px 8px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    input, select, textarea { width: 100%; box-sizing: border-box; padding: 6px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    .row { display: flex; gap: 10px; }
+    .row > div { flex: 1; }
+    button { margin-top: 16px; padding: 8px 16px; background: #4a86e8; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    button:disabled { background: #aaa; }
+    #status { margin-top: 10px; font-style: italic; }
+    .error { color: #cc0000; }
+    .success { color: #137333; }
+    .hint { color: #777; font-weight: normal; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <form id="form">
+    <label>Tour *</label>
+    <select id="tourId" required></select>
+
+    <label>Job <span class="hint"> - only ambassadors marked eligible will be selectable</span></label>
+    <select id="job" required></select>
+
+    <div class="row">
+      <div>
+        <label>Date *</label>
+        <input type="date" id="date" required>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Start Time *</label>
+        <input type="time" id="startTime" required>
+      </div>
+      <div>
+        <label>End Time *</label>
+        <input type="time" id="endTime" required>
+      </div>
+    </div>
+
+    <label>Ambassador * <span class="hint"> - grayed out = already booked at that time</span></label>
+    <select id="ambassador" required></select>
+
+    <label>Notes</label>
+    <textarea id="notes" rows="2"></textarea>
+
+    <button type="submit" id="submitBtn">Assign Ambassador</button>
+    <div id="status"></div>
+  </form>
+
+  <script>
+    function loadTours() {
+      google.script.run.withSuccessHandler(function (tours) {
+        const sel = document.getElementById('tourId');
+        sel.innerHTML = '';
+        if (tours.length === 0) {
+          sel.innerHTML = '<option value="">No tours scheduled yet</option>';
+          return;
+        }
+        tours.forEach(function (t) {
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.label;
+          sel.appendChild(opt);
+        });
+      }).api_getTours();
+    }
+
+    function loadJobs() {
+      google.script.run.withSuccessHandler(function (jobs) {
+        const sel = document.getElementById('job');
+        sel.innerHTML = '';
+        if (jobs.length === 0) {
+          sel.innerHTML = '<option value="">No active jobs - add one on the Jobs sheet</option>';
+          return;
+        }
+        jobs.forEach(function (j) {
+          const opt = document.createElement('option');
+          opt.value = j;
+          opt.textContent = j;
+          sel.appendChild(opt);
+        });
+        refreshAmbassadors();
+      }).api_getJobs();
+    }
+
+    function refreshAmbassadors() {
+      const job = document.getElementById('job').value;
+      const date = document.getElementById('date').value;
+      const startTime = document.getElementById('startTime').value;
+      const endTime = document.getElementById('endTime').value;
+      const sel = document.getElementById('ambassador');
+      if (!job) { sel.innerHTML = '<option value="">Choose a job first</option>'; return; }
+
+      google.script.run.withSuccessHandler(function (list) {
+        sel.innerHTML = '';
+        if (list.length === 0) {
+          sel.innerHTML = '<option value="">No eligible, active ambassadors for this job</option>';
+          return;
+        }
+        list.forEach(function (a) {
+          const opt = document.createElement('option');
+          opt.value = a.name;
+          opt.textContent = a.name + (a.busy ? ' (busy at that time)' : '');
+          opt.disabled = a.busy;
+          sel.appendChild(opt);
+        });
+      }).api_getAssignableAmbassadors(job, date, startTime, endTime);
+    }
+
+    ['job', 'date', 'startTime', 'endTime'].forEach(function (id) {
+      document.getElementById(id).addEventListener('change', refreshAmbassadors);
+    });
+
+    loadTours();
+    loadJobs();
+
+    document.getElementById('form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const status = document.getElementById('status');
+      btn.disabled = true;
+      status.className = '';
+      status.textContent = 'Saving...';
+
+      const data = {
+        tourId: document.getElementById('tourId').value,
+        job: document.getElementById('job').value,
+        date: document.getElementById('date').value,
+        startTime: document.getElementById('startTime').value,
+        endTime: document.getElementById('endTime').value,
+        ambassador: document.getElementById('ambassador').value,
+        notes: document.getElementById('notes').value
+      };
+
+      google.script.run
+        .withSuccessHandler(function (id) {
+          status.className = 'success';
+          status.textContent = 'Assigned (' + id + ').';
+          document.getElementById('notes').value = '';
+          refreshAmbassadors();
+          btn.disabled = false;
+        })
+        .withFailureHandler(function (err) {
+          status.className = 'error';
+          status.textContent = err.message || String(err);
+          btn.disabled = false;
+        })
+        .api_assignAmbassador(data);
+    });
+  </script>
+</body>
+</html>

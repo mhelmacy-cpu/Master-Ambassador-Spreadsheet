@@ -22,9 +22,9 @@ const SHEETS = {
 const HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Grade', 'Homeroom Pod', 'Borough', 'Gender',
   'Parent 1 Name', 'Parent 1 Email', 'Parent 2 Name', 'Parent 2 Email', 'Teacher', 'Student Email', 'Active',
-  'Total Tours', 'Last Tour Date', 'Notes'];
+  'Total Tours', 'Jobs Breakdown', 'Last Tour Date', 'Notes'];
 HEADERS[SHEETS.JOBS] = ['Job Name', 'Description', 'Active'];
-HEADERS[SHEETS.TOURS] = ['Tour ID', 'Date', 'Start Time', 'End Time', 'Visiting School / Group', 'Contact Name', 'Contact Email', 'Grade Level', '# of Visitors', 'Status', 'Notes'];
+HEADERS[SHEETS.TOURS] = ['Tour ID', 'Date', 'Start Time', 'End Time', 'Visiting School / Group', 'Contact Name', 'Contact Email', 'Grade Level', '# of Visitors', 'Jobs Filled', 'Roles Filled', 'Status', 'Notes'];
 HEADERS[SHEETS.TOUR_ROUTES] = ['Route', 'Direction', 'Humanities Teacher', 'Language', 'Itinerary'];
 HEADERS[SHEETS.TOURING_STUDENTS] = ['Tour ID', 'First Name', 'Last Name', 'Grade', 'Borough', 'Gender', 'Route', 'School', 'Allergies / Medical Notes', 'Chaperone Name', 'Chaperone Contact', 'Notes'];
 HEADERS[SHEETS.ASSIGNMENTS] = ['Assignment ID', 'Tour ID', 'Date', 'Start Time', 'End Time', 'Job', 'Ambassador', 'Ambassador Teacher', 'Touring Student', 'Status', 'Notes'];

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #333; padding: 4px 8px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    select { width: 100%; box-sizing: border-box; padding: 6px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    button { margin-top: 16px; padding: 8px 16px; background: #4a86e8; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    button:disabled { background: #aaa; }
+    #status { margin-top: 10px; font-style: italic; white-space: pre-wrap; }
+    .error { color: #cc0000; }
+    .success { color: #137333; }
+    p { color: #555; }
+  </style>
+</head>
+<body>
+  <p>Sends 3 rounds of email for the selected tour's confirmed assignments (from
+  "Staff This Tour..."): each participating ambassador gets their own schedule; each
+  ambassador's teacher is told which student(s) they'll miss; each teacher receiving
+  touring visitors is told how many to expect (no names).</p>
+
+  <form id="form">
+    <label>Tour *</label>
+    <select id="tourId" required></select>
+    <button type="submit" id="submitBtn">Send Emails</button>
+    <div id="status"></div>
+  </form>
+
+  <script>
+    function loadTours() {
+      google.script.run.withSuccessHandler(function (tours) {
+        const sel = document.getElementById('tourId');
+        sel.innerHTML = '';
+        if (tours.length === 0) {
+          sel.innerHTML = '<option value="">No tours scheduled yet</option>';
+          return;
+        }
+        tours.forEach(function (t) {
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.label;
+          sel.appendChild(opt);
+        });
+      }).api_getTours();
+    }
+    loadTours();
+
+    document.getElementById('form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const status = document.getElementById('status');
+      const tourId = document.getElementById('tourId').value;
+      btn.disabled = true;
+      status.className = '';
+      status.textContent = 'Sending...';
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          btn.disabled = false;
+          let msg = 'Ambassadors notified: ' + result.ambassadorsSent +
+            '\nTeachers (missing a student) notified: ' + result.teachersMissingSent +
+            '\nTeachers (receiving visitors) notified: ' + result.receivingSent;
+          const problems = [];
+          if (result.ambassadorsSkipped.length) problems.push('No Student Email on file: ' + result.ambassadorsSkipped.join(', '));
+          if (result.teachersMissingSkipped.length) problems.push('No Teacher Email on file: ' + result.teachersMissingSkipped.join(', '));
+          if (result.receivingSkipped.length) problems.push('Receiving-class email(s) not sent: ' + result.receivingSkipped.join(', '));
+          if (result.unmatchedStudents.length) problems.push('No grade-matched guide found for: ' + result.unmatchedStudents.join(', '));
+          if (problems.length) {
+            msg += '\n\n' + problems.join('\n');
+            status.className = 'error';
+          } else {
+            status.className = 'success';
+          }
+          status.textContent = msg;
+        })
+        .withFailureHandler(function (err) {
+          status.className = 'error';
+          status.textContent = err.message || String(err);
+          btn.disabled = false;
+        })
+        .api_sendTourDayEmails(tourId);
+    });
+  </script>
+</body>
+</html>

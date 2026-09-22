@@ -30,10 +30,11 @@ visitor-tour and student-ambassador program end to end:
 ## How it's organized
 
 Everything lives as a Google Sheet with an attached Apps Script project.
-The script source lives in [`src/`](src/) in this repo so it's version
-controlled; see [`SETUP.md`](SETUP.md) for how to get it into an actual
-Google Sheet (two options: paste into the Apps Script editor, or push with
-`clasp`).
+The source lives in [`src/`](src/), split into small modules. Running
+`python3 tools/bundle.py` merges those into the 4 script files in
+[`dist/`](dist/) — that's what actually gets pasted into Apps Script, since
+every `.gs` file shares one namespace and 4 files is a lot less to paste
+than 21. See [`SETUP.md`](SETUP.md) for getting it into a Google Sheet.
 
 ### Sheets it creates
 
@@ -52,7 +53,7 @@ Google Sheet (two options: paste into the Apps Script editor, or push with
 
 ### Menu
 
-Opening the spreadsheet adds a **🎓 Tour & Ambassador Scheduler** menu with:
+Opening the spreadsheet adds a **Tour & Ambassador Scheduler** menu with:
 
 - **First-Time Setup** — creates every sheet, headers, dropdowns, and sample rows. Safe to re-run any time.
 - **Schedule a Tour…**, **Add Touring Student…**, **Assign Ambassador…** — form dialogs, so staff never has to hand-edit raw rows.

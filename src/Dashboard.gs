@@ -6,6 +6,7 @@
 
 function refreshDashboard() {
   refreshAmbassadorStats();
+  refreshTourTallies();
 
   const sheet = getOrCreateSheet(SHEETS.DASHBOARD);
   sheet.clear();

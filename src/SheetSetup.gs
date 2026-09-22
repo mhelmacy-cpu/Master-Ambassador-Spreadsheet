@@ -73,8 +73,10 @@ function setupAmbassadorsSheet_() {
   sheet.getRange(1, colNum_(headers, 'Borough')).setNote(BOROUGH_LEGEND);
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Gender'), GENDER_OPTIONS, true);
   applyTeacherDropdown_(sheet, lastRow, colNum_(headers, 'Teacher'));
-  sheet.getRange(1, colNum_(headers, 'Total Tours')).setNote('Computed automatically - do not edit by hand. Refreshed whenever assignments change.');
-  sheet.getRange(1, colNum_(headers, 'Last Tour Date')).setNote('Computed automatically - do not edit by hand. Refreshed whenever assignments change.');
+  const computed = 'Computed automatically - do not edit by hand. Refreshed whenever assignments change.';
+  sheet.getRange(1, colNum_(headers, 'Total Tours')).setNote(computed);
+  sheet.getRange(1, colNum_(headers, 'Jobs Breakdown')).setNote(computed + '\nHow many times this ambassador has done each job.');
+  sheet.getRange(1, colNum_(headers, 'Last Tour Date')).setNote(computed);
   sheet.autoResizeColumns(1, headers.length);
 }
 
@@ -86,6 +88,9 @@ function setupToursSheet_() {
   applyTimeFormat_(sheet, lastRow, colNum_(headers, 'Start Time'));
   applyTimeFormat_(sheet, lastRow, colNum_(headers, 'End Time'));
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Status'), TOUR_STATUSES);
+  const computed = 'Computed automatically - do not edit by hand. Refreshed whenever assignments change.';
+  sheet.getRange(1, colNum_(headers, 'Jobs Filled')).setNote(computed + '\nHow many ambassador jobs are staffed on this tour.');
+  sheet.getRange(1, colNum_(headers, 'Roles Filled')).setNote(computed + '\nWhich roles are covered, and how many of each.');
   sheet.autoResizeColumns(1, headers.length);
 }
 
