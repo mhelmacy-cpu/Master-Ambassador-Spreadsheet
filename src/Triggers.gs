@@ -59,6 +59,67 @@ function capitalize_(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/* ---- Tour-day reminders: Monday PM, Tuesday PM, Wednesday AM ---- */
+
+/**
+ * Each of the three sends covers whichever tour is coming up, so the
+ * Monday and Tuesday runs reach ahead to Wednesday while the Wednesday
+ * run catches the tour happening that morning.
+ */
+function sendUpcomingTourReminders() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const horizon = new Date(today.getTime() + 7 * 86400000);
+
+  const headers = HEADERS[SHEETS.TOURS];
+  const { rows } = readSheet(SHEETS.TOURS);
+  const idCol = colNum_(headers, 'Tour ID') - 1;
+  const dateCol = colNum_(headers, 'Date') - 1;
+  const statusCol = colNum_(headers, 'Status') - 1;
+
+  const upcoming = rows.filter(r => {
+    if (!r[idCol] || String(r[statusCol]).trim() === 'Cancelled') return false;
+    const d = toDate_(r[dateCol]);
+    return d && d >= today && d < horizon;
+  });
+
+  const results = [];
+  upcoming.forEach(r => {
+    try {
+      results.push({ tourId: r[idCol], result: sendTourDayEmails(r[idCol]) });
+    } catch (err) {
+      // An unstaffed tour throws rather than mailing nobody; that is not
+      // a failure worth stopping the other tours for.
+      Logger.log('Tour reminder skipped for ' + r[idCol] + ': ' + err.message);
+    }
+  });
+  return results;
+}
+
+function enableTourReminders() {
+  deleteTriggersFor_(HANDLER_TOUR_REMINDERS);
+  [
+    { day: ScriptApp.WeekDay.MONDAY, hour: 14 },
+    { day: ScriptApp.WeekDay.TUESDAY, hour: 14 },
+    { day: ScriptApp.WeekDay.WEDNESDAY, hour: 6 }
+  ].forEach(slot => {
+    ScriptApp.newTrigger(HANDLER_TOUR_REMINDERS)
+      .timeBased()
+      .onWeekDay(slot.day)
+      .atHour(slot.hour)
+      .create();
+  });
+  SpreadsheetApp.getUi().alert('Tour reminders are on. Students, advisors and class teachers will ' +
+    'be emailed about any tour in the coming week on Monday afternoon, Tuesday afternoon, and ' +
+    'Wednesday morning.\n\nA tour that has not been staffed yet is skipped, so staff the tour ' +
+    'before Monday afternoon for the first send to go out.');
+}
+
+function disableTourReminders() {
+  deleteTriggersFor_(HANDLER_TOUR_REMINDERS);
+  SpreadsheetApp.getUi().alert('Tour reminders are turned off.');
+}
+
 /** Lightweight onEdit: keep the dashboard current when Assignments changes. */
 function onEdit(e) {
   try {

@@ -29,14 +29,14 @@
   <button type="button" id="suggestBtn">Suggest Staffing</button>
 
   <div id="results" style="display:none;">
-    <h3>Panelist</h3>
-    <select id="panelist"></select>
+    <h3>Panelists <span class="hint" id="panelistHint"></span></h3>
+    <div id="panelistSlots"></div>
 
-    <h3>Lobby Greeter</h3>
-    <select id="lobbyGreeter"></select>
+    <h3>Lobby Greeters <span class="hint" id="lobbyGreeterHint"></span></h3>
+    <div id="lobbyGreeterSlots"></div>
 
-    <h3>Table Greeter</h3>
-    <select id="tableGreeter"></select>
+    <h3>Table Greeters <span class="hint" id="tableGreeterHint"></span></h3>
+    <div id="tableGreeterSlots"></div>
 
     <h3>Tour Guides <span class="hint"> - 2 per touring student; at least one guide matches applying grade and (when possible) gender</span></h3>
     <div id="guideRows"></div>
@@ -89,13 +89,31 @@
       });
     }
 
+    /** One dropdown per slot the role needs, e.g. 3 for lobby greeters. */
+    function fillCrew(key, role) {
+      const wrap = document.getElementById(key + 'Slots');
+      wrap.innerHTML = '';
+      for (let i = 0; i < role.needed; i++) {
+        const sel = document.createElement('select');
+        sel.setAttribute('data-crew', key);
+        fillSelect(sel, role.alternates, role.chosen[i] || '');
+        wrap.appendChild(sel);
+      }
+      const hint = document.getElementById(key + 'Hint');
+      hint.textContent = role.short
+        ? ' - need ' + role.needed + ', only ' + role.chosen.length +
+          ' eligible and free; ' + role.short + ' slot(s) left empty'
+        : ' - ' + role.needed + ' needed';
+      hint.style.color = role.short ? '#b06000' : '#777';
+    }
+
     function renderSuggestion(suggestion) {
       lastSuggestion = suggestion;
       document.getElementById('results').style.display = 'block';
 
-      fillSelect(document.getElementById('panelist'), suggestion.singleRoles['Panelist'].alternates, suggestion.singleRoles['Panelist'].chosen);
-      fillSelect(document.getElementById('lobbyGreeter'), suggestion.singleRoles['Lobby Greeter'].alternates, suggestion.singleRoles['Lobby Greeter'].chosen);
-      fillSelect(document.getElementById('tableGreeter'), suggestion.singleRoles['Table Greeter'].alternates, suggestion.singleRoles['Table Greeter'].chosen);
+      fillCrew('panelist', suggestion.singleRoles['Panelist']);
+      fillCrew('lobbyGreeter', suggestion.singleRoles['Lobby Greeter']);
+      fillCrew('tableGreeter', suggestion.singleRoles['Table Greeter']);
 
       const guideRows = document.getElementById('guideRows');
       guideRows.innerHTML = '';
@@ -176,10 +194,17 @@
         };
       });
 
+      function crewValues(key) {
+        return Array.prototype.slice
+          .call(document.querySelectorAll('[data-crew="' + key + '"]'))
+          .map(function (sel) { return sel.value; })
+          .filter(function (v, i, all) { return v && all.indexOf(v) === i; });
+      }
+
       const selections = {
-        panelist: document.getElementById('panelist').value,
-        lobbyGreeter: document.getElementById('lobbyGreeter').value,
-        tableGreeter: document.getElementById('tableGreeter').value,
+        panelist: crewValues('panelist'),
+        lobbyGreeter: crewValues('lobbyGreeter'),
+        tableGreeter: crewValues('tableGreeter'),
         tourGuides: tourGuides
       };
 

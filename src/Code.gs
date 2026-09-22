@@ -28,7 +28,10 @@ function onOpen() {
       .addItem('Turn OFF weekly teacher emails', 'disableWeeklyEmailTrigger')
       .addSeparator()
       .addItem('Turn ON dashboard auto-refresh (10 min)', 'enableDashboardAutoRefresh')
-      .addItem('Turn OFF dashboard auto-refresh', 'disableDashboardAutoRefresh'))
+      .addItem('Turn OFF dashboard auto-refresh', 'disableDashboardAutoRefresh')
+      .addSeparator()
+      .addItem('Turn ON tour reminders (Mon/Tue PM, Wed AM)', 'enableTourReminders')
+      .addItem('Turn OFF tour reminders', 'disableTourReminders'))
     .addToUi();
 }
 

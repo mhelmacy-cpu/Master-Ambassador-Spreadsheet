@@ -51,8 +51,25 @@ const DEFAULT_SETTINGS = [
   ['Weekly Email Day', 'Monday'],
   ['Weekly Email Hour (0-23)', '6'],
   ['Weekly Email Lookahead Days', '7'],
-  ['Dashboard "Starting Soon" Window (minutes)', '15']
+  ['Dashboard "Starting Soon" Window (minutes)', '15'],
+  ['Tour Start Time', '08:30'],
+  ['Tour End Time', '09:25'],
+  ['Lobby Greeters Needed', '3'],
+  ['Table Greeters Needed', '2'],
+  ['Panelists Needed', '5'],
+  ['Tour Guides Per Visiting Student', '2'],
+  ['Max Families Per Route', '1']
 ];
+
+/** How many ambassadors each event-wide role needs, from Settings. */
+function jobsNeeded_() {
+  const needed = {};
+  needed[TOUR_JOBS.LOBBY_GREETER] = Number(getSetting('Lobby Greeters Needed', 3)) || 3;
+  needed[TOUR_JOBS.TABLE_GREETER] = Number(getSetting('Table Greeters Needed', 2)) || 2;
+  needed[TOUR_JOBS.PANELIST] = Number(getSetting('Panelists Needed', 5)) || 5;
+  return needed;
+}
 
 const HANDLER_WEEKLY_EMAIL = 'sendWeeklyTeacherEmails';
 const HANDLER_DASHBOARD_REFRESH = 'refreshDashboard';
+const HANDLER_TOUR_REMINDERS = 'sendUpcomingTourReminders';

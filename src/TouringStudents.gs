@@ -8,11 +8,15 @@ function addTouringStudent(data) {
   if (!data.tourId) throw new Error('A tour must be selected.');
   if (!data.firstName) throw new Error('First name is required.');
 
-  if (data.route) {
-    const taken = getRouteAvailability(data.tourId).find(r => r.route === data.route);
+  const availability = getRouteAvailability(data.tourId);
+  let route = data.route;
+  if (route) {
+    const taken = availability.find(r => r.route === route);
     if (taken && taken.taken) {
-      throw new Error('Route ' + data.route + ' is already assigned to ' + taken.takenBy + ' for this tour.');
+      throw new Error('Route ' + route + ' is already assigned to ' + taken.takenBy + ' for this tour.');
     }
+  } else {
+    route = pickNextRoute_(availability);
   }
 
   const row = headers.map(h => {
@@ -23,7 +27,7 @@ function addTouringStudent(data) {
       case 'Grade': return data.grade || '';
       case 'Borough': return data.borough || '';
       case 'Gender': return data.gender || '';
-      case 'Route': return data.route || '';
+      case 'Route': return route || '';
       case 'School': return data.school || '';
       case 'Allergies / Medical Notes': return data.medicalNotes || '';
       case 'Chaperone Name': return data.chaperoneName || '';
@@ -34,6 +38,22 @@ function addTouringStudent(data) {
   });
   sheet.appendRow(row);
   return true;
+}
+
+/**
+ * The next route to hand a family: the first free one, or failing that
+ * the least-used one.
+ *
+ * There are 7 routes, so a morning with 8 families has to double one up.
+ * That's allowed rather than refused - a family without a route is worse
+ * than two families on the same path - and Max Families Per Route on the
+ * Settings sheet controls when it starts doubling.
+ */
+function pickNextRoute_(availability) {
+  const maxPerRoute = Number(getSetting('Max Families Per Route', 1)) || 1;
+  const underCap = availability.filter(r => r.count < maxPerRoute);
+  const pool = underCap.length ? underCap : availability;
+  return pool.reduce((best, r) => r.count < best.count ? r : best, pool[0]).route;
 }
 
 function listTouringStudentsForTour(tourId) {
@@ -54,12 +74,15 @@ function getRouteAvailability(tourId) {
   const takenBy = {};
   students.forEach(r => {
     const route = String(r[routeCol] || '').trim();
-    if (route) takenBy[route] = fullName_(r[firstCol], r[lastCol]);
+    if (!route) return;
+    (takenBy[route] = takenBy[route] || []).push(fullName_(r[firstCol], r[lastCol]));
   });
 
+  const maxPerRoute = Number(getSetting('Max Families Per Route', 1)) || 1;
   return TOUR_ROUTE_NUMBERS.map(route => ({
     route: route,
-    taken: !!takenBy[route],
-    takenBy: takenBy[route] || ''
+    count: (takenBy[route] || []).length,
+    taken: (takenBy[route] || []).length >= maxPerRoute,
+    takenBy: (takenBy[route] || []).join(', ')
   }));
 }

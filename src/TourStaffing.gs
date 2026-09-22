@@ -62,16 +62,35 @@ function suggestStaffingForTour(tourId) {
     return x.name < y.name ? -1 : 1;
   }
 
-  function pickBestSingle(job) {
-    const ranked = availableFor(job).sort(byFairness);
-    if (ranked.length === 0) return { chosen: null, alternates: [] };
-    usedThisPass[ranked[0].name] = (usedThisPass[ranked[0].name] || 0) + 1;
-    return { chosen: ranked[0].name, alternates: ranked.map(a => a.name) };
+  /**
+   * The lobby, table and panel crews staff the morning as a whole rather
+   * than any one route, so each needs several people. Picks are taken in
+   * fairness order and re-ranked after every pick, so one pass doesn't
+   * hand the same kid two of the slots while others sit idle.
+   */
+  function pickCrew(job, count) {
+    const pool = availableFor(job);
+    const chosen = [];
+    for (let i = 0; i < count; i++) {
+      const ranked = pool
+        .filter(a => chosen.indexOf(a.name) === -1)
+        .sort(byFairness);
+      if (ranked.length === 0) break;
+      chosen.push(ranked[0].name);
+      usedThisPass[ranked[0].name] = (usedThisPass[ranked[0].name] || 0) + 1;
+    }
+    return {
+      chosen: chosen,
+      needed: count,
+      short: Math.max(0, count - chosen.length),
+      alternates: pool.sort(byFairness).map(a => a.name)
+    };
   }
 
+  const needed = jobsNeeded_();
   const singleRoles = {};
   [TOUR_JOBS.PANELIST, TOUR_JOBS.LOBBY_GREETER, TOUR_JOBS.TABLE_GREETER].forEach(job => {
-    singleRoles[job] = pickBestSingle(job);
+    singleRoles[job] = pickCrew(job, needed[job] || 1);
   });
 
   const guidePool = availableFor(TOUR_JOBS.TOUR_GUIDE);
@@ -88,10 +107,16 @@ function suggestStaffingForTour(tourId) {
       return score;
     }
 
-    const ranked = guidePool.slice().sort((x, y) => {
-      const diff = fitScore(y) - fitScore(x);
-      return diff !== 0 ? diff : byFairness(x, y);
-    });
+    // Anyone already holding a slot this morning is out of the running.
+    // Every job runs 8:30-9:25, so a second one is a double-booking that
+    // assignAmbassador would reject at save time anyway - better to
+    // suggest a weaker slate that saves than a stronger one that fails.
+    const ranked = guidePool
+      .filter(a => !usedThisPass[a.name])
+      .sort((x, y) => {
+        const diff = fitScore(y) - fitScore(x);
+        return diff !== 0 ? diff : byFairness(x, y);
+      });
 
     if (ranked.length === 0) {
       return { studentName: s.name, route: s.route, guide1: null, guide2: null, alternates: [], gradeMatched: false, classWith: null };
@@ -180,9 +205,9 @@ function confirmTourStaffing(tourId, selections) {
     }
   }
 
-  tryAssign(TOUR_JOBS.PANELIST, selections.panelist);
-  tryAssign(TOUR_JOBS.LOBBY_GREETER, selections.lobbyGreeter);
-  tryAssign(TOUR_JOBS.TABLE_GREETER, selections.tableGreeter);
+  (selections.panelist || []).forEach(name => tryAssign(TOUR_JOBS.PANELIST, name));
+  (selections.lobbyGreeter || []).forEach(name => tryAssign(TOUR_JOBS.LOBBY_GREETER, name));
+  (selections.tableGreeter || []).forEach(name => tryAssign(TOUR_JOBS.TABLE_GREETER, name));
   (selections.tourGuides || []).forEach(g => {
     tryAssign(TOUR_JOBS.TOUR_GUIDE, g.guide1, g.studentName);
     tryAssign(TOUR_JOBS.TOUR_GUIDE, g.guide2, g.studentName);
