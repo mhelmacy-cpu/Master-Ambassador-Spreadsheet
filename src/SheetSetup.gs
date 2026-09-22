@@ -44,10 +44,11 @@ function setupTeachersSheet_() {
 function setupJobsSheet_() {
   const sheet = getOrCreateSheet(SHEETS.JOBS);
   if (sheet.getLastRow() < 2) {
-    sheet.getRange(2, 1, 3, 3).setValues([
-      ['Front Desk Greeter', 'Greets visiting families at the main entrance.', 'Yes'],
-      ['Tour Guide', 'Leads prospective families on a walking tour of the school.', 'Yes'],
-      ['Classroom Helper', 'Assists a visiting student inside a classroom for the day.', 'Yes']
+    sheet.getRange(2, 1, 4, 3).setValues([
+      ['Panelist', 'Speaks on the student panel about their experience at the school.', 'Yes'],
+      ['Lobby Greeter', 'Greets visiting families as they arrive in the lobby.', 'Yes'],
+      ['Table Greeter', 'Staffs the welcome/sign-in table for visiting families.', 'Yes'],
+      ['Tour Guide', 'Leads a prospective family on a walking tour of the school.', 'Yes']
     ]);
   }
   const lastRow = Math.max(sheet.getLastRow(), 2);
