@@ -6,14 +6,27 @@
  * ambassadors who are eligible + active + free at the tour's time,
  * ranked by fairness (fewest Total Tours first) so duty rotates.
  *
- * Tour Guide: TOUR_GUIDES_PER_STUDENT (2) picks per touring student,
- * ranked by grade fit + borough fit, then fairness. Gender is a
- * constraint, not a weighted score: guide #1 is the best-fit candidate
- * whose gender matches the touring student's (when known and available);
- * guide #2 is simply the next-best-fit candidate of any gender. So a
- * boy touring might get one girl guide and one boy guide, or two boys —
- * never two guides picked without checking for at least one gender
- * match first.
+ * Tour Guide: 2 picks per touring student, ranked by grade fit + borough
+ * fit, then fairness. Grade and Gender are hard constraints, not just
+ * weighted scores: at least one of the 2 guides must be the exact same
+ * grade as the grade the student is applying to (this is generalized —
+ * it isn't specific to any one grade), and at least one must match
+ * Gender, whenever the eligible/available pool allows it. A single
+ * guide covering both is preferred; otherwise the two constraints are
+ * split across guide1/guide2. So a 5th-grade applicant touring with a
+ * 5th and 6th grader goes to class with the 5th grader; a boy touring
+ * might get one girl guide and one boy guide, or two boys, but never
+ * two guides picked without checking for at least one grade match and
+ * at least one gender match first.
+ *
+ * The "bring visitors to class" step isn't a separately-computed room —
+ * it's simply whichever guide covers the grade match, at wherever their
+ * own class already is (their Homeroom Pod + Teacher). Up to 3 touring
+ * students are steered toward the same class before spreading to
+ * another one of that grade's classes; if there aren't enough
+ * grade-matched guides to stay under that, it goes over rather than
+ * leaving a student without a grade match — that's flagged for staff to
+ * rebalance by hand.
  */
 
 function suggestStaffingForTour(tourId) {
@@ -30,6 +43,9 @@ function suggestStaffingForTour(tourId) {
   const { rows: assignmentRows } = readSheet(SHEETS.ASSIGNMENTS);
   const aCols = assignmentCols_();
   const usedThisPass = {};
+  const classVisitCount = {}; // "Pod|Teacher" -> # touring students already sent there this pass
+  const CLASS_VISIT_MAX = 3;
+  function classKey_(a) { return (a.homeroomPod || '?') + '|' + (a.teacher || '?'); }
 
   function availableFor(job) {
     return directory.filter(a =>
@@ -78,22 +94,57 @@ function suggestStaffingForTour(tourId) {
     });
 
     if (ranked.length === 0) {
-      return { studentName: s.name, route: s.route, guide1: null, guide2: null, alternates: [] };
+      return { studentName: s.name, route: s.route, guide1: null, guide2: null, alternates: [], gradeMatched: false, classWith: null };
     }
 
-    const genderMatch = s.gender ? ranked.find(a => a.gender && a.gender === s.gender) : null;
-    const guide1 = genderMatch || ranked[0];
-    const guide2 = ranked.find(a => a.name !== guide1.name) || null;
+    // Hard constraints: at least one guide should match applying Grade
+    // (exactly), and at least one should match Gender, when the pool
+    // allows it. A single guide covering both is preferred; otherwise
+    // split the two constraints across guide1/guide2. Among grade
+    // matches, prefer whichever one's class hasn't hit the 3-visitor
+    // cap yet — but never exclude someone just for being over it (the
+    // grade match is the hard constraint; the cap is a soft, rebalance-
+    // it-by-hand preference).
+    const gradeMatches = (s.grade != null ? ranked.filter(a => a.grade === s.grade) : [])
+      .slice()
+      .sort((x, y) => (classVisitCount[classKey_(x)] || 0) - (classVisitCount[classKey_(y)] || 0));
+    const genderMatches = s.gender ? ranked.filter(a => a.gender === s.gender) : [];
+    const coversBoth = a => gradeMatches.includes(a) && genderMatches.includes(a);
+
+    let guide1 = ranked.find(coversBoth) || gradeMatches[0] || genderMatches[0] || ranked[0];
+    const guide1CoversGrade = s.grade != null && guide1.grade === s.grade;
+    const guide1CoversGender = !!(s.gender && guide1.gender === s.gender);
+
+    let guide2 = null;
+    if (!guide1CoversGrade && gradeMatches.length > 0) {
+      guide2 = gradeMatches.find(a => a.name !== guide1.name) || null;
+    }
+    if (!guide2 && !guide1CoversGender && genderMatches.length > 0) {
+      guide2 = genderMatches.find(a => a.name !== guide1.name) || null;
+    }
+    if (!guide2) guide2 = ranked.find(a => a.name !== guide1.name) || null;
 
     usedThisPass[guide1.name] = (usedThisPass[guide1.name] || 0) + 1;
     if (guide2) usedThisPass[guide2.name] = (usedThisPass[guide2.name] || 0) + 1;
+
+    const gradeMatched = guide1CoversGrade || (guide2 && guide2.grade === s.grade);
+    const classGuide = guide1CoversGrade ? guide1 : (guide2 && guide2.grade === s.grade ? guide2 : null);
+    let classOverCap = false;
+    if (classGuide) {
+      const key = classKey_(classGuide);
+      classOverCap = (classVisitCount[key] || 0) >= CLASS_VISIT_MAX;
+      classVisitCount[key] = (classVisitCount[key] || 0) + 1;
+    }
 
     return {
       studentName: s.name,
       route: s.route,
       guide1: guide1.name,
       guide2: guide2 ? guide2.name : null,
-      alternates: ranked.map(a => a.name)
+      alternates: ranked.map(a => a.name),
+      gradeMatched: gradeMatched,
+      classWith: classGuide ? { guide: classGuide.name, pod: classGuide.homeroomPod, teacher: classGuide.teacher } : null,
+      classOverCap: classOverCap
     };
   });
 
@@ -146,6 +197,8 @@ function getAmbassadorDirectory_() {
   const firstCol = colNum_(headers, 'First Name') - 1;
   const lastCol = colNum_(headers, 'Last Name') - 1;
   const gradeCol = colNum_(headers, 'Grade') - 1;
+  const homeroomPodCol = colNum_(headers, 'Homeroom Pod') - 1;
+  const teacherCol = colNum_(headers, 'Teacher') - 1;
   const boroughCol = colNum_(headers, 'Borough') - 1;
   const genderCol = colNum_(headers, 'Gender') - 1;
   const activeCol = colNum_(headers, 'Active') - 1;
@@ -156,6 +209,8 @@ function getAmbassadorDirectory_() {
     .map(r => ({
       name: fullName_(r[firstCol], r[lastCol]),
       grade: parseGradeNum_(r[gradeCol]),
+      homeroomPod: String(r[homeroomPodCol] || '').trim(),
+      teacher: String(r[teacherCol] || '').trim(),
       borough: String(r[boroughCol] || '').trim().toUpperCase(),
       gender: String(r[genderCol] || '').trim(),
       active: String(r[activeCol]).trim().toLowerCase() === 'yes',

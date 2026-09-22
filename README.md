@@ -22,7 +22,9 @@ visitor-tour and student-ambassador program end to end:
 - **Track each ambassador's tour history** — Total Tours and Last Tour
   Date columns on the Ambassadors sheet, kept current automatically.
 - **Email teachers automatically, once a week**, a list of when their
-  student(s) will be pulled for ambassador duty.
+  student(s) will be pulled for ambassador duty — plus a per-tour-day
+  send covering ambassadors, the teachers they're missing class from,
+  and the teachers receiving touring visitors (headcount only).
 - **Manage job eligibility** per ambassador with a simple checkbox matrix.
 
 ## How it's organized
@@ -60,7 +62,8 @@ Opening the spreadsheet adds a **🎓 Tour & Ambassador Scheduler** menu with:
 - **Import / Update Ambassadors…** — paste a roster (Name, Grade, Borough, Parent 1 Name/Email, Parent 2 Name/Email — tab- or comma-separated, straight out of a spreadsheet) and it upserts the Ambassadors sheet. Matches on name **and** borough, since a student can legitimately have two rows (one per borough they're paired with). Fields you've hand-set per student — Teacher, Student Email, Active, Notes — are never overwritten by an import.
 - **Rebuild Eligibility Matrix** — re-syncs the checkbox grid after you add ambassadors or jobs (keeps existing checkmarks).
 - **Refresh Dashboard Now** — manually rebuild the live view.
-- **Send Weekly Teacher Emails Now** — trigger the email immediately (good for testing).
+- **Send Tour Day Emails…** — pick a tour that's already been staffed and sends 3 rounds of email: each participating ambassador gets their own schedule; each ambassador's teacher is told which student(s) they'll miss and when; each teacher receiving touring visitors (the grade-matched guide's own class) is told how many to expect — no names, per instruction.
+- **Send Weekly Teacher Emails Now** — trigger the rolling weekly digest immediately (good for testing).
 - **Automation** submenu — turn the weekly email and/or 10-minute dashboard auto-refresh on or off.
 
 ## Everyday usage
@@ -86,17 +89,31 @@ kid isn't suggested for two roles on the same tour unless the pool is too
 small to avoid it.
 
 **Tour Guide** — 2 per touring student (from the Touring Students rows
-added to that tour), ranked by:
-1. Grade fit (exact grade beats one grade off beats no match)
-2. Borough fit (exact match)
-3. Fairness (fewest Total Tours), as the tiebreaker
+added to that tour), ranked by grade fit + borough fit + fairness, but
+**Grade and Gender are hard constraints, not just weighted scores**: at
+least one of the 2 guides must be the *exact* same grade as the grade
+the student is applying to (this applies to every grade, not just one),
+and at least one must match Gender, whenever the eligible/available pool
+allows it. A single guide covering both is preferred; otherwise the two
+constraints are split across guide 1 and guide 2. So a 5th-grade
+applicant touring with a 5th and 6th grader is paired with the 5th
+grader for both guide duty and the class visit; a boy touring might get
+one girl guide and one boy guide, or two boys — the rule only guarantees
+*at least one* match on each axis, never that both guides must match.
 
-Gender is a **constraint, not a weighted score**: Guide 1 is the
-best-fit candidate whose Gender matches the touring student's (when
-both are set and a match exists); Guide 2 is simply the next-best-fit
-candidate of *any* gender. So a boy touring might get one girl guide and
-one boy guide, or two boys — the rule only guarantees *at least one*
-gender match when possible, never that both must match.
+**The "bring visitors to class" step isn't a separately-computed
+room** — it's simply wherever the grade-matched guide's own class
+already is (their Homeroom Pod + Teacher, from the roster sync). Up to 3
+touring students are steered toward the same class before spreading to
+another one of that grade's classes; if there aren't enough
+grade-matched guides available to stay under that, it goes over rather
+than leaving a student without a grade match — flagged in the dialog for
+staff to rebalance by hand. The dialog also reminds staff to verify the
+class isn't PE, Music, or Choices before walking a family over: the
+school's bell-schedule PDF splits each subject into parallel sections
+(A/B/C) without saying which named student is in which section, so
+there's no reliable way to compute a specific ambassador's live subject
+automatically — this is a manual check, not a bug.
 
 Nothing is ever saved by the suggestion step itself — **Staff This
 Tour…** always shows an editable slate first, and only writes to

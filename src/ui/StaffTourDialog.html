@@ -19,6 +19,8 @@
     .guide-row .row > div { flex: 1; }
     .student-name { font-weight: bold; }
     .empty { color: #999; font-style: italic; }
+    .class-visit { margin-top: 6px; font-size: 12px; color: #137333; }
+    .class-visit.warn { color: #b06000; }
   </style>
 </head>
 <body>
@@ -36,7 +38,7 @@
     <h3>Table Greeter</h3>
     <select id="tableGreeter"></select>
 
-    <h3>Tour Guides <span class="hint">— 2 per touring student; guide 1 is picked to match gender when possible</span></h3>
+    <h3>Tour Guides <span class="hint">— 2 per touring student; at least one guide matches applying grade and (when possible) gender</span></h3>
     <div id="guideRows"></div>
 
     <button type="button" id="confirmBtn">Confirm &amp; Save</button>
@@ -115,6 +117,19 @@
         guideRows.appendChild(div);
         fillSelect(div.querySelector('[data-slot="guide1"]'), g.alternates, g.guide1);
         fillSelect(div.querySelector('[data-slot="guide2"]'), g.alternates, g.guide2);
+
+        const classDiv = document.createElement('div');
+        if (g.classWith) {
+          classDiv.className = 'class-visit' + (g.classOverCap ? ' warn' : '');
+          classDiv.textContent = 'Class visit: with ' + g.classWith.guide + '’s class (' +
+            g.classWith.pod + (g.classWith.teacher ? ' — ' + g.classWith.teacher : '') + ')' +
+            (g.classOverCap ? ' — already has 3+ visitors, rebalance by hand if needed' : '') +
+            '. Verify it isn’t PE, Music, or Choices before heading over.';
+        } else {
+          classDiv.className = 'class-visit warn';
+          classDiv.textContent = 'No guide of this student’s applying grade was available — pick a class visit manually.';
+        }
+        div.appendChild(classDiv);
       });
     }
 

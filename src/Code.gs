@@ -18,6 +18,7 @@ function onOpen() {
     .addItem('🔁 Rebuild Eligibility Matrix', 'rebuildEligibilityMatrix')
     .addItem('📍 Refresh Dashboard Now', 'refreshDashboard')
     .addSeparator()
+    .addItem('✉️ Send Tour Day Emails…', 'showSendTourDayEmailsDialog')
     .addItem('✉️ Send Weekly Teacher Emails Now', 'sendWeeklyTeacherEmailsFromMenu_')
     .addSubMenu(SpreadsheetApp.getUi().createMenu('⏱️ Automation')
       .addItem('Turn ON weekly teacher emails', 'enableWeeklyEmailTrigger')
@@ -50,6 +51,10 @@ function showImportAmbassadorsDialog() {
 
 function showStaffTourDialog() {
   showDialog_('ui/StaffTourDialog', 'Staff This Tour', 640, 600);
+}
+
+function showSendTourDayEmailsDialog() {
+  showDialog_('ui/SendTourDayEmailsDialog', 'Send Tour Day Emails', 520, 420);
 }
 
 /* ---- Data providers for the dialogs (google.script.run) ---- */
@@ -100,4 +105,8 @@ function api_getRouteAvailability(tourId) {
 
 function api_generateWednesdayTours(startDateStr, weeks) {
   return generateWednesdayTours(startDateStr, weeks);
+}
+
+function api_sendTourDayEmails(tourId) {
+  return sendTourDayEmails(tourId);
 }
