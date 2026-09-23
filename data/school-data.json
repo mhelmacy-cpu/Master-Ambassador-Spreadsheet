@@ -3920,5 +3920,61 @@
    "initials": "LL",
    "note": "Subbing for Eliza (EZ) through the first half of the year; the schedule lists them together, so both are emailed."
   }
- ]
+ ],
+ "scheduleModel": {
+  "note": "How to read the bell schedule. Verified against all 5 days of the 2026-27 grid.",
+  "rule": [
+   "Every MS student belongs to TWO cross-cutting groups: a homeroom pod (their advisory) and a split (A/B/C, grade-wide). Roughly half the week runs in each.",
+   "A block whose text carries a section letter - Math A, Art B, Science C, Hum As/Bs - belongs to the SPLIT group named by that letter, not to the pod whose column it is drawn in.",
+   "A block with no letter - Hum DR M211, Music CN M103 - belongs to the POD whose column it is drawn in.",
+   "So: lettered block -> look up by the student split. Unlettered block -> look up by pod."
+  ],
+  "podColumnLetter": {
+   "DJM": "A",
+   "AOS": "B",
+   "CCM": "C",
+   "EEL": "A",
+   "MSB": "B",
+   "CJM": "A",
+   "RSS": "B"
+  },
+  "podColumnLetterNote": "Each pod column carries exactly one letter across the whole week (MMS is 5th grade, a single pod, so its two split groups are drawn as half-width columns instead). That is why the column can be mistaken for the pod on lettered blocks.",
+  "gradePods": {
+   "5": [
+    "MMS"
+   ],
+   "6": [
+    "DJM",
+    "AOS",
+    "CCM"
+   ],
+   "7": [
+    "EEL",
+    "MSB"
+   ],
+   "8": [
+    "CJM",
+    "RSS"
+   ]
+  },
+  "gradeSplits": {
+   "5": [
+    "A",
+    "B"
+   ],
+   "6": [
+    "A",
+    "B",
+    "C"
+   ],
+   "7": [
+    "A",
+    "B"
+   ],
+   "8": [
+    "A",
+    "B"
+   ]
+  }
+ }
 }
