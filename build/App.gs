@@ -27,6 +27,7 @@ const SHEETS = {
   TEACHERS: 'Teachers',
   BELL: 'Bell Schedule',
   ROUTES: 'Tour Routes',
+  BUDDIES: '5th Grade Buddies',
   SETTINGS: 'Settings'
 };
 
@@ -35,20 +36,23 @@ HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', '
   'Borough', 'Gender', 'Race (Presenting)', 'Student Email', 'Parent 1 Name', 'Parent 1 Email',
   'Parent 2 Name', 'Parent 2 Email', 'Active'];
 HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'School', 'Grade', 'Gender', 'Race', 'Borough',
-  'Route', 'Tour Guides', 'Notes'];
+  'Class Visit', 'Route', 'Tour Guides', 'Class Buddy', 'Notes'];
 HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route', 'Notes'];
+const CLASS_VISIT_WITH_GUIDE = 'With tour guide';
 HEADERS[SHEETS.JOBS] = ['Job Name', 'Description', 'Active'];
 HEADERS[SHEETS.ELIGIBILITY] = ['Ambassador', 'Panelist', 'Lobby Greeter', 'Table Greeter', 'Tour Guide'];
 HEADERS[SHEETS.TEACHERS] = ['Teacher Name', 'Initials', 'Teacher Email', 'Room / Notes'];
 HEADERS[SHEETS.BELL] = ['Day', 'Homeroom', 'Split', 'Start', 'End', 'What / Teacher / Room'];
 HEADERS[SHEETS.ROUTES] = ['Route', 'Direction', 'Humanities Teacher', 'Language', 'Itinerary'];
+HEADERS[SHEETS.BUDDIES] = ['Student', 'Language', 'Teacher', 'Room', 'Can Host a Visitor'];
 HEADERS[SHEETS.SETTINGS] = ['Setting', 'Value'];
 
 const JOBS = {
   PANELIST: 'Panelist',
   LOBBY: 'Lobby Greeter',
   TABLE: 'Table Greeter',
-  GUIDE: 'Tour Guide'
+  GUIDE: 'Tour Guide',
+  BUDDY: 'Class Buddy'
 };
 
 const YES_NO = ['Yes', 'No'];
@@ -69,6 +73,15 @@ const RACE_OPTIONS = ['White', 'African American', 'Asian'];
 const BOROUGHS = ['M', 'B', 'Q', 'X', 'S', 'J'];
 const BOROUGH_NAMES = { M: 'Manhattan', B: 'Brooklyn', Q: 'Queens', X: 'Bronx', S: 'Staten Island', J: 'New Jersey' };
 
+/** The class-visit choices offered for a rising 5th grader. */
+function classVisitOptions_() {
+  const out = [CLASS_VISIT_WITH_GUIDE];
+  Object.keys(FIFTH_LANGUAGE_CLASSES_).forEach(function (k) {
+    out.push('5th grade ' + FIFTH_LANGUAGE_CLASSES_[k].language);
+  });
+  return out;
+}
+
 const DEFAULT_SETTINGS = [
   ['Sender Display Name', 'LREI Middle School Tours'],
   ['Reply-To Email', ''],
@@ -84,7 +97,8 @@ const DEFAULT_SETTINGS = [
   ['Guide Grades for Rising 7', '6 and 7'],
   ['Guide Grades for Rising 8', '7 and 8'],
   ['Visitor Races Needing a Student of Color Guide', 'African American, Black'],
-  ['Max Families Per Route', '1']
+  ['Max Families Per Route', '1'],
+  ['Class Visit Handoff Time', '9:06']
 ];
 
 const HANDLER_TEACHER_EMAILS = 'sendTeacherEmailsForNextTour';
@@ -311,6 +325,7 @@ function setupSpreadsheet() {
   setupAmbassadors_();
   setupProspective_();
   setupTracker_();
+  setupBuddies_();
   setupJobs_();
   setupEligibility_();
   setupTeachers_();
@@ -320,7 +335,7 @@ function setupSpreadsheet() {
 
   if (firstRun) {
     const order = [SHEETS.PROSPECTIVE, SHEETS.TRACKER, SHEETS.AMBASSADORS, SHEETS.ELIGIBILITY,
-      SHEETS.JOBS, SHEETS.TEACHERS, SHEETS.ROUTES, SHEETS.BELL, SHEETS.SETTINGS];
+        SHEETS.JOBS, SHEETS.BUDDIES, SHEETS.TEACHERS, SHEETS.ROUTES, SHEETS.BELL, SHEETS.SETTINGS];
     order.forEach(function (name, i) {
       const s = ss_().getSheetByName(name);
       if (s) ss_().setActiveSheet(s).moveActiveSheet(i + 1);
@@ -406,6 +421,15 @@ function setupProspective_() {
     'A student applying for 7th is in 6th at the moment, so they get one ' +
     'guide in 6th and one in 7th. Rising 5th graders get two 6th graders, ' +
     'since there is no grade below that here.');
+  dropdown_(s, last, col_(SHEETS.PROSPECTIVE, 'Class Visit') + 1, classVisitOptions_(), true);
+  note_(s, SHEETS.PROSPECTIVE, 'Class Visit',
+    'Where this visitor spends the end of the morning.\n\n' +
+    'Leave blank or choose "' + CLASS_VISIT_WITH_GUIDE + '" and they go to class ' +
+    'with one of their guides, as usual.\n\n' +
+    'For a rising 5th grader you can instead pick one of the 5th grade ' +
+    'language classes. A 5th grader from that class collects them from the ' +
+    'guides and walks them down to the cafeteria at the end.');
+  note_(s, SHEETS.PROSPECTIVE, 'Class Buddy', 'Filled in by Staff This Wednesday Tour - do not type here.');
   note_(s, SHEETS.PROSPECTIVE, 'Route', 'Filled in by Staff This Wednesday Tour - do not type here.');
   note_(s, SHEETS.PROSPECTIVE, 'Tour Guides', 'Filled in by Staff This Wednesday Tour - do not type here.');
   s.autoResizeColumns(1, h.length);
@@ -425,6 +449,39 @@ function setupTracker_() {
   s.autoResizeColumns(1, HEADERS[SHEETS.TRACKER].length);
 }
 
+/**
+ * The 5th graders who can host a visiting student in their own class.
+ *
+ * Fifth grade rotates through the three languages roughly every four
+ * weeks, so this sheet is meant to be edited: when the rotation turns
+ * over, change the Language column and the visits follow it.
+ */
+function setupBuddies_() {
+  const s = sheet_(SHEETS.BUDDIES);
+  const fresh = s.getLastRow() < 2;
+  if (fresh) {
+    const rows = FIFTH_LANGUAGE_STUDENTS_.map(function (st) {
+      const c = FIFTH_LANGUAGE_CLASSES_[st.lang] || {};
+      return [st.name, c.language || '', c.teacher || '', c.room || '', st.canHost ? 'Yes' : 'No'];
+    });
+    s.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  if (!fresh) return;
+  const last = Math.max(s.getLastRow(), 2);
+  dropdown_(s, last, col_(SHEETS.BUDDIES, 'Language') + 1,
+    Object.keys(FIFTH_LANGUAGE_CLASSES_).map(function (k) { return FIFTH_LANGUAGE_CLASSES_[k].language; }), true);
+  dropdown_(s, last, col_(SHEETS.BUDDIES, 'Can Host a Visitor') + 1, YES_NO);
+  note_(s, SHEETS.BUDDIES, 'Language',
+    'Fifth grade rotates through all three languages, so this changes every ' +
+    'few weeks. Update it here when the rotation turns over and the class ' +
+    'visits follow - the Teacher and Room should change with it.');
+  note_(s, SHEETS.BUDDIES, 'Can Host a Visitor',
+    'Yes means this student can have a visiting student join them in class. ' +
+    'They collect the visitor from the tour guides and walk them down to the ' +
+    'cafeteria at the end.');
+  s.autoResizeColumns(1, HEADERS[SHEETS.BUDDIES].length);
+}
+
 function setupJobs_() {
   const s = sheet_(SHEETS.JOBS);
   const fresh = s.getLastRow() < 2;
@@ -433,7 +490,8 @@ function setupJobs_() {
       [JOBS.PANELIST, 'Speaks on the student panel. Chosen by hand, not by the staffing command.', 'Yes'],
       [JOBS.LOBBY, 'Greets visiting families as they arrive in the lobby.', 'Yes'],
       [JOBS.TABLE, 'Staffs the welcome and sign-in table.', 'Yes'],
-      [JOBS.GUIDE, 'Walks a prospective student round the building on a set route.', 'Yes']
+      [JOBS.GUIDE, 'Walks a prospective student round the building on a set route.', 'Yes'],
+      [JOBS.BUDDY, 'A 5th grader hosting a visiting student in their own class after the tour.', 'Yes']
     ]);
   }
   if (!fresh) return;
@@ -940,10 +998,32 @@ function prospectiveFor_(dateVal) {
       grade: trim_(r[col_(N, 'Grade')]).replace(/[^0-9]/g, ''),
       gender: trim_(r[col_(N, 'Gender')]),
       race: trim_(cell_(r, N, 'Race')),
+      classVisit: trim_(cell_(r, N, 'Class Visit')),
       borough: trim_(r[col_(N, 'Borough')]).toUpperCase()
     });
   });
   return out;
+}
+
+/** The 5th graders available to host, from the Buddies sheet. */
+function buddies_() {
+  const N = SHEETS.BUDDIES;
+  return rows_(N).map(function (r) {
+    return {
+      name: trim_(r[col_(N, 'Student')]),
+      language: trim_(r[col_(N, 'Language')]),
+      teacher: trim_(r[col_(N, 'Teacher')]),
+      room: trim_(r[col_(N, 'Room')]),
+      canHost: norm_(r[col_(N, 'Can Host a Visitor')]) === 'yes'
+    };
+  }).filter(function (b) { return b.name !== ''; });
+}
+
+/** "5th grade Mandarin" -> "mandarin". Blank for a guide visit. */
+function classVisitLanguage_(choice) {
+  const c = norm_(choice);
+  if (!c || c === norm_(CLASS_VISIT_WITH_GUIDE)) return '';
+  return c.replace(/^5th grade\s*/, '').replace(/\s*class$/, '');
 }
 
 /* =========================================================
@@ -1084,6 +1164,40 @@ function planTour(dateStr) {
         ? guideMissReason_(v, missing, pool, used, canDo, all.length)
         : ''
     };
+  });
+
+  /* ---- 5th grade class visits ---- */
+  const buddyPool = buddies_().filter(function (b) { return b.canHost; });
+  const buddyUsed = {};
+  const handoff = setting_('Class Visit Handoff Time', '9:06');
+  const tourEnd = setting_('Tour End Time', '9:25');
+
+  pairs.forEach(function (p) {
+    const want = classVisitLanguage_(p.visitor.classVisit);
+    if (!want) return;
+    const inClass = buddyPool.filter(function (b) {
+      return !buddyUsed[b.name] && norm_(b.language) === want;
+    });
+    if (!inClass.length) {
+      p.buddyProblem = buddyPool.filter(function (b) { return norm_(b.language) === want; }).length
+        ? 'every 5th grader in that class is already hosting someone'
+        : 'no 5th grader on the Buddies sheet is in that class and marked Can Host';
+      return;
+    }
+    // Whoever has hosted least so far.
+    inClass.sort(function (a, b) {
+      const ha = (hist[norm_(a.name)] || {}).total || 0;
+      const hb = (hist[norm_(b.name)] || {}).total || 0;
+      if (ha !== hb) return ha - hb;
+      return a.name < b.name ? -1 : 1;
+    });
+    const pick = inClass[0];
+    buddyUsed[pick.name] = true;
+    p.buddy = pick;
+    p.handoff = timeLabelOrRaw_(handoff) + ' - bring ' + p.visitor.name + ' to ' + pick.name +
+      ' in ' + pick.room + ' (' + pick.teacher + ', ' + pick.language + '). Tour guides are ' +
+      'finished and can go back to class. ' + pick.name + ' brings ' + p.visitor.name +
+      ' down to the cafeteria at ' + timeLabelOrRaw_(tourEnd) + '.';
   });
 
   /* ---- greeters ---- */
@@ -1363,6 +1477,16 @@ function commitTour(dateStr) {
       out.push(row);
     });
   });
+  plan.pairs.forEach(function (p) {
+    if (!p.buddy) return;
+    const row = blankRow_(N);
+    row[col_(N, 'Tour Date')] = dateVal;
+    row[col_(N, 'Ambassador')] = p.buddy.name;
+    row[col_(N, 'Job')] = JOBS.BUDDY;
+    row[col_(N, 'Prospective Student(s)')] = p.visitor.name;
+    row[col_(N, 'Notes')] = p.handoff;
+    out.push(row);
+  });
   plan.greeters.forEach(function (c) {
     c.chosen.forEach(function (n) {
       const row = blankRow_(N);
@@ -1384,6 +1508,11 @@ function commitTour(dateStr) {
     psheet.getRange(p.visitor.row, col_(P, 'Route') + 1).setValue(p.route);
     psheet.getRange(p.visitor.row, col_(P, 'Tour Guides') + 1)
       .setValue((p.guideNames || p.guides).join(', '));
+    const bcol = optionalCol_(P, 'Class Buddy');
+    if (bcol !== -1) {
+      psheet.getRange(p.visitor.row, bcol + 1)
+        .setValue(p.buddy ? p.buddy.name + ' (' + p.buddy.room + ')' : '');
+    }
   });
 
   return { written: out.length, plan: plan };
@@ -1472,6 +1601,8 @@ function sendStudentEmails(dateStr) {
 
   const grouped = {};
   assignments.forEach(function (a) {
+    // The 5th grade buddies hear about it in person, not by email.
+    if (a.job === JOBS.BUDDY) return;
     (grouped[a.name] = grouped[a.name] || []).push(a);
   });
 
@@ -1538,8 +1669,32 @@ function sendTeacherEmails(dateStr) {
     seen[norm_(a.name)] = { jobs: [a] };
   });
 
+  /* The language teacher whose class a visitor is joining. The 5th grader
+   * hosting them is spoken to in person, so only the teacher hears. */
+  const byHost = {};
+  const buddyIndex = {};
+  buddies_().forEach(function (b) { buddyIndex[norm_(b.name)] = b; });
+  assignments.forEach(function (a) {
+    if (a.job !== JOBS.BUDDY) return;
+    const b = buddyIndex[norm_(a.name)];
+    if (!b || !b.teacher) {
+      needsYou.push(a.name + ' is hosting ' + a.visitor +
+        ' but has no Teacher on the 5th Grade Buddies sheet, so nobody could be told.');
+      return;
+    }
+    const t = teacherByName[norm_(b.teacher)];
+    if (!t || !t.email) {
+      needsYou.push(b.teacher + ' is hosting ' + a.visitor + ' in ' + b.room +
+        ' but has no email on the Teachers sheet.');
+      return;
+    }
+    if (!byHost[t.email]) byHost[t.email] = { name: t.name, rows: [] };
+    byHost[t.email].rows.push({ visitor: a.visitor, student: a.name, room: b.room, language: b.language });
+  });
+
   Object.keys(seen).forEach(function (key) {
-    const jobs = seen[key].jobs;
+    const jobs = seen[key].jobs.filter(function (j) { return j.job !== JOBS.BUDDY; });
+    if (!jobs.length) return;
     const name = jobs[0].name;
     const who = byName[key];
     if (!who) { needsYou.push(name + ' is on the tracker but not on the Ambassadors sheet.'); return; }
@@ -1638,8 +1793,36 @@ function sendTeacherEmails(dateStr) {
     teachersSent++;
   });
 
+  let hostsSent = 0;
+  const handoff = timeLabelOrRaw_(setting_('Class Visit Handoff Time', '9:06'));
+  const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
+  Object.keys(byHost).forEach(function (email) {
+    const e = byHost[email];
+    const body = e.rows.map(function (r) {
+      return '<tr><td style="' + TD_ + '">' + escapeHtml_(r.visitor) + '</td>' +
+        '<td style="' + TD_ + '">' + escapeHtml_(r.student) + '</td>' +
+        '<td style="' + TD_ + '">' + escapeHtml_(r.room) + '</td></tr>';
+    }).join('');
+    const many = e.rows.length > 1;
+    const html = '<div style="' + MAIL_STYLE_ + '">' +
+      '<p>Hi ' + escapeHtml_(e.name) + ',</p>' +
+      '<p>' + (many ? 'Prospective students are' : 'A prospective student is') +
+      ' joining your class ' + escapeHtml_(when.body) + ', at the end of a Middle School tour. ' +
+      'Their tour guides bring them up at about ' + escapeHtml_(handoff) +
+      ', and the 5th grader below walks them down to the cafeteria at ' +
+      escapeHtml_(endsAt) + '.</p>' +
+      '<table style="' + TABLE_STYLE_ + '">' +
+      '<tr><th style="' + TH_ + '">Visiting student</th>' +
+      '<th style="' + TH_ + '">Sitting with</th><th style="' + TH_ + '">Room</th></tr>' +
+      body + '</table>' +
+      '<p>Nothing is needed from you beyond a seat.<br>' + escapeHtml_(senderName) + '</p></div>';
+    MailApp.sendEmail(mailOptions_(email,
+      'Student Visitor in Your Class - ' + when.subject, html));
+    hostsSent++;
+  });
+
   return {
-    advisorsSent: advisorsSent, teachersSent: teachersSent,
+    advisorsSent: advisorsSent, teachersSent: teachersSent, hostsSent: hostsSent,
     needsYou: needsYou, date: longDate_(dateVal)
   };
 }
@@ -1779,6 +1962,9 @@ function showStaffDialog() {
     '(x.visitor.school?" <span class=\'muted\'><br>("+esc(x.visitor.school)+")</span>":"")+"</td><td>"+' +
     '(x.guides.length?esc(x.guides.join(", ")):"<b>none found</b>")+' +
     '(x.guideMix?"<br><span class=\'muted\'>"+esc(x.guideMix)+"</span>":"")+' +
+    '(x.buddy?"<br><span class=\'muted\'>class visit: "+esc(x.buddy.name)+" - "+esc(x.buddy.language)+' +
+    '", "+esc(x.buddy.teacher)+", "+esc(x.buddy.room)+"</span>":"")+' +
+    '(x.buddyProblem?"<br><b>class visit not assigned - "+esc(x.buddyProblem)+"</b>":"")+' +
     '(x.socShortfall?"<br><b>no student of color was free for this pair</b>":"")+' +
     '(x.genderShortfall?"<br><b>nobody of the visitor\'s own gender was free</b>":"")+' +
     '(x.short?" <span class=\'muted\'>short "+x.short+(x.why?" - "+esc(x.why):"")+"</span>":"")+' +
@@ -1829,8 +2015,9 @@ function showEmailDialog() {
     'function done(r){var h="<div class=\'free\'>";' +
     'if(r.note){h+=esc(r.note);}else{' +
     'if(r.sent!=null){h+="<b>"+r.sent+"</b> student email(s) sent for "+esc(r.date)+".";}' +
-    'else{h+="<b>"+r.advisorsSent+"</b> advisor email(s) and <b>"+r.teachersSent+' +
-    '"</b> class-teacher email(s) sent for "+esc(r.date)+".";}}' +
+    'else{h+="<b>"+r.advisorsSent+"</b> advisor email(s), <b>"+r.teachersSent+' +
+    '"</b> class-teacher email(s)"+(r.hostsSent?" and <b>"+r.hostsSent+"</b> host-teacher email(s)":"")+' +
+    '" sent for "+esc(r.date)+".";}}' +
     'h+="</div>";' +
     'if(r.skipped&&r.skipped.length){h+="<div class=\'warn\'><b>No Student Email on file, so not sent:</b><br>"+' +
     'esc(r.skipped.join(", "))+"</div>";}' +

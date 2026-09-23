@@ -326,3 +326,39 @@ const BELL_SCHEDULE_ = {
   }
 };
 
+
+/* ---------- Fifth grade world language, for class visits ---------- */
+
+/*
+ * The first 5th grade world language rotation, 8 Sept to 2 Oct. MMS ro
+ * tates through all three, so this changes each rotation and is editab
+ * le on the 5th Grade Buddies sheet.
+ */
+
+const FIFTH_LANGUAGE_CLASSES_ = {
+  'F': { language: 'French', teacher: 'Sharyn', room: 'M207' },
+  'M': { language: 'Mandarin', teacher: 'Janet', room: 'M208' },
+  'S': { language: 'Spanish', teacher: 'Mary Katherine', room: 'M209' }
+};
+
+const FIFTH_LANGUAGE_STUDENTS_ = [
+  { name: 'Aeon Anjargolian', lang: 'F', canHost: false },
+  { name: 'Archimedes Gutmann', lang: 'F', canHost: false },
+  { name: 'Ezra Fisher', lang: 'F', canHost: false },
+  { name: 'McKenna Rodzevicius', lang: 'F', canHost: false },
+  { name: 'Perla Dunn', lang: 'F', canHost: true },
+  { name: 'Tobik Maczka', lang: 'F', canHost: false },
+  { name: 'Aiden Tedder', lang: 'M', canHost: false },
+  { name: 'Edie Gerson', lang: 'M', canHost: true },
+  { name: 'Isabella Dike', lang: 'M', canHost: false },
+  { name: 'Luka Cuparic', lang: 'M', canHost: false },
+  { name: 'Miles Titus', lang: 'M', canHost: true },
+  { name: 'Rhea Kaiser', lang: 'M', canHost: true },
+  { name: 'Alexander Rogoff', lang: 'S', canHost: true },
+  { name: 'Ellis Ahmed', lang: 'S', canHost: true },
+  { name: 'Joakim Leon-McCool', lang: 'S', canHost: false },
+  { name: 'Liv Feldman', lang: 'S', canHost: false },
+  { name: 'Matteo Keklikian', lang: 'S', canHost: true },
+  { name: 'Olivia Lee', lang: 'S', canHost: false },
+  { name: 'Roger Sierant', lang: 'S', canHost: true }
+];
