@@ -53,7 +53,15 @@ One command, run once the prospective students are entered. It assigns:
 - **Lobby Greeters** - three.
 - **Table Greeters** - two.
 
-It does **not** assign **Panelists**. Those are chosen by hand.
+It does **not** assign **Panelists**. Those are chosen by hand - but by
+ticking them in the dialog rather than typing them onto the tracker. The
+command offers everyone still free (and anyone already on the panel,
+ticked), marks the yellow lights, and whoever is ticked when she saves is
+written to the Tour Tracker as a Panelist. That is what puts them in the
+Tuesday and Wednesday emails with everybody else.
+
+Unticking somebody takes their row off again. A name typed straight onto
+the tracker that the dialog never offered is left alone.
 
 Because of that, the command finishes by listing every ambassador it did
 not use, so the panel can be picked from that list without double-booking

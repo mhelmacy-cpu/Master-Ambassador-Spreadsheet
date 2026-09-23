@@ -1524,13 +1524,28 @@ function planTour(dateStr, keepExisting) {
     crew(JOBS.TABLE, Number(setting_('Table Greeters Needed', '2')) || 2)
   ];
 
-  /* ---- who is left, for the panel ---- */
-  const free = pool.filter(function (a) { return !used[a.name] && canDo(a, JOBS.PANELIST); })
-    .sort(fairness)
-    .map(function (a) {
-      const h = hist[norm_(a.name)] || { total: 0 };
-      return { name: a.name, grade: a.grade, tours: h.total };
-    });
+  /* ---- who is left, for the panel ----
+   *
+   * The panel is hers to pick, so this only offers the people who are
+   * free to be picked. Anyone already saved as a panelist for this date
+   * is in the list too, ticked, so the list is what the panel is rather
+   * than what is left over.
+   */
+  const onPanel = {};
+  assignmentsOn_(dateVal).forEach(function (a) {
+    if (a.job === JOBS.PANELIST) onPanel[norm_(a.name)] = true;
+  });
+  const free = pool.filter(function (a) {
+    if (onPanel[norm_(a.name)]) return true;
+    return !used[a.name] && canDo(a, JOBS.PANELIST);
+  }).sort(fairness).map(function (a) {
+    const h = hist[norm_(a.name)] || { total: 0 };
+    return {
+      name: a.name, grade: a.grade, tours: h.total,
+      onPanel: !!onPanel[norm_(a.name)],
+      yellow: norm_(a.light) === 'yellow'
+    };
+  });
 
   const everyone = [];
   pairs.forEach(function (p) { p.guideNames.forEach(function (g) { everyone.push(g); }); });
@@ -1757,7 +1772,7 @@ function setupWarnings_(all, visitors) {
 }
 
 /** Writes a plan to the Tour Tracker and back onto Prospective Students. */
-function commitTour(dateStr, keepExisting) {
+function commitTour(dateStr, keepExisting, panelists) {
   const plan = planTour(dateStr, keepExisting);
   const dateVal = toDate_(plan.date);
   const N = SHEETS.TRACKER;
@@ -1829,6 +1844,8 @@ function commitTour(dateStr, keepExisting) {
       .setNumberFormat('yyyy-mm-dd');
   }
 
+  const panel = savePanel_(dateVal, panelists, plan);
+
   const P = SHEETS.PROSPECTIVE;
   const psheet = sheet_(P);
   plan.pairs.forEach(function (p) {
@@ -1842,7 +1859,59 @@ function commitTour(dateStr, keepExisting) {
     }
   });
 
-  return { written: out.length, plan: plan };
+  return { written: out.length, panel: panel, plan: plan };
+}
+
+/**
+ * The panel she ticked, written to the tracker.
+ *
+ * She picks the panel herself, so this only records it - but recording
+ * it is what puts those ambassadors in the Tuesday and Wednesday
+ * emails along with everybody else, which is the whole point.
+ *
+ * Only the names she was offered are hers to take off again. Anyone
+ * typed straight onto the tracker who is not on the Ambassadors sheet
+ * is left alone, because the dialog never showed them.
+ */
+function savePanel_(dateVal, names, plan) {
+  if (!names) return null;
+  const N = SHEETS.TRACKER;
+  const tracker = sheet_(N);
+  const want = {};
+  (names || []).forEach(function (n) { if (trim_(n)) want[norm_(n)] = trim_(n); });
+
+  const offered = {};
+  (plan.free || []).forEach(function (f) { offered[norm_(f.name)] = true; });
+
+  let removed = 0;
+  const have = {};
+  const existing = rows_(N);
+  for (let i = existing.length - 1; i >= 0; i--) {
+    const r = existing[i];
+    if (!sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal)) continue;
+    if (trim_(r[col_(N, 'Job')]) !== JOBS.PANELIST) continue;
+    const who = norm_(r[col_(N, 'Ambassador')]);
+    if (want[who]) { have[who] = true; continue; }
+    if (!offered[who]) continue;          // never offered, so not hers to lose
+    tracker.deleteRow(i + 2);
+    removed++;
+  }
+
+  const add = [];
+  Object.keys(want).forEach(function (k) {
+    if (have[k]) return;
+    const row = blankRow_(N);
+    row[col_(N, 'Tour Date')] = dateVal;
+    row[col_(N, 'Ambassador')] = want[k];
+    row[col_(N, 'Job')] = JOBS.PANELIST;
+    add.push(row);
+  });
+  if (add.length) {
+    tracker.getRange(tracker.getLastRow() + 1, 1, add.length, add[0].length).setValues(add);
+    tracker.getRange(2, col_(N, 'Tour Date') + 1, tracker.getLastRow() - 1, 1)
+      .setNumberFormat('yyyy-mm-dd');
+  }
+  return { added: add.length, removed: removed, total: Object.keys(want).length };
 }
 
 /* =========================================================
@@ -2662,6 +2731,11 @@ const DIALOG_CSS_ =
   '.check-first label{display:flex;align-items:center;gap:8px;font-weight:bold;cursor:pointer;margin:0;}' +
   '.check-first input{width:16px;height:16px;cursor:pointer;}' +
   '.free{background:#eef5ee;border:1px solid #bcd6bf;border-radius:6px;padding:10px;margin-top:12px;}' +
+  '.panel{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0;}' +
+  '.panel label{display:flex;align-items:center;gap:6px;font-weight:normal;margin:0;' +
+  'width:calc(50% - 14px);cursor:pointer;}' +
+  '.panel input{width:15px;height:15px;cursor:pointer;}' +
+  '.panel .yel{color:#8a5a12;font-size:11px;}' +
   '.muted{color:#777;}';
 
 function showStaffDialog() {
@@ -2725,9 +2799,15 @@ function showStaffDialog() {
     'if(p.overallMix){h+="<h3>Everyone assigned ("+p.assignedCount+")</h3><div class=\'muted\'>"+' +
     'esc(p.overallMix)+(p.overallRaceMix?"<br>"+esc(p.overallRaceMix):"")+"</div>";}' +
     'h+="</div>";' +
-    'if(p.free.length){h+="<div class=\'free\'><b>Still free - pick your panelists from these "+p.free.length+"</b><br>"+' +
-    'esc(p.free.map(function(f){return f.name+" ("+(f.tours||0)+")";}).join(", "))+' +
-    '"<br><span class=\'muted\'>The number is how many jobs they have done, fewest first.</span></div>";}' +
+    'if(p.free.length){h+="<div class=\'free\'><b>Your panel - tick who you want</b>' +
+    '<div class=\'panel\'>"+p.free.map(function(f){' +
+    'return "<label><input type=\'checkbox\' class=\'pan\' value=\""+esc(f.name)+"\""+' +
+    '(f.onPanel?" checked":"")+"> "+esc(f.name)+" <span class=\'muted\'>"+(f.grade?"gr "+' +
+    'esc(f.grade)+", ":"")+(f.tours||0)+"</span>"+(f.yellow?" <b class=\'yel\'>check ' +
+    'first</b>":"")+"</label>";}).join("")+"</div>"+' +
+    '"<span class=\'muted\'>The number is how many jobs they have done, fewest first. ' +
+    'Whoever is ticked when you save is put on the Tour Tracker, so they get the same ' +
+    'emails as everybody else.</span></div>";}' +
     'if(p.warnings.length){h+="<div class=\'warn\'><b>Worth fixing first</b><ul>"+' +
     'p.warnings.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>";}' +
     'if(p.needConfirm&&p.needConfirm.length){' +
@@ -2744,9 +2824,16 @@ function showStaffDialog() {
     'if(!b||!b.checked){return;}}document.getElementById("save").disabled=true;' +
     'google.script.run.withSuccessHandler(function(r){' +
     'document.getElementById("out").innerHTML="<div class=\'free\'><b>Saved.</b> "+r.written+' +
-    '" row(s) written to the Tour Tracker, and the routes and guides filled in on Prospective Students.</div>";})' +
+    '" row(s) written to the Tour Tracker, and the routes and guides filled in on ' +
+    'Prospective Students."+(r.panel?"<br>Panel: "+r.panel.total+" ambassador(s)"+' +
+    '(r.panel.added?", "+r.panel.added+" added":"")+(r.panel.removed?", "+r.panel.removed+' +
+    '" taken off":"")+".":"")+"</div>";})' +
     '.withFailureHandler(fail).api_commitTour(document.getElementById("d").value,' +
-    'document.getElementById("keep").checked);}' +
+    'document.getElementById("keep").checked,panelPicked());}' +
+    'function panelPicked(){var out=[];' +
+    'var boxes=document.querySelectorAll("input.pan");' +
+    'for(var i=0;i<boxes.length;i++){if(boxes[i].checked){out.push(boxes[i].value);}}' +
+    'return out;}' +
     '<\/script>';
   dialog_(html, 'Staff This Wednesday Tour', 640, 620);
 }
@@ -2855,7 +2942,9 @@ function showLockerSlipDialog() {
 function api_buildLockerSlips(dateStr) { return buildLockerSlips(dateStr); }
 function api_buildRouteSheets(dateStr) { return buildRouteSheets(dateStr); }
 function api_planTour(dateStr, keep) { return planTour(dateStr, keep); }
-function api_commitTour(dateStr, keep) { return commitTour(dateStr, keep); }
+function api_commitTour(dateStr, keep, panelists) {
+  return commitTour(dateStr, keep, panelists);
+}
 /**
  * One test click gives her every version that will really go out.
  *
