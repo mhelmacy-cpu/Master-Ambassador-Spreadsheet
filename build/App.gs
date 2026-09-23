@@ -977,6 +977,31 @@ function guideGradesFor_(applyingForGrade, howMany) {
   });
 }
 
+/**
+ * Swaps out any grade there is simply nobody in.
+ *
+ * A setting can ask for a grade the school has no ambassadors in - the
+ * default for a rising 6th grader asks for a 5th grader, and there are
+ * none. Rather than leave that place empty, it moves up to the nearest
+ * grade that does have somebody. So a rising 5th grader gets two 6th
+ * graders whatever the setting has been changed to.
+ */
+function usableGrades_(wanted, pool) {
+  const have = {};
+  pool.forEach(function (a) { if (a.grade) have[a.grade] = true; });
+  if (!Object.keys(have).length) return wanted;
+  return wanted.map(function (g) {
+    if (have[g]) return g;
+    for (let up = Number(g) + 1; up <= HIGHEST_GRADE_; up++) {
+      if (have[String(up)]) return String(up);
+    }
+    for (let down = Number(g) - 1; down >= LOWEST_GRADE_; down--) {
+      if (have[String(down)]) return String(down);
+    }
+    return g;
+  });
+}
+
 /** "6th", 6, " 7 " -> "6". A date is not a grade, so it gives nothing. */
 function gradeNumber_(value) {
   if (value instanceof Date) return '';
@@ -1095,7 +1120,7 @@ function planTour(dateStr) {
   const routeUse = {};
 
   const pairs = visitors.map(function (v) {
-    const wantGrades = guideGradesFor_(v.grade, perVisitor);
+    const wantGrades = usableGrades_(guideGradesFor_(v.grade, perVisitor), pool);
     const needsSoC = needsSoCGuide_(v.race);
     // Each guide comes from its own grade, so the places are filled one
     // at a time rather than taken off a single ranked list.
