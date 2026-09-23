@@ -189,6 +189,23 @@ function headerIndex_(name) {
 }
 
 /** Every data row of a sheet, at its real width. */
+/**
+ * Sheet reads, remembered for the length of one run.
+ *
+ * Every trip to a sheet is a round trip, and the schedule lookup alone
+ * used to re-read all 400 bell schedule rows once per ambassador. These
+ * are all pure reads within a single run, so the first one pays and the
+ * rest are free. Anything that writes calls clearReadCache_().
+ */
+let READ_CACHE_ = {};
+
+function cached_(key, make) {
+  if (READ_CACHE_[key] === undefined) READ_CACHE_[key] = make();
+  return READ_CACHE_[key];
+}
+
+function clearReadCache_() { READ_CACHE_ = {}; }
+
 function rows_(name) {
   const s = sheet_(name);
   const last = s.getLastRow();
@@ -339,6 +356,7 @@ function setupSpreadsheet() {
   // Only a workbook with nothing in it yet gets its tabs arranged and its
   // columns sized. Run this again later and it fills gaps without
   // touching a single thing already there.
+  clearReadCache_();
   const before = ss_().getSheetByName(SHEETS.AMBASSADORS);
   const firstRun = !before || before.getLastRow() < 2;
   Object.keys(SHEETS).forEach(function (k) { sheet_(SHEETS[k]); });
@@ -361,6 +379,7 @@ function setupSpreadsheet() {
   if (ensureJobHourColumns_()) {
     added.push('Out of Class From/To on Jobs');
   }
+  clearReadCache_();               // columns just changed under it
 
   setupAmbassadors_();
   setupProspective_();
@@ -567,21 +586,23 @@ function setupJobs_() {
  * columns.
  */
 function jobHours_() {
-  const N = SHEETS.JOBS;
-  const out = {};
-  Object.keys(JOB_HOURS_).forEach(function (j) {
-    out[norm_(j)] = { from: JOB_HOURS_[j][0], to: JOB_HOURS_[j][1] };
+  return cached_('jobHours', function () {
+    const N = SHEETS.JOBS;
+    const out = {};
+    Object.keys(JOB_HOURS_).forEach(function (j) {
+      out[norm_(j)] = { from: JOB_HOURS_[j][0], to: JOB_HOURS_[j][1] };
+    });
+    rows_(N).forEach(function (r) {
+      const job = trim_(r[col_(N, 'Job Name')]);
+      if (!job) return;
+      const from = timeCell_(cell_(r, N, 'Out of Class From'));
+      const to = timeCell_(cell_(r, N, 'Out of Class To'));
+      if (!from && !to) return;
+      const have = out[norm_(job)] || { from: '', to: '' };
+      out[norm_(job)] = { from: from || have.from, to: to || have.to };
+    });
+    return out;
   });
-  rows_(N).forEach(function (r) {
-    const job = trim_(r[col_(N, 'Job Name')]);
-    if (!job) return;
-    const from = timeCell_(cell_(r, N, 'Out of Class From'));
-    const to = timeCell_(cell_(r, N, 'Out of Class To'));
-    if (!from && !to) return;
-    const have = out[norm_(job)] || { from: '', to: '' };
-    out[norm_(job)] = { from: from || have.from, to: to || have.to };
-  });
-  return out;
 }
 
 /** A time cell, however Sheets chose to store it. */
@@ -867,26 +888,30 @@ function initialsIn_(text) {
 
 /** initials (upper case) -> {name, email}, from the Teachers sheet. */
 function teachersByInitials_() {
-  const map = {};
-  rows_(SHEETS.TEACHERS).forEach(function (r) {
-    const name = trim_(r[0]);
-    if (!name) return;
-    trim_(r[1]).split(',').forEach(function (raw) {
-      const key = trim_(raw).toUpperCase();
-      if (key) map[key] = { name: name, email: trim_(r[2]) };
+  return cached_('teacherInitials', function () {
+    const map = {};
+    rows_(SHEETS.TEACHERS).forEach(function (r) {
+      const name = trim_(r[0]);
+      if (!name) return;
+      trim_(r[1]).split(',').forEach(function (raw) {
+        const key = trim_(raw).toUpperCase();
+        if (key) map[key] = { name: name, email: trim_(r[2]) };
+      });
     });
+    return map;
   });
-  return map;
 }
 
 /** advisor name (normalised) -> email, from the Teachers sheet. */
 function teachersByName_() {
-  const map = {};
-  rows_(SHEETS.TEACHERS).forEach(function (r) {
-    const name = trim_(r[0]);
-    if (name) map[norm_(name)] = { name: name, email: trim_(r[2]) };
+  return cached_('teacherNames', function () {
+    const map = {};
+    rows_(SHEETS.TEACHERS).forEach(function (r) {
+      const name = trim_(r[0]);
+      if (name) map[norm_(name)] = { name: name, email: trim_(r[2]) };
+    });
+    return map;
   });
-  return map;
 }
 
 /**
@@ -894,28 +919,30 @@ function teachersByName_() {
  * falling back to Data.gs before setup has run.
  */
 function bellSchedule_() {
-  const out = {};
-  const add = function (day, pod, split, start, end, what) {
-    if (!day || !pod) return;
-    if (!out[day]) out[day] = {};
-    if (!out[day][pod]) out[day][pod] = [];
-    out[day][pod].push({ split: split, start: start, end: end, what: what });
-  };
-  const sheet = ss_().getSheetByName(SHEETS.BELL);
-  if (sheet && sheet.getLastRow() > 1) {
-    rows_(SHEETS.BELL).forEach(function (r) {
-      add(trim_(r[0]), trim_(r[1]), splitLetter_(r[2]), r[3], r[4], trim_(r[5]));
-    });
-    return out;
-  }
-  SCHEDULE_DAYS_.forEach(function (day) {
-    PODS.forEach(function (pod) {
-      (BELL_SCHEDULE_[day][pod] || []).forEach(function (e) {
-        add(day, pod, splitLetterOf_(e[2]), e[0], e[1], e[2]);
+  return cached_('bell', function () {
+    const out = {};
+    const add = function (day, pod, split, start, end, what) {
+      if (!day || !pod) return;
+      if (!out[day]) out[day] = {};
+      if (!out[day][pod]) out[day][pod] = [];
+      out[day][pod].push({ split: split, start: start, end: end, what: what });
+    };
+    const sheet = ss_().getSheetByName(SHEETS.BELL);
+    if (sheet && sheet.getLastRow() > 1) {
+      rows_(SHEETS.BELL).forEach(function (r) {
+        add(trim_(r[0]), trim_(r[1]), splitLetter_(r[2]), r[3], r[4], trim_(r[5]));
+      });
+      return out;
+    }
+    SCHEDULE_DAYS_.forEach(function (day) {
+      PODS.forEach(function (pod) {
+        (BELL_SCHEDULE_[day][pod] || []).forEach(function (e) {
+          add(day, pod, splitLetterOf_(e[2]), e[0], e[1], e[2]);
+        });
       });
     });
+    return out;
   });
-  return out;
 }
 
 /**
@@ -996,60 +1023,68 @@ function isOpenChoice_(text) {
 
 /** Every ambassador row as an object, whether or not it is filled in. */
 function ambassadors_() {
-  const N = SHEETS.AMBASSADORS;
-  return rows_(N).map(function (r) {
-    return {
-      name: fullName_(r[col_(N, 'First Name')], r[col_(N, 'Last Name')]),
-      pod: trim_(r[col_(N, 'Homeroom')]).toUpperCase(),
-      split: splitLetter_(r[col_(N, 'Split')]),
-      grade: trim_(r[col_(N, 'Grade')]).replace(/[^0-9]/g, ''),
-      advisor: trim_(r[col_(N, 'Advisor')]),
-      borough: trim_(r[col_(N, 'Borough')]).toUpperCase(),
-      gender: trim_(r[col_(N, 'Gender')]),
-      presenting: trim_(cell_(r, N, 'Race (Presenting)')),
-      email: trim_(r[col_(N, 'Student Email')]),
-      light: trim_(cell_(r, N, 'Light')),
-      active: norm_(r[col_(N, 'Active')]) === 'yes'
-    };
-  }).filter(function (a) { return a.name !== ''; });
+  return cached_('ambassadors', function () {
+    const N = SHEETS.AMBASSADORS;
+    return rows_(N).map(function (r) {
+      return {
+        name: fullName_(r[col_(N, 'First Name')], r[col_(N, 'Last Name')]),
+        pod: trim_(r[col_(N, 'Homeroom')]).toUpperCase(),
+        split: splitLetter_(r[col_(N, 'Split')]),
+        grade: trim_(r[col_(N, 'Grade')]).replace(/[^0-9]/g, ''),
+        advisor: trim_(r[col_(N, 'Advisor')]),
+        borough: trim_(r[col_(N, 'Borough')]).toUpperCase(),
+        gender: trim_(r[col_(N, 'Gender')]),
+        presenting: trim_(cell_(r, N, 'Race (Presenting)')),
+        email: trim_(r[col_(N, 'Student Email')]),
+        light: trim_(cell_(r, N, 'Light')),
+        active: norm_(r[col_(N, 'Active')]) === 'yes'
+      };
+    }).filter(function (a) { return a.name !== ''; });
+  });
 }
 
 /** name -> {Job: count}, plus a total, read off the Tour Tracker. */
 function jobHistory_() {
-  const N = SHEETS.TRACKER;
-  const hist = {};
-  rows_(N).forEach(function (r) {
-    const who = norm_(r[col_(N, 'Ambassador')]);
-    const job = trim_(r[col_(N, 'Job')]);
-    if (!who || !job) return;
-    if (!hist[who]) hist[who] = { total: 0, byJob: {} };
-    hist[who].total += 1;
-    hist[who].byJob[job] = (hist[who].byJob[job] || 0) + 1;
+  return cached_('jobHistory', function () {
+    const N = SHEETS.TRACKER;
+    const hist = {};
+    rows_(N).forEach(function (r) {
+      const who = norm_(r[col_(N, 'Ambassador')]);
+      const job = trim_(r[col_(N, 'Job')]);
+      if (!who || !job) return;
+      if (!hist[who]) hist[who] = { total: 0, byJob: {} };
+      hist[who].total += 1;
+      hist[who].byJob[job] = (hist[who].byJob[job] || 0) + 1;
+    });
+    return hist;
   });
-  return hist;
 }
 
 /** name -> {Job: true}, read off the Eligibility sheet. Missing row = eligible. */
 function eligibility_() {
-  const N = SHEETS.ELIGIBILITY;
-  const map = {};
-  rows_(N).forEach(function (r) {
-    const who = norm_(r[col_(N, 'Ambassador')]);
-    if (!who) return;
-    map[who] = {};
-    [JOBS.PANELIST, JOBS.LOBBY, JOBS.TABLE, JOBS.GUIDE].forEach(function (job) {
-      map[who][job] = norm_(r[col_(N, job)]) !== 'no';
+  return cached_('eligibility', function () {
+    const N = SHEETS.ELIGIBILITY;
+    const map = {};
+    rows_(N).forEach(function (r) {
+      const who = norm_(r[col_(N, 'Ambassador')]);
+      if (!who) return;
+      map[who] = {};
+      [JOBS.PANELIST, JOBS.LOBBY, JOBS.TABLE, JOBS.GUIDE].forEach(function (job) {
+        map[who][job] = norm_(r[col_(N, job)]) !== 'no';
+      });
     });
+    return map;
   });
-  return map;
 }
 
 function activeJobs_() {
-  const on = {};
-  rows_(SHEETS.JOBS).forEach(function (r) {
-    if (norm_(r[2]) !== 'no') on[trim_(r[0])] = true;
+  return cached_('activeJobs', function () {
+    const on = {};
+    rows_(SHEETS.JOBS).forEach(function (r) {
+      if (norm_(r[2]) !== 'no') on[trim_(r[0])] = true;
+    });
+    return on;
   });
-  return on;
 }
 
 /**
@@ -1169,17 +1204,19 @@ function prospectiveFor_(dateVal) {
 
 /** The 5th graders available to host, from the Buddies sheet. */
 function buddies_() {
-  const N = SHEETS.BUDDIES;
-  return rows_(N).map(function (r) {
-    return {
-      name: trim_(r[col_(N, 'Student')]),
-      gender: trim_(cell_(r, N, 'Gender')),
-      language: trim_(r[col_(N, 'Language')]),
-      teacher: trim_(r[col_(N, 'Teacher')]),
-      room: trim_(r[col_(N, 'Room')]),
-      canHost: norm_(r[col_(N, 'Can Host a Visitor')]) === 'yes'
-    };
-  }).filter(function (b) { return b.name !== ''; });
+  return cached_('buddies', function () {
+    const N = SHEETS.BUDDIES;
+    return rows_(N).map(function (r) {
+      return {
+        name: trim_(r[col_(N, 'Student')]),
+        gender: trim_(cell_(r, N, 'Gender')),
+        language: trim_(r[col_(N, 'Language')]),
+        teacher: trim_(r[col_(N, 'Teacher')]),
+        room: trim_(r[col_(N, 'Room')]),
+        canHost: norm_(r[col_(N, 'Can Host a Visitor')]) === 'yes'
+      };
+    }).filter(function (b) { return b.name !== ''; });
+  });
 }
 
 /** "5th grade Mandarin" -> "mandarin". Blank for a guide visit. */
@@ -1232,6 +1269,7 @@ function buddyHandoff_(p, buddy, handoff, tourEnd) {
 }
 
 function planTour(dateStr, keepExisting) {
+  clearReadCache_();
   const dateVal = toDate_(dateStr);
   if (!dateVal) throw new Error('Pick a tour date first.');
 
@@ -1779,6 +1817,7 @@ function setupWarnings_(all, visitors) {
 /** Writes a plan to the Tour Tracker and back onto Prospective Students. */
 function commitTour(dateStr, keepExisting, panelists) {
   const plan = planTour(dateStr, keepExisting);
+  clearReadCache_();               // the tracker is about to change
   const dateVal = toDate_(plan.date);
   const N = SHEETS.TRACKER;
   const tracker = sheet_(N);
@@ -2107,6 +2146,7 @@ function routeSheetPages_(dateVal) {
 }
 
 function buildRouteSheets(dateStr) {
+  clearReadCache_();
   const dateVal = toDate_(dateStr);
   if (!dateVal) throw new Error('Pick a tour date first.');
   const sheets = routeSheetPages_(dateVal);
@@ -2218,6 +2258,7 @@ function lockerSlipData_(dateVal) {
 }
 
 function buildLockerSlips(dateStr) {
+  clearReadCache_();
   const dateVal = toDate_(dateStr);
   if (!dateVal) throw new Error('Pick a tour date first.');
   const slips = lockerSlipData_(dateVal);
@@ -2319,6 +2360,7 @@ function tourRoster_(dateVal) {
 }
 
 function buildTourRoster(dateStr) {
+  clearReadCache_();
   const dateVal = dateStr instanceof Date ? dateStr : toDate_(dateStr);
   if (!dateVal) throw new Error('Pick a tour date first.');
   const rows = tourRoster_(dateVal);
@@ -2497,6 +2539,7 @@ const TD_ = 'padding:6px 10px;border:1px solid #ddd;';
 /* ---------- students ---------- */
 
 function sendStudentEmails(dateStr) {
+  clearReadCache_();
   const dateVal = dateStr ? toDate_(dateStr) : nextTourDate_();
   if (!dateVal) return { sent: 0, skipped: [], note: 'No tour on the Tour Tracker yet.' };
 
@@ -2566,6 +2609,7 @@ function timeLabelOrRaw_(v) {
 /* ---------- advisors and class teachers ---------- */
 
 function sendTeacherEmails(dateStr) {
+  clearReadCache_();
   const dateVal = dateStr ? toDate_(dateStr) : nextTourDate_();
   if (!dateVal) return { advisorsSent: 0, teachersSent: 0, needsYou: [], note: 'No tour on the Tour Tracker yet.' };
 
@@ -3110,15 +3154,32 @@ function api_commitTour(dateStr, keep, panelists) {
  * "tomorrow" on the Tuesday, "today" on the Wednesday - so a test that
  * only showed one of them would not be a test of what happens.
  */
+/**
+ * Which day each send goes out, as a date in the tour's own week.
+ *
+ * The day number comes from here rather than from ScriptApp.WeekDay,
+ * whose values are enum objects and never equal to what getDay()
+ * returns - comparing the two is always false, and the search for the
+ * day walks backwards for ever.
+ */
+const WEEKDAY_NUMBER_ = {
+  SUNDAY: 0, MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3,
+  THURSDAY: 4, FRIDAY: 5, SATURDAY: 6
+};
+
 function sendDaysFor_(handler, dateVal) {
   const days = [];
   REMINDER_SLOTS_.forEach(function (slot) {
     if (slot.handler !== handler) return;
-    const want = ScriptApp.WeekDay[slot.day];
+    const want = WEEKDAY_NUMBER_[slot.day];
+    if (want === undefined) return;
     // The nearest such weekday on or before the tour.
     const d = new Date(dateVal.getTime());
     d.setHours(0, 0, 0, 0);
-    while (d.getDay() !== want) d.setDate(d.getDate() - 1);
+    for (let i = 0; i < 7 && d.getDay() !== want; i++) {
+      d.setDate(d.getDate() - 1);
+    }
+    if (d.getDay() !== want) return;
     days.push({ when: d, label: slot.label });
   });
   days.sort(function (a, b) { return a.when - b.when; });
