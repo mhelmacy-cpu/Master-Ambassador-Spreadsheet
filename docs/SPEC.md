@@ -147,6 +147,19 @@ always hear well before the students. The Wednesday send is the tight
 one: at the late end it arrives 8:00 AM, still twenty-five minutes before
 ambassadors are due in the cafeteria at 8:25.
 
+### Testing them
+
+"Send Emails Now..." opens with **Test** ticked. Ticked, every copy goes
+to whoever is running the script - or to a `Preview Email To` address on
+Settings, if one is typed there - with a line at the top naming the
+address it would really have gone to, and `[TEST]` on the subject.
+Nothing reaches a student or a teacher. Untick it to send for real.
+
+The redirect works inside `mailOptions_`, which every message is built
+by, so a send cannot get past it - and it is cleared in a `finally`, so
+a test run that fails part way cannot leave the next real send pointing
+at the wrong place.
+
 ### Who they come from
 
 Whichever account authorizes the script and switches the triggers on, so

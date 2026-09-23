@@ -1956,7 +1956,41 @@ function assignmentsOn_(dateVal) {
   });
 }
 
+/* ---------- test copies ----------
+ *
+ * A test run sends every message to her instead of to the school, with
+ * the address it would really have gone to printed at the top. Nothing
+ * else about the message changes, so what she reads is what they would
+ * have read. It works through mailOptions_, which every message passes
+ * through, so no send can get past it by accident.
+ */
+let PREVIEW_TO_ = '';
+
+/** Where test copies go: the Settings address if there is one, else whoever is running this. */
+function previewAddress_() {
+  const set = setting_('Preview Email To', '');
+  if (set) return set;
+  return Session.getEffectiveUser().getEmail();
+}
+
+/** Runs fn with every send redirected to one address. */
+function asTest_(address, fn) {
+  PREVIEW_TO_ = trim_(address);
+  try {
+    return fn();
+  } finally {
+    PREVIEW_TO_ = '';
+  }
+}
+
 function mailOptions_(to, subject, html) {
+  if (PREVIEW_TO_) {
+    html = '<div style="' + MAIL_STYLE_ + 'background:#fbf0ee;border:1px solid #a8322a;' +
+      'padding:8px 10px;margin-bottom:14px;"><b>Test copy.</b> The real one goes to ' +
+      escapeHtml_(to) + '.</div>' + html;
+    subject = '[TEST] ' + subject;
+    to = PREVIEW_TO_;
+  }
   const opts = {
     to: to,
     subject: subject,
@@ -2418,7 +2452,9 @@ function showEmailDialog() {
     'or to check what would go.</p>' +
     '<label for="d">Tour date</label>' +
     '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
-    '<div style="margin-top:14px;">' +
+    '<p style="margin:12px 0 0;"><label><input type="checkbox" id="test" checked> ' +
+    '<b>Test</b> - send every copy to me instead, nothing to students or teachers</label></p>' +
+    '<div style="margin-top:12px;">' +
     '<button onclick="go(\'students\')">Send to students</button>' +
     '<button onclick="go(\'teachers\')">Send to teachers and advisors</button>' +
     '</div><div id="out"></div>' +
@@ -2427,8 +2463,11 @@ function showEmailDialog() {
     'function go(which){document.getElementById("out").innerHTML="<p class=\'muted\'>Sending...</p>";' +
     'google.script.run.withSuccessHandler(done).withFailureHandler(function(e){' +
     'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";})' +
-    '.api_sendEmails(which,document.getElementById("d").value);}' +
+    '.api_sendEmails(which,document.getElementById("d").value,' +
+    'document.getElementById("test").checked);}' +
     'function done(r){var h="<div class=\'free\'>";' +
+    'if(r.testTo){h+="<b>Test only.</b> Everything below went to "+esc(r.testTo)+' +
+    '" and nowhere else.<br>";}' +
     'if(r.note){h+=esc(r.note);}else{' +
     'if(r.sent!=null){h+="<b>"+r.sent+"</b> student email(s) sent for "+esc(r.date)+".";}' +
     'else{h+="<b>"+r.advisorsSent+"</b> advisor email(s), <b>"+r.teachersSent+' +
@@ -2505,6 +2544,14 @@ function api_buildLockerSlips(dateStr) { return buildLockerSlips(dateStr); }
 function api_buildRouteSheets(dateStr) { return buildRouteSheets(dateStr); }
 function api_planTour(dateStr) { return planTour(dateStr); }
 function api_commitTour(dateStr) { return commitTour(dateStr); }
-function api_sendEmails(which, dateStr) {
-  return which === 'students' ? sendStudentEmails(dateStr) : sendTeacherEmails(dateStr);
+function api_sendEmails(which, dateStr, test) {
+  const run = function () {
+    return which === 'students' ? sendStudentEmails(dateStr) : sendTeacherEmails(dateStr);
+  };
+  if (!test) return run();
+  const to = previewAddress_();
+  if (!to) throw new Error('Could not work out your email address to send the test to.');
+  const r = asTest_(to, run);
+  r.testTo = to;
+  return r;
 }
