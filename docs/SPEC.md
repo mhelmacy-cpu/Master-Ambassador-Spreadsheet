@@ -94,13 +94,29 @@ EEL=A, MSB=B, CJM=A, RSS=B), which is what makes the column look like the
 pod until you check a student whose split differs from it. Sixteen of the
 thirty rostered ambassadors are that case.
 
+### Staffing again after a late sign-up
+
+"Keep what is already assigned" is ticked by default. Ticked, the
+command leaves every pair, route, crew and class visit already on the
+Tour Tracker exactly as it is, and staffs only students who have no
+guides yet - routes carry on from the last one used, and nobody already
+working gets a second job. Untick it to start that date over.
+
+Panelists are never touched either way: the command does not assign
+them, so it does not delete them.
+
 ## Printouts
 
 Two documents, both built as Google Docs so they can be corrected on the
 morning before they reach the printer.
 
-- **Print Tour Routes** - one page per visiting student: their guides,
-  their route, their class visit, and the handoff note at the bottom.
+- **Print Tour Routes** - one page per tour guide, addressed to them by
+  name, ordered route 1, route 1, route 2, route 2, so the stack comes
+  off the printer ready to hand out. Double spaced, short sentences, and
+  it always ends by saying whether they are done. Their copy carries who
+  they are taking, who is with them, the walk itself, and what to do at
+  9:06 - which differs between the two guides, so each is told only
+  their own part.
 - **Print Locker Slips** - one slip per ambassador, several to a page in
   bordered boxes so the page cuts into strips. They go up on lockers on
   Tuesday morning, so each one is four lines and no more: name (with
@@ -121,7 +137,7 @@ Two audiences, on separate schedules.
 
 ### Teachers and advisors - two sends
 
-    Monday    11:00 AM
+    Tuesday    8:30 AM
     Wednesday  7:45 AM
 
 Three rounds go out together each time:
@@ -131,9 +147,8 @@ Three rounds go out together each time:
   student's split, not their homeroom
 - the teacher whose class is receiving visitors
 
-### Students - three sends
+### Students - two sends
 
-    Monday     3:30 PM
     Tuesday   12:00 PM
     Wednesday  7:45 AM
 
@@ -141,7 +156,7 @@ One round: the student's own job, and to be in the cafeteria at 8:25.
 
 ### How the wording adapts
 
-The same message goes out on three different days, so it never says a
+The same message goes out on two different days, so it never says a
 flat "today". It reads Today, Tomorrow, or the weekday by name, worked
 out from when it is actually being sent.
 
@@ -151,12 +166,11 @@ Apps Script takes whole hours, so the times that are not on the hour use
 `nearMinute`, and Google runs every time-based trigger within about
 fifteen minutes either side of the time asked for. So:
 
-    Monday 11:00 AM ->  roughly 10:45 - 11:15 AM
-    Monday 3:30 PM  ->  roughly 3:15 - 3:45 PM
+    Tuesday 8:30 AM ->  roughly 8:15 - 8:45 AM
     Tuesday noon    ->  roughly 11:45 AM - 12:15 PM
     Wednesday 7:45  ->  roughly 7:30 - 8:00 AM
 
-Monday's two sends are four and a half hours apart, so the teachers
+Tuesday's two sends are three and a half hours apart, so the teachers
 always hear well before the students. The Wednesday send is the tight
 one: at the late end it arrives 8:00 AM, still twenty-five minutes before
 ambassadors are due in the cafeteria at 8:25.
@@ -166,8 +180,14 @@ ambassadors are due in the cafeteria at 8:25.
 "Send Emails Now..." opens with **Test** ticked. Ticked, every copy goes
 to whoever is running the script - or to a `Preview Email To` address on
 Settings, if one is typed there - with a line at the top naming the
-address it would really have gone to, and `[TEST]` on the subject.
-Nothing reaches a student or a teacher. Untick it to send for real.
+address it would really have gone to. Nothing reaches a student or a
+teacher. Untick it to send for real.
+
+A test runs **both sends**, each worded for the day it goes out, so one
+click shows everything that will really arrive:
+
+    [TEST - Students, Tuesday 12:00 PM] Your Tour Job - Tomorrow
+    [TEST - Students, Wednesday 7:45 AM] Your Tour Job - Today
 
 The redirect works inside `mailOptions_`, which every message is built
 by, so a send cannot get past it - and it is cleared in a `finally`, so
@@ -181,7 +201,7 @@ setup must be done signed in as mhelmacy@lrei.org. Display name and
 Reply-To are both set on the Settings sheet.
 
 A tour that has not been staffed yet is skipped rather than mailed to
-nobody, so staff the tour before Monday afternoon for the first send to
+nobody, so staff the tour before Tuesday morning for the first send to
 go out.
 
 ## Still needed from the office

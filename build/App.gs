@@ -10,8 +10,8 @@
  *   2. Run "Staff This Wednesday Tour". It pairs each visitor with two
  *      guides, gives each pair a route, and picks the greeters. It does
  *      NOT pick panelists - it lists who is still free so you can.
- *   3. Emails go out on their own: teachers Monday 11am and Wednesday
- *      7:45am, students Monday 3:30pm, Tuesday noon and Wednesday 7:45am.
+ *   3. Emails go out on their own: teachers Tuesday 8:30am and Wednesday
+ *      7:45am, students Tuesday noon and Wednesday 7:45am.
  */
 
 /* =========================================================
@@ -1193,7 +1193,40 @@ function classVisitLanguage_(choice) {
  * the plan ends with everyone still free.
  * ========================================================= */
 
-function planTour(dateStr) {
+/**
+ * What is already staffed for this date, so a second run can leave it be.
+ *
+ * Someone signs up on the Tuesday and only the new visitor needs a pair
+ * and a route. Re-planning from scratch would reshuffle everybody, after
+ * the routes are printed and the ambassadors have been told.
+ */
+function staffedAlready_(dateVal) {
+  const out = { guides: {}, route: {}, buddy: {}, crew: {}, busy: {}, any: false };
+  assignmentsOn_(dateVal).forEach(function (a) {
+    out.busy[a.name] = a.job;
+    out.any = true;
+    const key = norm_(a.visitor);
+    if (a.job === JOBS.GUIDE) {
+      (out.guides[key] = out.guides[key] || []).push(a.name);
+      if (a.route) out.route[key] = a.route;
+    } else if (a.job === JOBS.BUDDY) {
+      out.buddy[key] = a.name;
+    } else {
+      (out.crew[a.job] = out.crew[a.job] || []).push(a.name);
+    }
+  });
+  return out;
+}
+
+/** The Tour Tracker note for a class visit. */
+function buddyHandoff_(p, buddy, handoff, tourEnd) {
+  return timeLabelOrRaw_(handoff) + ' - bring ' + p.visitor.name + ' to ' + buddy.name +
+    ' in ' + buddy.room + ' (' + buddy.teacher + ', ' + buddy.language + '). Tour guides are ' +
+    'finished and can go back to class. ' + buddy.name + ' brings ' + p.visitor.name +
+    ' down to the cafeteria at ' + timeLabelOrRaw_(tourEnd) + '.';
+}
+
+function planTour(dateStr, keepExisting) {
   const dateVal = toDate_(dateStr);
   if (!dateVal) throw new Error('Pick a tour date first.');
 
@@ -1209,7 +1242,15 @@ function planTour(dateStr) {
   const jobsOn = activeJobs_();
   const pool = all.filter(function (a) { return a.active; });
 
+  // Anything already on the tracker for this date, when she is topping up
+  // rather than starting over. Those people keep their jobs and are not
+  // free to be given another.
+  const kept = keepExisting ? staffedAlready_(dateVal) : null;
+
   const used = {};                       // name -> job already given on this tour
+  if (kept) {
+    Object.keys(kept.busy).forEach(function (n) { used[n] = kept.busy[n]; });
+  }
   const canDo = function (a, job) {
     if (jobsOn[job] === undefined ? false : !jobsOn[job]) return false;
     const e = elig[norm_(a.name)];
@@ -1227,10 +1268,39 @@ function planTour(dateStr) {
   const maxPerRoute = Number(setting_('Max Families Per Route', '1')) || 1;
   const routes = rows_(SHEETS.ROUTES).map(function (r) { return trim_(r[0]); }).filter(Boolean);
   const routeUse = {};
+  if (kept) {
+    Object.keys(kept.route).forEach(function (k) {
+      const r = kept.route[k];
+      routeUse[r] = (routeUse[r] || 0) + 1;
+    });
+  }
+
+  const byAmbName = {};
+  all.forEach(function (a) { byAmbName[norm_(a.name)] = a; });
 
   const pairs = visitors.map(function (v) {
     const wantGrades = usableGrades_(guideGradesFor_(v.grade, perVisitor), pool);
     const needsSoC = needsSoCGuide_(v.race);
+
+    // Already paired on a previous run: left exactly as it is.
+    const had = kept && kept.guides[norm_(v.name)];
+    if (had && had.length) {
+      const asAmb = had.map(function (n) {
+        return byAmbName[norm_(n)] || { name: n, grade: '', gender: '', presenting: '' };
+      });
+      return {
+        visitor: v, kept: true,
+        guides: asAmb.map(function (a) {
+          return a.name + (a.grade ? ' (grade ' + a.grade + ')' : '');
+        }),
+        guideNames: asAmb.map(function (a) { return a.name; }),
+        wantGrades: wantGrades, needsSoC: needsSoC,
+        guideMix: traitMix_(asAmb.map(function (a) { return a.name; }), pool, 'presenting'),
+        route: kept.route[norm_(v.name)] || '', routeShared: false,
+        socShortfall: false, genderShortfall: false,
+        short: Math.max(0, perVisitor - asAmb.length), why: ''
+      };
+    }
     // Each guide comes from its own grade, so the places are filled one
     // at a time rather than taken off a single ranked list.
     const chosen = [];
@@ -1347,9 +1417,23 @@ function planTour(dateStr) {
   const handoff = setting_('Class Visit Handoff Time', '9:06');
   const tourEnd = setting_('Tour End Time', '9:25');
 
+  if (kept) {
+    Object.keys(kept.buddy).forEach(function (k) { buddyUsed[kept.buddy[k]] = true; });
+  }
+
   pairs.forEach(function (p) {
     const want = classVisitLanguage_(p.visitor.classVisit);
     if (!want) return;
+    const hadBuddy = kept && kept.buddy[norm_(p.visitor.name)];
+    if (hadBuddy) {
+      const b = buddyPool.filter(function (x) { return norm_(x.name) === norm_(hadBuddy); })[0];
+      if (b) {
+        p.buddy = b;
+        p.buddyKept = true;
+        p.handoff = buddyHandoff_(p, b, handoff, tourEnd);
+        return;
+      }
+    }
     const inClass = buddyPool.filter(function (b) {
       return !buddyUsed[b.name] && norm_(b.language) === want;
     });
@@ -1379,10 +1463,7 @@ function planTour(dateStr) {
     p.buddyGenderMiss = !!p.visitor.gender && !!pick.gender &&
       norm_(pick.gender) !== norm_(p.visitor.gender);
     p.buddyGenderUnknown = !!p.visitor.gender && !pick.gender;
-    p.handoff = timeLabelOrRaw_(handoff) + ' - bring ' + p.visitor.name + ' to ' + pick.name +
-      ' in ' + pick.room + ' (' + pick.teacher + ', ' + pick.language + '). Tour guides are ' +
-      'finished and can go back to class. ' + pick.name + ' brings ' + p.visitor.name +
-      ' down to the cafeteria at ' + timeLabelOrRaw_(tourEnd) + '.';
+    p.handoff = buddyHandoff_(p, pick, handoff, tourEnd);
   });
 
   /* ---- greeters ---- */
@@ -1397,7 +1478,11 @@ function planTour(dateStr) {
    */
   const crew = function (job, count) {
     const available = pool.filter(function (a) { return !used[a.name] && canDo(a, job); }).sort(fairness);
-    const picked = [];
+    // Whoever is on this crew already stays on it, and only the gap is filled.
+    const picked = ((kept && kept.crew[job]) || []).map(function (n) {
+      return byAmbName[norm_(n)] || { name: n, grade: '', gender: '', presenting: '' };
+    });
+    const keptCount = picked.length;
     while (picked.length < count) {
       let best = null;
       let bestKey = null;
@@ -1420,6 +1505,7 @@ function planTour(dateStr) {
     }
     const chosen = picked.map(function (a) { return a.name; });
     chosen.forEach(function (n) { used[n] = job; });
+    const added = chosen.slice(keptCount);
     let why = '';
     if (chosen.length < count) {
       if (!all.length) why = 'the Ambassadors sheet is empty';
@@ -1427,7 +1513,7 @@ function planTour(dateStr) {
       else why = 'everyone eligible is already on another job';
     }
     return {
-      job: job, chosen: chosen, needed: count,
+      job: job, chosen: chosen, needed: count, added: added, keptCount: keptCount,
       short: Math.max(0, count - chosen.length), why: why,
       mix: genderMix_(chosen, pool),
       raceMix: traitMix_(chosen, pool, 'presenting')
@@ -1454,7 +1540,9 @@ function planTour(dateStr) {
   const byName = {};
   all.forEach(function (a) { byName[norm_(a.name)] = a; });
   const needConfirm = [];
+  // Only the ones this run is adding. She approved the rest already.
   pairs.forEach(function (p) {
+    if (p.kept) return;
     p.guideNames.forEach(function (g) {
       const a = byName[norm_(g)];
       if (a && norm_(a.light) === 'yellow') {
@@ -1463,7 +1551,7 @@ function planTour(dateStr) {
     });
   });
   greeters.forEach(function (c) {
-    c.chosen.forEach(function (n) {
+    (c.added || c.chosen).forEach(function (n) {
       const a = byName[norm_(n)];
       if (a && norm_(a.light) === 'yellow') needConfirm.push({ name: n, job: c.job, withWhom: '' });
     });
@@ -1472,6 +1560,8 @@ function planTour(dateStr) {
   return {
     date: dateKey_(dateVal),
     dateLabel: longDate_(dateVal),
+    keptAnything: !!(kept && kept.any),
+    newPairs: pairs.filter(function (p) { return !p.kept; }).length,
     pairs: pairs,
     greeters: greeters,
     free: free,
@@ -1667,17 +1757,40 @@ function setupWarnings_(all, visitors) {
 }
 
 /** Writes a plan to the Tour Tracker and back onto Prospective Students. */
-function commitTour(dateStr) {
-  const plan = planTour(dateStr);
+function commitTour(dateStr, keepExisting) {
+  const plan = planTour(dateStr, keepExisting);
   const dateVal = toDate_(plan.date);
   const N = SHEETS.TRACKER;
   const tracker = sheet_(N);
 
-  // Replace anything already recorded for this date, so re-running is safe.
-  const existing = rows_(N);
-  for (let i = existing.length - 1; i >= 0; i--) {
-    if (sameDay_(toDate_(existing[i][col_(N, 'Tour Date')]), dateVal)) tracker.deleteRow(i + 2);
+  // Starting this date over: clear out what the command put there before.
+  // Panelists are hers, put in by hand, so they are never touched - and
+  // when she is topping up, nothing is cleared at all.
+  if (!keepExisting) {
+    const mine = {};
+    [JOBS.GUIDE, JOBS.BUDDY, JOBS.LOBBY, JOBS.TABLE].forEach(function (j) { mine[j] = true; });
+    const existing = rows_(N);
+    for (let i = existing.length - 1; i >= 0; i--) {
+      if (!sameDay_(toDate_(existing[i][col_(N, 'Tour Date')]), dateVal)) continue;
+      if (!mine[trim_(existing[i][col_(N, 'Job')])]) continue;
+      tracker.deleteRow(i + 2);
+    }
   }
+
+  // A row already on the tracker is never written twice.
+  const seenRow = {};
+  rows_(N).forEach(function (r) {
+    if (!sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal)) return;
+    seenRow[norm_(r[col_(N, 'Ambassador')]) + '|' + norm_(r[col_(N, 'Job')]) + '|' +
+      norm_(r[col_(N, 'Prospective Student(s)')])] = true;
+  });
+  const fresh = function (row) {
+    const key = norm_(row[col_(N, 'Ambassador')]) + '|' + norm_(row[col_(N, 'Job')]) + '|' +
+      norm_(row[col_(N, 'Prospective Student(s)')]);
+    if (seenRow[key]) return false;
+    seenRow[key] = true;
+    return true;
+  };
 
   const out = [];
   plan.pairs.forEach(function (p) {
@@ -1688,7 +1801,7 @@ function commitTour(dateStr) {
       row[col_(N, 'Job')] = JOBS.GUIDE;
       row[col_(N, 'Prospective Student(s)')] = p.visitor.name;
       row[col_(N, 'Route')] = p.route;
-      out.push(row);
+      if (fresh(row)) out.push(row);
     });
   });
   plan.pairs.forEach(function (p) {
@@ -1699,7 +1812,7 @@ function commitTour(dateStr) {
     row[col_(N, 'Job')] = JOBS.BUDDY;
     row[col_(N, 'Prospective Student(s)')] = p.visitor.name;
     row[col_(N, 'Notes')] = p.handoff;
-    out.push(row);
+    if (fresh(row)) out.push(row);
   });
   plan.greeters.forEach(function (c) {
     c.chosen.forEach(function (n) {
@@ -1707,7 +1820,7 @@ function commitTour(dateStr) {
       row[col_(N, 'Tour Date')] = dateVal;
       row[col_(N, 'Ambassador')] = n;
       row[col_(N, 'Job')] = c.job;
-      out.push(row);
+      if (fresh(row)) out.push(row);
     });
   });
   if (out.length) {
@@ -1792,16 +1905,17 @@ function readCell_(name, row, header) {
  * they are in different classes only one can, so one takes the visitor
  * and the other is finished.
  */
-function guideHandback_(page, dateVal) {
+/**
+ * Who walks the visitor to class, and who is finished.
+ *
+ * Both guides come out of the same period, so if that period is the
+ * same class for both they simply take the visitor in together. Where
+ * they are in different classes only one can, so one takes the visitor
+ * and the other goes back alone.
+ */
+function handbackPlan_(page, dateVal) {
   const names = page.guides.map(function (g) { return g.replace(/\s*\(.*$/, ''); });
-  if (!names.length) return '';
-  const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
-  const wait = setting_('Wait For', 'Maren');
-  const takeThem = function (who) {
-    return who + ': take ' + page.visitor.name + ' to class with you. At ' + endsAt +
-      ' bring them down to the cafeteria and wait with them until ' + wait + ' is back.';
-  };
-  if (names.length === 1) return takeThem(names[0]);
+  if (names.length < 2) return { takers: names, others: [] };
 
   const startMin = toMinutes_(setting_('Class Visit Handoff Time', '9:06'));
   const endMin = toMinutes_(setting_('Tour End Time', '9:25'));
@@ -1816,14 +1930,34 @@ function guideHandback_(page, dateVal) {
   };
   const first = classOf(names[0]);
   const second = classOf(names[1]);
-
   if (first && second && norm_(first) === norm_(second)) {
-    return takeThem(names.join(' and '));
+    return { takers: names, others: [] };
   }
-  return takeThem(names[0]) + '  ' + names[1] + ': go back to class. You are finished.';
+  return { takers: [names[0]], others: names.slice(1) };
 }
 
-/** "Take Nora to SPANISH with Alexander Rogoff. ..." */
+/**
+ * The last thing on one guide's sheet, written to that guide.
+ *
+ * Short sentences, one instruction each, and it always ends by saying
+ * they are done - the question a 12 year old holding this actually has.
+ */
+function handbackFor_(page, name, dateVal) {
+  const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
+  const wait = setting_('Wait For', 'Maren');
+  const plan = handbackPlan_(page, dateVal);
+  const takes = plan.takers.indexOf(name) !== -1;
+  if (takes) {
+    const withWhom = plan.takers.filter(function (n) { return n !== name; });
+    return (withWhom.length ? 'You and ' + withWhom.join(' and ') + ' take ' : 'Take ') +
+      page.visitor.name + ' to class with you. At ' + endsAt + ' walk them down to the ' +
+      'cafeteria and wait there with them until ' + wait + ' comes back. Then you are done.';
+  }
+  return plan.takers.join(' and ') + ' is taking ' + page.visitor.name +
+    ' to class. Go back to your own class. You are done.';
+}
+
+/** The guides' line on a sheet that ends in a 5th grade class visit. */
 function handoffForGuides_(page) {
   const b = page.buddy;
   const who = page.buddyName || (b && b.name) || '';
@@ -1835,12 +1969,11 @@ function handoffForGuides_(page) {
 
 /** What the 5th grader does once the sheet reaches them. */
 function handoffForBuddy_(page) {
-  const who = page.buddyName || (page.buddy && page.buddy.name) || '';
   const wait = setting_('Wait For', 'Maren');
   const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
-  return who + ': introduce yourself and tell ' + page.visitor.name +
-    ' what you are working on. At ' + endsAt + ' take them down to the cafeteria ' +
-    'and wait with them until ' + wait + ' gets back.';
+  return 'Introduce yourself to ' + page.visitor.name + ' and tell them what you are ' +
+    'working on. At ' + endsAt + ' take them down to the cafeteria and wait with them ' +
+    'until ' + wait + ' gets back.';
 }
 
 /**
@@ -1855,67 +1988,114 @@ function appendBold_(body, text) {
   return p;
 }
 
+/** One line on a route sheet, double spaced so it can be read while walking. */
+function say_(body, text, bold) {
+  const p = body.appendParagraph(text);
+  p.setLineSpacing(2);
+  if (bold) p.editAsText().setBold(true);
+  return p;
+}
+
+/**
+ * A printable sheet for every guide, in route order.
+ *
+ * Each guide gets their own copy of their own route, so the stack comes
+ * off the printer route 1, route 1, route 2, route 2 and can be handed
+ * out without sorting. The sheet is addressed to that one guide and
+ * tells them, in order, only what they have to do.
+ */
+function routeSheetPages_(dateVal) {
+  const out = [];
+  routeSheetData_(dateVal).forEach(function (page) {
+    const names = page.guides.map(function (g) { return g.replace(/\s*\(.*$/, ''); });
+    if (!names.length) {
+      out.push({ page: page, guide: '', others: [] });
+      return;
+    }
+    names.forEach(function (n) {
+      out.push({
+        page: page, guide: n,
+        others: names.filter(function (x) { return x !== n; })
+      });
+    });
+  });
+  // Route order, then by visitor, so the two copies of a route sit together.
+  out.sort(function (a, b) {
+    const ra = Number(a.page.routeNo) || 999;
+    const rb = Number(b.page.routeNo) || 999;
+    if (ra !== rb) return ra - rb;
+    if (a.page.visitor.name !== b.page.visitor.name) {
+      return a.page.visitor.name < b.page.visitor.name ? -1 : 1;
+    }
+    return a.guide < b.guide ? -1 : 1;
+  });
+  return out;
+}
+
 function buildRouteSheets(dateStr) {
   const dateVal = toDate_(dateStr);
   if (!dateVal) throw new Error('Pick a tour date first.');
-  const pages = routeSheetData_(dateVal);
-  if (!pages.length) {
+  const sheets = routeSheetPages_(dateVal);
+  if (!sheets.length) {
     throw new Error('No visiting students listed for ' + longDate_(dateVal) + '.');
   }
 
   const handoffAt = timeLabelOrRaw_(setting_('Class Visit Handoff Time', '9:06'));
+  const reportAt = timeLabelOrRaw_(setting_('Ambassadors Report At', '8:25 AM'));
+  const reportTo = setting_('Ambassadors Report To', 'the cafeteria');
   const title = 'Tour Routes - ' + longDate_(dateVal);
   const doc = DocumentApp.create(title);
   const body = doc.getBody();
   body.clear();
 
-  pages.forEach(function (page, i) {
+  sheets.forEach(function (sheet, i) {
+    const page = sheet.page;
     if (i > 0) body.appendPageBreak();
 
-    body.appendParagraph(page.visitor.name.toUpperCase())
+    body.appendParagraph(sheet.guide ? sheet.guide.toUpperCase() : page.visitor.name.toUpperCase())
       .setHeading(DocumentApp.ParagraphHeading.HEADING1);
 
-    const sub = [];
-    if (page.visitor.school) sub.push(page.visitor.school);
-    if (page.visitor.grade) sub.push('applying for grade ' + page.visitor.grade);
-    body.appendParagraph(sub.join('  -  ')).setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    say_(body, 'Route ' + (page.routeNo || '-') +
+      (page.direction ? ' (' + page.direction + ')' : '') + '   -   ' + longDate_(dateVal));
 
-    body.appendParagraph(longDate_(dateVal) +
-      (page.routeNo ? '  -  Route ' + page.routeNo : '') +
-      (page.direction ? ' (' + page.direction + ')' : ''));
-
-    body.appendParagraph('Tour guides: ' + (page.guides.join(', ') || 'not assigned'));
-    if (page.buddy) {
-      body.appendParagraph('Class visit: ' + page.buddyName + '  -  ' +
-        page.buddy.language + ', ' + page.buddy.teacher + ', ' + page.buddy.room);
+    const about = [];
+    if (page.visitor.school) about.push('from ' + page.visitor.school);
+    if (page.visitor.grade) about.push('applying for grade ' + page.visitor.grade);
+    say_(body, 'You are taking: ' + page.visitor.name +
+      (about.length ? ' (' + about.join(', ') + ')' : ''), true);
+    if (sheet.others.length) {
+      say_(body, 'With you: ' + sheet.others.join(' and '));
+    } else if (!sheet.guide) {
+      say_(body, 'No tour guide has been assigned yet.', true);
     }
-    body.appendParagraph('');
+    say_(body, 'Be in ' + reportTo + ' at ' + reportAt + '.');
+    if (page.buddy) {
+      say_(body, 'Class visit at the end: ' + page.buddyName + ' - ' +
+        page.buddy.language + ' with ' + page.buddy.teacher + ' in ' + page.buddy.room + '.');
+    }
 
-    // The walk itself, minus the two closing lines when there is a handoff.
+    say_(body, 'YOUR WALK', true);
+
+    // The walk itself. The last two lines of every route are about
+    // handing the visitor back, which the sheet says in its own words
+    // below, to this guide rather than to both of them.
     const closing = /Bring visitors to class|Bring visitor down to cafeteria/;
     page.lines.forEach(function (line) {
       if (closing.test(line)) return;
-      body.appendParagraph(line);
+      say_(body, line);
     });
 
     if (page.buddy) {
-      body.appendParagraph('');
-      appendBold_(body, handoffAt + '  ' + handoffForGuides_(page));
-      body.appendParagraph('');
-      body.appendParagraph('For ' + page.buddyName)
-        .setHeading(DocumentApp.ParagraphHeading.HEADING3);
-      body.appendParagraph(handoffForBuddy_(page));
-    } else {
-      const back = guideHandback_(page, dateVal);
-      if (back) {
-        body.appendParagraph('');
-        appendBold_(body, handoffAt + '  ' + back);
-      }
+      say_(body, handoffAt + '   ' + handoffForGuides_(page), true);
+        say_(body, 'FOR ' + page.buddyName.toUpperCase(), true);
+      say_(body, handoffForBuddy_(page));
+    } else if (sheet.guide) {
+      say_(body, handoffAt + '   ' + handbackFor_(page, sheet.guide, dateVal), true);
     }
   });
 
   doc.saveAndClose();
-  return { url: doc.getUrl(), name: title, pages: pages.length };
+  return { url: doc.getUrl(), name: title, pages: sheets.length };
 }
 
 /* =========================================================
@@ -2009,14 +2189,21 @@ function buildLockerSlips(dateStr) {
 /* =========================================================
  * Emails
  *
- * Teachers and advisors hear twice: Monday 11am and Wednesday 7:45am.
- * Students hear three times: Monday 3:30pm, Tuesday noon, Wednesday
- * 7:45am. The same wording serves all of them, so it never says a flat
+ * Teachers and advisors hear twice: Tuesday 8:30am and Wednesday 7:45am.
+ * Students hear twice: Tuesday noon and Wednesday 7:45am. The same
+ * wording serves all of them, so it never says a flat
  * "today" - it works that out from the day it is actually sent.
  * ========================================================= */
 
+/**
+ * The day a test run is pretending it is, so she can read the Tuesday
+ * wording and the Wednesday wording without waiting for either.
+ */
+let PRETEND_TODAY_ = null;
+
 function whenLabel_(tourDate) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const today = PRETEND_TODAY_ ? new Date(PRETEND_TODAY_.getTime()) : new Date();
+  today.setHours(0, 0, 0, 0);
   const d = new Date(tourDate.getTime()); d.setHours(0, 0, 0, 0);
   const days = Math.round((d - today) / 86400000);
   const label = WEEKDAYS_[d.getDay()] + ', ' + MONTHS_[d.getMonth()] + ' ' + d.getDate();
@@ -2062,6 +2249,7 @@ function assignmentsOn_(dateVal) {
  * through, so no send can get past it by accident.
  */
 let PREVIEW_TO_ = '';
+let TEST_LABEL_ = '';
 
 /** Where test copies go: the Settings address if there is one, else whoever is running this. */
 function previewAddress_() {
@@ -2083,9 +2271,10 @@ function asTest_(address, fn) {
 function mailOptions_(to, subject, html) {
   if (PREVIEW_TO_) {
     html = '<div style="' + MAIL_STYLE_ + 'background:#fbf0ee;border:1px solid #a8322a;' +
-      'padding:8px 10px;margin-bottom:14px;"><b>Test copy.</b> The real one goes to ' +
-      escapeHtml_(to) + '.</div>' + html;
-    subject = '[TEST] ' + subject;
+      'padding:8px 10px;margin-bottom:14px;"><b>Test copy' +
+      (TEST_LABEL_ ? ' of the ' + escapeHtml_(TEST_LABEL_) + ' send' : '') +
+      '.</b> The real one goes to ' + escapeHtml_(to) + '.</div>' + html;
+    subject = '[TEST' + (TEST_LABEL_ ? ' - ' + TEST_LABEL_ : '') + '] ' + subject;
     to = PREVIEW_TO_;
   }
   const opts = {
@@ -2373,9 +2562,8 @@ function sendTeacherEmailsForNextTour() { return sendTeacherEmails(null); }
  * ========================================================= */
 
 const REMINDER_SLOTS_ = [
-  { handler: HANDLER_TEACHER_EMAILS, day: 'MONDAY', hour: 11, minute: 0, label: 'Teachers, Monday 11:00 AM' },
+  { handler: HANDLER_TEACHER_EMAILS, day: 'TUESDAY', hour: 8, minute: 30, label: 'Teachers, Tuesday 8:30 AM' },
   { handler: HANDLER_TEACHER_EMAILS, day: 'WEDNESDAY', hour: 7, minute: 45, label: 'Teachers, Wednesday 7:45 AM' },
-  { handler: HANDLER_STUDENT_EMAILS, day: 'MONDAY', hour: 15, minute: 30, label: 'Students, Monday 3:30 PM' },
   { handler: HANDLER_STUDENT_EMAILS, day: 'TUESDAY', hour: 12, minute: 0, label: 'Students, Tuesday 12:00 PM' },
   { handler: HANDLER_STUDENT_EMAILS, day: 'WEDNESDAY', hour: 7, minute: 45, label: 'Students, Wednesday 7:45 AM' }
 ];
@@ -2410,7 +2598,7 @@ function enableReminders() {
     'so treat them as "around" rather than on the dot.\n\n' +
     'They send as ' + whoAmI_() + ', because that is the account that just ' +
     'switched them on.\n\n' +
-    'A tour with nothing staffed is skipped, so staff it before Monday morning.');
+    'A tour with nothing staffed is skipped, so staff it before Tuesday morning.');
 }
 
 function disableReminders() {
@@ -2484,7 +2672,10 @@ function showStaffDialog() {
     'Panelists are left for you.</p>' +
     '<label for="d">Tour date</label>' +
     '<input type="date" id="d" value="' + nextWednesday() + '">' +
-    '<div style="margin-top:14px;">' +
+    '<p style="margin:12px 0 0;"><label><input type="checkbox" id="keep" checked> ' +
+    '<b>Keep what is already assigned</b> - only staff students who have no guides yet, ' +
+    'for someone who signed up late</label></p>' +
+    '<div style="margin-top:12px;">' +
     '<button id="preview" onclick="doPreview()">Preview</button>' +
     '<button id="save" class="ghost" onclick="doSave()" disabled>Save to Tour Tracker</button>' +
     '</div><div id="out"></div>' +
@@ -2493,12 +2684,15 @@ function showStaffDialog() {
     'function busy(b){document.getElementById("preview").disabled=b;}' +
     'function doPreview(){busy(true);document.getElementById("out").innerHTML="<p class=\'muted\'>Working...</p>";' +
     'google.script.run.withSuccessHandler(render).withFailureHandler(fail)' +
-    '.api_planTour(document.getElementById("d").value);}' +
+    '.api_planTour(document.getElementById("d").value,' +
+    'document.getElementById("keep").checked);}' +
     'function fail(e){busy(false);document.getElementById("out").innerHTML=' +
     '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
     'function render(p){busy(false);' +
     'var h="<div class=\'out\'><h3>"+esc(p.dateLabel)+"</h3><table><tr><th>Visiting student</th>' +
     '<th>Guides</th><th>Route</th></tr>";' +
+    'if(p.keptAnything){h+="<p class=\'muted\'>"+(p.newPairs?p.newPairs+" student(s) staffed now; ":' +
+    '"nothing new to staff; ")+"everything else is left exactly as it was.</p>";}' +
     'p.pairs.forEach(function(x){h+="<tr><td>"+esc(x.visitor.name)+' +
     '(x.visitor.grade?" <span class=\'muted\'>grade "+esc(x.visitor.grade)+"</span>":"")+' +
     '(x.visitor.race?" <span class=\'muted\'>"+esc(x.visitor.race)+(x.needsSoC?" - needs a student of color":"")+"</span>":"")+' +
@@ -2517,11 +2711,13 @@ function showStaffDialog() {
     '(x.socShortfall?"<br><b>no student of color was free for this pair</b>":"")+' +
     '(x.genderShortfall?"<br><b>nobody of the visitor\'s own gender was free</b>":"")+' +
     '(x.short?" <span class=\'muted\'>short "+x.short+(x.why?" - "+esc(x.why):"")+"</span>":"")+' +
+    '(x.kept?"<br><span class=\'muted\'>already assigned - left alone</span>":"")+' +
     '"</td><td>"+esc(x.route||"-")+' +
     '(x.routeShared?"<br><span class=\'muted\'>shared - every route was already ' +
     'taken</span>":"")+"</td></tr>";});' +
     'h+="</table>";' +
-    'p.greeters.forEach(function(c){h+="<h3>"+esc(c.job)+" ("+c.chosen.length+" of "+c.needed+")</h3><div>"+' +
+    'p.greeters.forEach(function(c){h+="<h3>"+esc(c.job)+" ("+c.chosen.length+" of "+c.needed+")"+' +
+    '(c.keptCount?" <span class=\'muted\'>"+c.keptCount+" already assigned</span>":"")+"</h3><div>"+' +
     '(c.chosen.length?esc(c.chosen.join(", ")):"<b>none available</b>")+' +
     '(c.mix?" <span class=\'muted\'>("+esc(c.mix)+")</span>":"")+' +
     '(c.raceMix?"<br><span class=\'muted\'>"+esc(c.raceMix)+"</span>":"")+' +
@@ -2549,7 +2745,8 @@ function showStaffDialog() {
     'google.script.run.withSuccessHandler(function(r){' +
     'document.getElementById("out").innerHTML="<div class=\'free\'><b>Saved.</b> "+r.written+' +
     '" row(s) written to the Tour Tracker, and the routes and guides filled in on Prospective Students.</div>";})' +
-    '.withFailureHandler(fail).api_commitTour(document.getElementById("d").value);}' +
+    '.withFailureHandler(fail).api_commitTour(document.getElementById("d").value,' +
+    'document.getElementById("keep").checked);}' +
     '<\/script>';
   dialog_(html, 'Staff This Wednesday Tour', 640, 620);
 }
@@ -2564,7 +2761,9 @@ function showEmailDialog() {
     '<label for="d">Tour date</label>' +
     '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
     '<p style="margin:12px 0 0;"><label><input type="checkbox" id="test" checked> ' +
-    '<b>Test</b> - send every copy to me instead, nothing to students or teachers</label></p>' +
+    '<b>Test</b> - send every copy to me instead, nothing to students or teachers. ' +
+    'You get both sends, the Tuesday one and the Wednesday one, so you can read ' +
+    'each as it will arrive.</label></p>' +
     '<div style="margin-top:12px;">' +
     '<button onclick="go(\'students\')">Send to students</button>' +
     '<button onclick="go(\'teachers\')">Send to teachers and advisors</button>' +
@@ -2578,7 +2777,8 @@ function showEmailDialog() {
     'document.getElementById("test").checked);}' +
     'function done(r){var h="<div class=\'free\'>";' +
     'if(r.testTo){h+="<b>Test only.</b> Everything below went to "+esc(r.testTo)+' +
-    '" and nowhere else.<br>";}' +
+    '" and nowhere else"+(r.testDays&&r.testDays.length>1?", once for each send: "+' +
+    'esc(r.testDays.join(" and ")):"")+".<br>";}' +
     'if(r.note){h+=esc(r.note);}else{' +
     'if(r.sent!=null){h+="<b>"+r.sent+"</b> student email(s) sent for "+esc(r.date)+".";}' +
     'else{h+="<b>"+r.advisorsSent+"</b> advisor email(s), <b>"+r.teachersSent+' +
@@ -2601,8 +2801,9 @@ function showRouteSheetDialog() {
   const html =
     '<style>' + DIALOG_CSS_ + '</style>' +
     '<h2>Print tour routes</h2>' +
-    '<p class="sub">One page per visiting student, with their guides, their route and ' +
-    'their class visit. Opens as a Google Doc you can edit before printing.</p>' +
+    '<p class="sub">One page per tour guide, in route order - route 1, route 1, route 2, ' +
+    'route 2 - so the stack comes off the printer ready to hand out. Opens as a Google ' +
+    'Doc you can edit before printing.</p>' +
     '<label for="d">Tour date</label>' +
     '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
     '<div style="margin-top:14px;"><button id="go" onclick="make()">Build the document</button></div>' +
@@ -2614,7 +2815,7 @@ function showRouteSheetDialog() {
     'google.script.run.withSuccessHandler(function(r){' +
     'document.getElementById("go").disabled=false;' +
     'document.getElementById("out").innerHTML="<div class=\'free\'><b>"+r.pages+' +
-    '" page(s) ready.</b><br><a href=\'"+r.url+"\' target=\'_blank\'>Open "+esc(r.name)+' +
+    '" sheet(s) ready, one per guide.</b><br><a href=\'"+r.url+"\' target=\'_blank\'>Open "+esc(r.name)+' +
     '"</a><br><span class=\'muted\'>It is in your Drive. File &rsaquo; Print when you are happy with it.</span></div>";})' +
     '.withFailureHandler(function(e){document.getElementById("go").disabled=false;' +
     'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";})' +
@@ -2653,16 +2854,64 @@ function showLockerSlipDialog() {
 
 function api_buildLockerSlips(dateStr) { return buildLockerSlips(dateStr); }
 function api_buildRouteSheets(dateStr) { return buildRouteSheets(dateStr); }
-function api_planTour(dateStr) { return planTour(dateStr); }
-function api_commitTour(dateStr) { return commitTour(dateStr); }
+function api_planTour(dateStr, keep) { return planTour(dateStr, keep); }
+function api_commitTour(dateStr, keep) { return commitTour(dateStr, keep); }
+/**
+ * One test click gives her every version that will really go out.
+ *
+ * The same message is sent on two days and reads differently on each -
+ * "tomorrow" on the Tuesday, "today" on the Wednesday - so a test that
+ * only showed one of them would not be a test of what happens.
+ */
+function sendDaysFor_(handler, dateVal) {
+  const days = [];
+  REMINDER_SLOTS_.forEach(function (slot) {
+    if (slot.handler !== handler) return;
+    const want = ScriptApp.WeekDay[slot.day];
+    // The nearest such weekday on or before the tour.
+    const d = new Date(dateVal.getTime());
+    d.setHours(0, 0, 0, 0);
+    while (d.getDay() !== want) d.setDate(d.getDate() - 1);
+    days.push({ when: d, label: slot.label });
+  });
+  days.sort(function (a, b) { return a.when - b.when; });
+  return days;
+}
+
 function api_sendEmails(which, dateStr, test) {
+  const students = which === 'students';
   const run = function () {
-    return which === 'students' ? sendStudentEmails(dateStr) : sendTeacherEmails(dateStr);
+    return students ? sendStudentEmails(dateStr) : sendTeacherEmails(dateStr);
   };
   if (!test) return run();
+
   const to = previewAddress_();
   if (!to) throw new Error('Could not work out your email address to send the test to.');
-  const r = asTest_(to, run);
-  r.testTo = to;
-  return r;
+  const dateVal = dateStr ? toDate_(dateStr) : nextTourDate_();
+  const days = dateVal
+    ? sendDaysFor_(students ? HANDLER_STUDENT_EMAILS : HANDLER_TEACHER_EMAILS, dateVal)
+    : [];
+  if (!days.length) days.push({ when: null, label: '' });
+
+  let out = null;
+  days.forEach(function (day) {
+    PRETEND_TODAY_ = day.when;
+    TEST_LABEL_ = day.label;
+    try {
+      const r = asTest_(to, run);
+      if (!out) {
+        out = r;
+      } else {
+        ['sent', 'advisorsSent', 'teachersSent', 'hostsSent'].forEach(function (k) {
+          if (typeof r[k] === 'number') out[k] = (out[k] || 0) + r[k];
+        });
+      }
+    } finally {
+      PRETEND_TODAY_ = null;
+      TEST_LABEL_ = '';
+    }
+  });
+  out.testTo = to;
+  out.testDays = days.map(function (d) { return d.label; }).filter(Boolean);
+  return out;
 }
