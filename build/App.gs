@@ -288,15 +288,26 @@ function longDate_(d) {
   return WEEKDAYS_[d.getDay()] + ', ' + MONTHS_[d.getMonth()] + ' ' + d.getDate();
 }
 
+/**
+ * A setting, as text.
+ *
+ * Sheets keeps a time cell as a Date on 30 December 1899, so a cell
+ * reading 9:25 comes back as "Sat Dec 30 1899 09:25:00 GMT-0500" the
+ * moment anything prints it - which is how a tour route ended up
+ * telling a guide to come back in 1899. A time is handed back as a
+ * plain label; a real date is left alone, since that is somebody
+ * meaning a date.
+ */
 function setting_(key, fallback) {
-  const data = rows_(SHEETS.SETTINGS);
-  for (let i = 0; i < data.length; i++) {
-    if (trim_(data[i][0]) === key) {
-      const v = trim_(data[i][1]);
-      if (v !== '') return v;
+  const raw = settingRaw_(key);
+  if (raw instanceof Date) {
+    if (raw.getFullYear() <= 1900) {
+      return timeLabel_(raw.getHours() * 60 + raw.getMinutes());
     }
+    return trim_(raw);
   }
-  return fallback;
+  const v = trim_(raw);
+  return v === '' ? fallback : v;
 }
 
 function toast_(msg) {
