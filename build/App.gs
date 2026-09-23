@@ -28,6 +28,7 @@ const SHEETS = {
   BELL: 'Bell Schedule',
   ROUTES: 'Tour Routes',
   BUDDIES: '5th Grade Buddies',
+  APART: 'Keep Apart',
   SETTINGS: 'Settings'
 };
 
@@ -37,6 +38,7 @@ HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', '
   'Parent 2 Name', 'Parent 2 Email', 'Light', 'Strength', 'Active'];
 HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'School', 'Grade', 'Gender', 'Race', 'Borough',
   'Full Pay', 'Well Connected', 'Class Visit', 'Route', 'Tour Guides', 'Class Buddy', 'Notes'];
+HEADERS[SHEETS.APART] = ['Ambassador', 'And', 'Notes'];
 HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route', 'Notes'];
 const CLASS_VISIT_WITH_GUIDE = 'With tour guide';
 HEADERS[SHEETS.JOBS] = ['Job Name', 'Description', 'Active', 'Out of Class From', 'Out of Class To'];
@@ -455,6 +457,7 @@ function setupSpreadsheet() {
   setupTracker_();
   setupBuddies_();
   setupJobs_();
+  setupKeepApart_();
   setupEligibility_();
   setupTeachers_();
   setupBellSchedule_();
@@ -463,7 +466,8 @@ function setupSpreadsheet() {
 
   if (firstRun) {
     const order = [SHEETS.PROSPECTIVE, SHEETS.TRACKER, SHEETS.AMBASSADORS, SHEETS.ELIGIBILITY,
-        SHEETS.JOBS, SHEETS.BUDDIES, SHEETS.TEACHERS, SHEETS.ROUTES, SHEETS.BELL, SHEETS.SETTINGS];
+        SHEETS.JOBS, SHEETS.APART, SHEETS.BUDDIES, SHEETS.TEACHERS, SHEETS.ROUTES,
+        SHEETS.BELL, SHEETS.SETTINGS];
     order.forEach(function (name, i) {
       const s = ss_().getSheetByName(name);
       if (s) ss_().setActiveSheet(s).moveActiveSheet(i + 1);
@@ -721,6 +725,120 @@ function awayWindow_(jobNames) {
  * here, so this runs at the start of staffing as well as at setup.
  * Rows already there are never touched: a No she has set stays set.
  */
+/**
+ * Pairs who are never given the same job on the same tour.
+ *
+ * First names are enough, because that is how she thinks of them and
+ * how she typed the list. A name is matched against the Ambassadors
+ * sheet at the moment of staffing, so new ambassadors are covered
+ * without anything here changing.
+ *
+ * Panelists are exempt: she picks those herself.
+ */
+const KEEP_APART_SEED_ = [
+  ['Laura', 'Oscar'],
+  ['Mika', 'Emma'],
+  ['Logan', 'Kayla'],
+  ['Logan', 'Margo'],
+  ['Margo', 'Kayla'],
+  ['Sanai', 'Logan'],
+  ['Sanai', 'Margo'],
+  ['Reagan', 'Afia'],
+  ['Reagan', 'Ama'],
+  ['Ama', 'Afia'],
+  ['Michelle', 'Reagan'],
+  ['Michelle', 'Afia'],
+  ['Michelle', 'Ama']
+];
+
+function setupKeepApart_() {
+  const s = sheet_(SHEETS.APART);
+  if (s.getLastRow() > 1) return;
+  const rows = KEEP_APART_SEED_.map(function (p) { return [p[0], p[1], '']; });
+  s.getRange(2, 1, rows.length, 3).setValues(rows);
+  note_(s, SHEETS.APART, 'Ambassador',
+    'Two ambassadors who are never given the same job on the same tour: never both ' +
+    'tour guides, never both lobby greeters, never both table greeters. First names ' +
+    'are enough unless two ambassadors share one, in which case write the full name. ' +
+    'Panelists are not affected, since you pick those by hand.');
+  s.autoResizeColumns(1, 3);
+}
+
+/**
+ * The list, with each name resolved to somebody on the Ambassadors
+ * sheet. A name that matches nobody, or matches two people, is reported
+ * rather than guessed at.
+ */
+function keepApart_() {
+  return cached_('keepApart', function () {
+    const N = SHEETS.APART;
+    const people = ambassadors_();
+    const byFull = {};
+    const byFirst = {};
+    people.forEach(function (a) {
+      byFull[norm_(a.name)] = a.name;
+      // "Afia" has to find Afia-Kusiwaa Twumasi, so a double first name
+      // is indexed whole and in pieces.
+      const first = norm_(a.name.split(' ')[0]);
+      const keys = [first].concat(first.split('-'));
+      keys.forEach(function (k) {
+        if (!k) return;
+        const list = byFirst[k] = byFirst[k] || [];
+        if (list.indexOf(a.name) === -1) list.push(a.name);
+      });
+    });
+
+    const pairs = [];
+    const unknown = [];
+    const ambiguous = [];
+    const resolve = function (raw) {
+      const key = norm_(raw);
+      if (!key) return '';
+      if (byFull[key]) return byFull[key];
+      const hits = byFirst[key] || [];
+      if (hits.length === 1) return hits[0];
+      if (hits.length > 1) {
+        if (ambiguous.indexOf(trim_(raw)) === -1) ambiguous.push(trim_(raw));
+        return '';
+      }
+      if (unknown.indexOf(trim_(raw)) === -1) unknown.push(trim_(raw));
+      return '';
+    };
+
+    rows_(N).forEach(function (r) {
+      const a = resolve(r[col_(N, 'Ambassador')]);
+      const b = resolve(r[col_(N, 'And')]);
+      if (!a || !b || norm_(a) === norm_(b)) return;
+      pairs.push([a, b]);
+    });
+
+    const apart = {};
+    pairs.forEach(function (p) {
+      apart[norm_(p[0]) + '|' + norm_(p[1])] = true;
+      apart[norm_(p[1]) + '|' + norm_(p[0])] = true;
+    });
+    return { apart: apart, pairs: pairs, unknown: unknown, ambiguous: ambiguous };
+  });
+}
+
+/** True if these two are on the list. */
+function keptApart_(a, b) {
+  return keepApart_().apart[norm_(a) + '|' + norm_(b)] === true;
+}
+
+/**
+ * True if giving this person this job would put them alongside somebody
+ * they are kept apart from. Panelists are never checked.
+ */
+function apartClash_(name, job, used) {
+  if (job === JOBS.PANELIST) return false;
+  const list = keepApart_().apart;
+  if (!Object.keys(list).length) return false;
+  return Object.keys(used).some(function (other) {
+    return used[other] === job && keptApart_(name, other);
+  });
+}
+
 function setupEligibility_() {
   const s = sheet_(SHEETS.ELIGIBILITY);
   const h = HEADERS[SHEETS.ELIGIBILITY];
@@ -1538,6 +1656,8 @@ function planTour(dateStr, keepExisting) {
           if (used[a.name] || !canDo(a, JOBS.GUIDE)) return false;
           if (!a.grade || !a.gender) return false;
           if (v.grade && grades.indexOf(a.grade) === -1) return false;
+          // Never bends, whatever it costs the rest of the matching.
+          if (apartClash_(a.name, JOBS.GUIDE, used)) return false;
           return true;
         });
       };
@@ -1755,7 +1875,9 @@ function planTour(dateStr, keepExisting) {
    * gender is left the crew simply fills from it rather than going short.
    */
   const crew = function (job, count) {
-    const available = pool.filter(function (a) { return !used[a.name] && canDo(a, job); }).sort(fairness);
+    const available = pool.filter(function (a) {
+      return !used[a.name] && canDo(a, job) && !apartClash_(a.name, job, used);
+    }).sort(fairness);
     // Whoever is on this crew already stays on it, and only the gap is filled.
     const picked = ((kept && kept.crew[job]) || []).map(function (n) {
       return byAmbName[norm_(n)] || { name: n, grade: '', gender: '', presenting: '' };
@@ -1779,6 +1901,13 @@ function planTour(dateStr, keepExisting) {
         }
       });
       if (best === null) break;
+      // The ones already on this crew count too, not only people who
+      // were given the job earlier in the run.
+      if (picked.some(function (x) { return keptApart_(x.name, best.name); })) {
+        const i = available.indexOf(best);
+        if (i !== -1) available.splice(i, 1);
+        continue;
+      }
       picked.push(best);
     }
     const chosen = picked.map(function (a) { return a.name; });
@@ -1933,6 +2062,12 @@ function guideMissReason_(v, missing, pool, used, canDo, total) {
     if (!inGrade.length) return 'no ' + label + ' ambassador on the sheet at all';
     const free = inGrade.filter(function (a) { return !used[a.name] && canDo(a, JOBS.GUIDE); });
     if (!free.length) return 'every ' + label + ' ambassador is already assigned';
+    const allClash = free.every(function (a) {
+      return apartClash_(a.name, JOBS.GUIDE, used);
+    });
+    if (allClash) {
+      return 'every ' + label + ' ambassador left is kept apart from one already guiding';
+    }
 
     const noDetails = free.filter(function (a) { return !a.grade || !a.gender; }).length;
     if (noDetails) return noDetails + ' ' + label + ' ambassador(s) have no Gender filled in';
@@ -2025,6 +2160,17 @@ function setupWarnings_(all, visitors) {
     w.push('The Ambassadors sheet has two columns headed ' + twice.join(', ') +
       '. Only the leftmost is read, so anything typed in the other is ignored. ' +
       'Delete or rename the spare.');
+  }
+
+  const apart = keepApart_();
+  if (apart.unknown.length) {
+    w.push('Keep Apart names nobody on the Ambassadors sheet: ' +
+      apart.unknown.join(', ') + '. Those pairs are being ignored - check the spelling.');
+  }
+  if (apart.ambiguous.length) {
+    w.push('Keep Apart says ' + apart.ambiguous.join(', ') +
+      ', and more than one ambassador goes by that name. Write the full name, or ' +
+      'those pairs are ignored.');
   }
 
   const buddyNoGender = buddies_().filter(function (b) { return b.canHost && !b.gender; }).length;

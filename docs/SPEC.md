@@ -50,6 +50,19 @@ One row per ambassador per tour. This is the record of who did what.
 per ambassador (tours done, jobs done, last tour) are computed from this,
 not typed.
 
+### Keep Apart
+
+Pairs of ambassadors who are never given the same job on the same tour:
+never both tour guides, never both lobby greeters, never both table
+greeters. They may both work, at different jobs.
+
+First names are enough, and a double first name is matched on either
+part, so "Afia" finds Afia-Kusiwaa Twumasi. A name matching nobody, or
+matching two people, is reported in the warnings rather than guessed at.
+
+The rule never bends. Where it leaves a place unfilled, the dialog says
+that is why. Panelists are exempt, since those are picked by hand.
+
 ### Jobs and Eligibility
 
 Every ambassador gets an Eligibility row automatically - staffing tops
