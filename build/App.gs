@@ -783,7 +783,7 @@ function planTour(dateStr) {
       guides: chosen.map(function (a) { return a.name; }),
       route: route,
       short: Math.max(0, perVisitor - chosen.length),
-      why: shortfallReason_(v, pool, used, canDo)
+      why: shortfallReason_(v, pool, used, canDo, all.length)
     };
   });
 
@@ -792,7 +792,16 @@ function planTour(dateStr) {
     const ranked = pool.filter(function (a) { return !used[a.name] && canDo(a, job); }).sort(fairness);
     const chosen = ranked.slice(0, count).map(function (a) { return a.name; });
     chosen.forEach(function (n) { used[n] = job; });
-    return { job: job, chosen: chosen, needed: count, short: Math.max(0, count - chosen.length) };
+    let why = '';
+    if (chosen.length < count) {
+      if (!all.length) why = 'the Ambassadors sheet is empty';
+      else if (!pool.length) why = 'nobody is marked Active - put Yes in the Active column';
+      else why = 'everyone eligible is already on another job';
+    }
+    return {
+      job: job, chosen: chosen, needed: count,
+      short: Math.max(0, count - chosen.length), why: why
+    };
   };
   const greeters = [
     crew(JOBS.LOBBY, Number(setting_('Lobby Greeters Needed', '3')) || 3),
@@ -818,9 +827,19 @@ function planTour(dateStr) {
 }
 
 /** Why a visitor could not be given a full pair, in plain words. */
-function shortfallReason_(v, pool, used, canDo) {
+function shortfallReason_(v, pool, used, canDo, total) {
+  if (!total) return 'the Ambassadors sheet is empty';
+  if (!pool.length) {
+    return 'no ambassador is marked Active - put Yes in the Active column';
+  }
   const left = pool.filter(function (a) { return !used[a.name] && canDo(a, JOBS.GUIDE); });
-  if (!left.length) return 'every ambassador is already assigned';
+  if (!left.length) {
+    const noDetails = pool.filter(function (a) { return !a.grade || !a.gender; }).length;
+    if (noDetails === pool.length) {
+      return 'every ambassador is missing Grade or Gender, so none can be matched';
+    }
+    return 'everyone eligible is already assigned';
+  }
   const noDetails = left.filter(function (a) { return !a.grade || !a.gender; }).length;
   const gradeOk = left.filter(function (a) { return !v.grade || a.grade === v.grade; });
   if (!gradeOk.length) {
@@ -836,6 +855,15 @@ function shortfallReason_(v, pool, used, canDo) {
 function setupWarnings_(all, visitors) {
   const w = [];
   const active = all.filter(function (a) { return a.active; });
+  if (!all.length) {
+    w.push('The Ambassadors sheet has no names on it. Run First-Time Setup, or type them in.');
+    return w;
+  }
+  if (!active.length) {
+    w.push('None of the ' + all.length + ' ambassadors is marked Active. Put Yes in the ' +
+      'Active column - a blank there means "not available", so nobody can be picked.');
+    return w;
+  }
   const missing = function (field, label) {
     const n = active.filter(function (a) { return !a[field]; }).length;
     if (n) w.push(n + ' active ambassador(s) have no ' + label + '.');
@@ -1295,7 +1323,8 @@ function showStaffDialog() {
     '"</td><td>"+esc(x.route||"-")+"</td></tr>";});' +
     'h+="</table>";' +
     'p.greeters.forEach(function(c){h+="<h3>"+esc(c.job)+" ("+c.chosen.length+" of "+c.needed+")</h3><div>"+' +
-    '(c.chosen.length?esc(c.chosen.join(", ")):"<b>none available</b>")+"</div>";});' +
+    '(c.chosen.length?esc(c.chosen.join(", ")):"<b>none available</b>")+' +
+    '(c.why?" <span class=\'muted\'>- "+esc(c.why)+"</span>":"")+"</div>";});' +
     'h+="</div>";' +
     'if(p.free.length){h+="<div class=\'free\'><b>Still free - pick your panelists from these "+p.free.length+"</b><br>"+' +
     'esc(p.free.map(function(f){return f.name+" ("+(f.tours||0)+")";}).join(", "))+' +
