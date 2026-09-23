@@ -1184,9 +1184,10 @@ function planTour(dateStr) {
       genderShortfall: !!v.gender && chosen.length > 0 &&
         !chosen.some(function (a) { return norm_(a.gender) === norm_(v.gender); }),
       short: Math.max(0, perVisitor - chosen.length),
-      why: missing.length
-        ? guideMissReason_(v, missing, pool, used, canDo, all.length)
-        : ''
+      why: !wantGrades.length
+        ? 'no usable Grade on this visitor - put the grade they are applying for ' +
+          '(a number) in the Grade column, or nobody can be matched to them'
+        : (missing.length ? guideMissReason_(v, missing, pool, used, canDo, all.length) : '')
     };
   });
 
@@ -2201,6 +2202,8 @@ function showStaffDialog() {
     '(x.visitor.race?" <span class=\'muted\'>"+esc(x.visitor.race)+(x.needsSoC?" - needs a student of color":"")+"</span>":"")+' +
     '(x.visitor.school?" <span class=\'muted\'><br>("+esc(x.visitor.school)+")</span>":"")+"</td><td>"+' +
     '(x.guides.length?esc(x.guides.join(", ")):"<b>none found</b>")+' +
+    '(x.wantGrades&&x.wantGrades.length?"<br><span class=\'muted\'>looking for grade "+' +
+    'esc(x.wantGrades.join(" + "))+"</span>":"")+' +
     '(x.guideMix?"<br><span class=\'muted\'>"+esc(x.guideMix)+"</span>":"")+' +
     '(x.buddy?"<br><span class=\'muted\'>class visit: "+esc(x.buddy.name)+' +
     '(x.buddy.gender?" ("+esc(x.buddy.gender)+")":"")+" - "+esc(x.buddy.language)+' +
