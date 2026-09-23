@@ -32,9 +32,9 @@ const SHEETS = {
 
 const HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
-  'Borough', 'Gender', 'Student Email', 'Parent 1 Name', 'Parent 1 Email',
+  'Borough', 'Gender', 'Race (Presenting)', 'Student Email', 'Parent 1 Name', 'Parent 1 Email',
   'Parent 2 Name', 'Parent 2 Email', 'Active'];
-HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'School', 'Grade', 'Gender', 'Borough',
+HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'School', 'Grade', 'Gender', 'Race', 'Borough',
   'Route', 'Tour Guides', 'Notes'];
 HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route', 'Notes'];
 HEADERS[SHEETS.JOBS] = ['Job Name', 'Description', 'Active'];
@@ -56,6 +56,12 @@ const SPLITS = ['A', 'B', 'C'];
 const PODS = ['MMS', 'DJM', 'AOS', 'CCM', 'EEL', 'MSB', 'CJM', 'RSS'];
 const GRADES = ['5', '6', '7', '8'];
 const GENDERS = ['Female', 'Male', 'Non-binary', 'Other'];
+
+/* Both of these are dropdowns that allow anything, so the list is a
+ * starting point rather than a limit - type a value that is not on it
+ * and it is kept, not rejected. */
+const PRESENTING_OPTIONS = ['White presenting', 'Student of color'];
+const RACE_OPTIONS = ['White', 'African American', 'Asian'];
 const BOROUGHS = ['M', 'B', 'Q', 'X', 'S', 'J'];
 const BOROUGH_NAMES = { M: 'Manhattan', B: 'Brooklyn', Q: 'Queens', X: 'Bronx', S: 'Staten Island', J: 'New Jersey' };
 
@@ -69,6 +75,10 @@ const DEFAULT_SETTINGS = [
   ['Lobby Greeters Needed', '3'],
   ['Table Greeters Needed', '2'],
   ['Tour Guides Per Visiting Student', '2'],
+  ['Guide Grades for Rising 5', '6'],
+  ['Guide Grades for Rising 6', '6, 7'],
+  ['Guide Grades for Rising 7', '7, 8'],
+  ['Guide Grades for Rising 8', '8'],
   ['Max Families Per Route', '1']
 ];
 
@@ -270,6 +280,16 @@ function setupSpreadsheet() {
   const firstRun = !before || before.getLastRow() < 2;
   Object.keys(SHEETS).forEach(function (k) { sheet_(SHEETS[k]); });
 
+  // These are added to a sheet however old it is, because they are new
+  // columns rather than formatting. Nothing else about the sheet changes.
+  const added = [];
+  if (ensureColumn_(SHEETS.AMBASSADORS, 'Race (Presenting)', PRESENTING_OPTIONS)) {
+    added.push('Race (Presenting) on Ambassadors');
+  }
+  if (ensureColumn_(SHEETS.PROSPECTIVE, 'Race', RACE_OPTIONS)) {
+    added.push('Race on Prospective Students');
+  }
+
   setupAmbassadors_();
   setupProspective_();
   setupTracker_();
@@ -290,7 +310,8 @@ function setupSpreadsheet() {
     ss_().setActiveSheet(ss_().getSheetByName(SHEETS.PROSPECTIVE));
   }
 
-  alert_((firstRun ? 'Setup complete.' :
+  alert_((added.length ? 'Added: ' + added.join(', ') + '.\n\n' : '') +
+    (firstRun ? 'Setup complete.' :
     'Setup checked over. Everything already there was left exactly as it was - ' +
     'no columns resized, no formatting changed.') + '\n\n' +
     'Three things to fill in before anything can send:\n\n' +
@@ -503,8 +524,34 @@ function setupSettings_() {
   s.getRange(2, 1, DEFAULT_SETTINGS.length, 2).setValues(DEFAULT_SETTINGS);
   note_(s, SHEETS.SETTINGS, 'Value',
     'Reply-To Email: leave blank and replies come back to whoever sends. ' +
-    'Set it to an admissions address to collect replies there instead.');
+    'Set it to an admissions address to collect replies there instead.\n\n' +
+    'Guide Grades for Rising N: which ambassador grades may guide a visitor ' +
+    'entering grade N. A rising 5th grader is in 4th now, so a 6th grader is ' +
+    'the one who has just lived the year they are about to start. Separate ' +
+    'several with commas.');
   s.autoResizeColumns(1, 2);
+}
+
+/**
+ * Makes sure a sheet has a column, adding it on the end if it does not.
+ *
+ * Only ever adds: an existing column is left exactly where it is, and
+ * nothing else on the sheet is touched. The new header copies the
+ * formatting of the one beside it so it matches the rest of the row.
+ */
+function ensureColumn_(name, header, options) {
+  const s = sheet_(name);
+  if (headerIndex_(name)[header] !== undefined) return false;
+  const at = Math.max(s.getLastColumn(), 1) + 1;
+  s.getRange(1, at).setValue(header);
+  try {
+    s.getRange(1, at - 1).copyFormatToRange(s, at, at, 1, 1);
+  } catch (err) {
+    // A sheet with nothing to copy from is fine; the header still lands.
+  }
+  delete HEADER_CACHE_[name];
+  if (options) dropdown_(s, Math.max(s.getLastRow(), 2), at, options, true);
+  return true;
 }
 
 function dropdown_(sheet, lastRow, col, values, allowOther) {
@@ -772,6 +819,24 @@ function activeJobs_() {
   return on;
 }
 
+/**
+ * Which ambassador grades may guide a visitor entering a given grade.
+ *
+ * A rising fifth grader is in fourth now, so the ambassador who has
+ * actually just lived the year they are about to start is a sixth
+ * grader. The office sets each of these on the Settings sheet; an entry
+ * grade with nothing set falls back to the same grade.
+ */
+function guideGradesFor_(visitorGrade) {
+  const g = trim_(visitorGrade).replace(/[^0-9]/g, '');
+  if (!g) return [];
+  const raw = setting_('Guide Grades for Rising ' + g, '');
+  const list = String(raw).split(/[,\/ ]+/)
+    .map(function (x) { return trim_(x).replace(/[^0-9]/g, ''); })
+    .filter(Boolean);
+  return list.length ? list : [g];
+}
+
 /** Visitors on a given tour date. */
 function prospectiveFor_(dateVal) {
   const N = SHEETS.PROSPECTIVE;
@@ -837,10 +902,11 @@ function planTour(dateStr) {
   const routeUse = {};
 
   const pairs = visitors.map(function (v) {
+    const wantGrades = guideGradesFor_(v.grade);
     const candidates = pool.filter(function (a) {
       if (used[a.name] || !canDo(a, JOBS.GUIDE)) return false;
       if (!a.grade || !a.gender) return false;
-      if (v.grade && a.grade !== v.grade) return false;
+      if (v.grade && wantGrades.indexOf(a.grade) === -1) return false;
       if (v.gender && norm_(a.gender) !== norm_(v.gender)) return false;
       return true;
     });
@@ -868,14 +934,45 @@ function planTour(dateStr) {
       guides: chosen.map(function (a) { return a.name; }),
       route: route,
       short: Math.max(0, perVisitor - chosen.length),
-      why: shortfallReason_(v, pool, used, canDo, all.length)
+      why: shortfallReason_(v, pool, used, canDo, all.length, wantGrades)
     };
   });
 
   /* ---- greeters ---- */
+  /**
+   * Picks a crew as evenly split by gender as the people available allow.
+   *
+   * Everyone eligible is put in a queue per gender, each ordered by who
+   * has done fewest jobs. Each place then goes to whichever queue has
+   * been drawn on least so far, so three places across two genders come
+   * out 2-1 rather than 3-0, and two places come out 1-1. Where only one
+   * gender is left the crew simply fills from it rather than going short.
+   */
   const crew = function (job, count) {
     const ranked = pool.filter(function (a) { return !used[a.name] && canDo(a, job); }).sort(fairness);
-    const chosen = ranked.slice(0, count).map(function (a) { return a.name; });
+    const queues = {};
+    const order = [];
+    ranked.forEach(function (a) {
+      const key = trim_(a.gender) || 'Not given';
+      if (!queues[key]) { queues[key] = []; order.push(key); }
+      queues[key].push(a);
+    });
+    const taken = {};
+    order.forEach(function (k) { taken[k] = 0; });
+    const chosen = [];
+    while (chosen.length < count) {
+      let best = null;
+      order.forEach(function (k) {
+        if (!queues[k].length) return;
+        if (best === null) { best = k; return; }
+        if (taken[k] < taken[best]) { best = k; return; }
+        // Same number taken from each: prefer whoever has done fewest jobs.
+        if (taken[k] === taken[best] && fairness(queues[k][0], queues[best][0]) < 0) best = k;
+      });
+      if (best === null) break;
+      chosen.push(queues[best].shift().name);
+      taken[best] += 1;
+    }
     chosen.forEach(function (n) { used[n] = job; });
     let why = '';
     if (chosen.length < count) {
@@ -885,7 +982,8 @@ function planTour(dateStr) {
     }
     return {
       job: job, chosen: chosen, needed: count,
-      short: Math.max(0, count - chosen.length), why: why
+      short: Math.max(0, count - chosen.length), why: why,
+      mix: genderMix_(chosen, pool)
     };
   };
   const greeters = [
@@ -901,18 +999,35 @@ function planTour(dateStr) {
       return { name: a.name, grade: a.grade, tours: h.total };
     });
 
+  const everyone = [];
+  pairs.forEach(function (p) { p.guides.forEach(function (g) { everyone.push(g); }); });
+  greeters.forEach(function (c) { c.chosen.forEach(function (n) { everyone.push(n); }); });
+
   return {
     date: dateKey_(dateVal),
     dateLabel: longDate_(dateVal),
     pairs: pairs,
     greeters: greeters,
     free: free,
+    overallMix: genderMix_(everyone, pool),
+    assignedCount: everyone.length,
     warnings: setupWarnings_(all, visitors)
   };
 }
 
+/** "2 Female, 1 Male" for a list of names. */
+function genderMix_(names, pool) {
+  const by = {};
+  names.forEach(function (n) {
+    const a = pool.filter(function (x) { return x.name === n; })[0];
+    const g = (a && trim_(a.gender)) || 'not given';
+    by[g] = (by[g] || 0) + 1;
+  });
+  return Object.keys(by).sort().map(function (g) { return by[g] + ' ' + g; }).join(', ');
+}
+
 /** Why a visitor could not be given a full pair, in plain words. */
-function shortfallReason_(v, pool, used, canDo, total) {
+function shortfallReason_(v, pool, used, canDo, total, wantGrades) {
   if (!total) return 'the Ambassadors sheet is empty';
   if (!pool.length) {
     return 'no ambassador is marked Active - put Yes in the Active column';
@@ -926,13 +1041,15 @@ function shortfallReason_(v, pool, used, canDo, total) {
     return 'everyone eligible is already assigned';
   }
   const noDetails = left.filter(function (a) { return !a.grade || !a.gender; }).length;
-  const gradeOk = left.filter(function (a) { return !v.grade || a.grade === v.grade; });
+  const want = wantGrades && wantGrades.length ? wantGrades : [v.grade];
+  const label = 'grade ' + want.join(' or ');
+  const gradeOk = left.filter(function (a) { return !v.grade || want.indexOf(a.grade) !== -1; });
   if (!gradeOk.length) {
-    return 'nobody left in grade ' + v.grade +
+    return 'nobody left in ' + label +
       (noDetails ? ' (' + noDetails + ' ambassador(s) have no grade or gender filled in)' : '');
   }
   const bothOk = gradeOk.filter(function (a) { return !v.gender || norm_(a.gender) === norm_(v.gender); });
-  if (!bothOk.length) return 'nobody left in grade ' + v.grade + ' of that gender';
+  if (!bothOk.length) return 'nobody left in ' + label + ' of that gender';
   return '';
 }
 
@@ -1414,7 +1531,10 @@ function showStaffDialog() {
     'h+="</table>";' +
     'p.greeters.forEach(function(c){h+="<h3>"+esc(c.job)+" ("+c.chosen.length+" of "+c.needed+")</h3><div>"+' +
     '(c.chosen.length?esc(c.chosen.join(", ")):"<b>none available</b>")+' +
+    '(c.mix?" <span class=\'muted\'>("+esc(c.mix)+")</span>":"")+' +
     '(c.why?" <span class=\'muted\'>- "+esc(c.why)+"</span>":"")+"</div>";});' +
+    'if(p.overallMix){h+="<h3>Everyone assigned ("+p.assignedCount+")</h3><div class=\'muted\'>"+' +
+    'esc(p.overallMix)+"</div>";}' +
     'h+="</div>";' +
     'if(p.free.length){h+="<div class=\'free\'><b>Still free - pick your panelists from these "+p.free.length+"</b><br>"+' +
     'esc(p.free.map(function(f){return f.name+" ("+(f.tours||0)+")";}).join(", "))+' +
