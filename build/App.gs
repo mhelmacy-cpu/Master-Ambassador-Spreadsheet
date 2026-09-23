@@ -44,7 +44,7 @@ HEADERS[SHEETS.ELIGIBILITY] = ['Ambassador', 'Panelist', 'Lobby Greeter', 'Table
 HEADERS[SHEETS.TEACHERS] = ['Teacher Name', 'Initials', 'Teacher Email', 'Room / Notes'];
 HEADERS[SHEETS.BELL] = ['Day', 'Homeroom', 'Split', 'Start', 'End', 'What / Teacher / Room'];
 HEADERS[SHEETS.ROUTES] = ['Route', 'Direction', 'Humanities Teacher', 'Language', 'Itinerary'];
-HEADERS[SHEETS.BUDDIES] = ['Student', 'Language', 'Teacher', 'Room', 'Can Host a Visitor'];
+HEADERS[SHEETS.BUDDIES] = ['Student', 'Gender', 'Language', 'Teacher', 'Room', 'Can Host a Visitor'];
 HEADERS[SHEETS.SETTINGS] = ['Setting', 'Value'];
 
 const JOBS = {
@@ -321,6 +321,9 @@ function setupSpreadsheet() {
   if (ensureColumn_(SHEETS.PROSPECTIVE, 'Race', RACE_OPTIONS)) {
     added.push('Race on Prospective Students');
   }
+  if (ensureColumn_(SHEETS.BUDDIES, 'Gender', GENDERS)) {
+    added.push('Gender on 5th Grade Buddies');
+  }
 
   setupAmbassadors_();
   setupProspective_();
@@ -462,12 +465,18 @@ function setupBuddies_() {
   if (fresh) {
     const rows = FIFTH_LANGUAGE_STUDENTS_.map(function (st) {
       const c = FIFTH_LANGUAGE_CLASSES_[st.lang] || {};
-      return [st.name, c.language || '', c.teacher || '', c.room || '', st.canHost ? 'Yes' : 'No'];
+      return [st.name, '', c.language || '', c.teacher || '', c.room || '', st.canHost ? 'Yes' : 'No'];
     });
     s.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
   }
   if (!fresh) return;
   const last = Math.max(s.getLastRow(), 2);
+  dropdown_(s, last, col_(SHEETS.BUDDIES, 'Gender') + 1, GENDERS, true);
+  note_(s, SHEETS.BUDDIES, 'Gender',
+    'A visiting girl is offered a girl to sit with, and a boy a boy, wherever ' +
+    'the class has one free. It is a preference, not a rule - a class with ' +
+    'nobody of that gender still hosts rather than turning the visitor away, ' +
+    'and the preview says when that happened.');
   dropdown_(s, last, col_(SHEETS.BUDDIES, 'Language') + 1,
     Object.keys(FIFTH_LANGUAGE_CLASSES_).map(function (k) { return FIFTH_LANGUAGE_CLASSES_[k].language; }), true);
   dropdown_(s, last, col_(SHEETS.BUDDIES, 'Can Host a Visitor') + 1, YES_NO);
@@ -1011,6 +1020,7 @@ function buddies_() {
   return rows_(N).map(function (r) {
     return {
       name: trim_(r[col_(N, 'Student')]),
+      gender: trim_(cell_(r, N, 'Gender')),
       language: trim_(r[col_(N, 'Language')]),
       teacher: trim_(r[col_(N, 'Teacher')]),
       room: trim_(r[col_(N, 'Room')]),
@@ -1184,8 +1194,15 @@ function planTour(dateStr) {
         : 'no 5th grader on the Buddies sheet is in that class and marked Can Host';
       return;
     }
-    // Whoever has hosted least so far.
+    // A visiting girl is offered a girl and a boy a boy, where the class has
+    // one free. A preference, not a rule: these classes are small, and one
+    // with nobody of that gender still hosts rather than turning them away.
     inClass.sort(function (a, b) {
+      if (p.visitor.gender) {
+        const ga = norm_(a.gender) === norm_(p.visitor.gender) ? 0 : 1;
+        const gb = norm_(b.gender) === norm_(p.visitor.gender) ? 0 : 1;
+        if (ga !== gb) return ga - gb;
+      }
       const ha = (hist[norm_(a.name)] || {}).total || 0;
       const hb = (hist[norm_(b.name)] || {}).total || 0;
       if (ha !== hb) return ha - hb;
@@ -1194,6 +1211,9 @@ function planTour(dateStr) {
     const pick = inClass[0];
     buddyUsed[pick.name] = true;
     p.buddy = pick;
+    p.buddyGenderMiss = !!p.visitor.gender && !!pick.gender &&
+      norm_(pick.gender) !== norm_(p.visitor.gender);
+    p.buddyGenderUnknown = !!p.visitor.gender && !pick.gender;
     p.handoff = timeLabelOrRaw_(handoff) + ' - bring ' + p.visitor.name + ' to ' + pick.name +
       ' in ' + pick.room + ' (' + pick.teacher + ', ' + pick.language + '). Tour guides are ' +
       'finished and can go back to class. ' + pick.name + ' brings ' + p.visitor.name +
@@ -1418,6 +1438,12 @@ function setupWarnings_(all, visitors) {
   missing('pod', 'Homeroom');
   missing('email', 'Student Email - they will not be told they are on duty');
   missing('advisor', 'Advisor - their advisor will not be told');
+
+  const buddyNoGender = buddies_().filter(function (b) { return b.canHost && !b.gender; }).length;
+  if (buddyNoGender && visitors.some(function (v) { return classVisitLanguage_(v.classVisit); })) {
+    w.push(buddyNoGender + ' of the 5th graders who can host have no Gender on the ' +
+      '5th Grade Buddies sheet, so a visiting girl cannot be matched with a girl.');
+  }
 
   const noTeacherEmail = rows_(SHEETS.TEACHERS).filter(function (r) {
     return trim_(r[0]) && !trim_(r[2]);
@@ -1962,8 +1988,12 @@ function showStaffDialog() {
     '(x.visitor.school?" <span class=\'muted\'><br>("+esc(x.visitor.school)+")</span>":"")+"</td><td>"+' +
     '(x.guides.length?esc(x.guides.join(", ")):"<b>none found</b>")+' +
     '(x.guideMix?"<br><span class=\'muted\'>"+esc(x.guideMix)+"</span>":"")+' +
-    '(x.buddy?"<br><span class=\'muted\'>class visit: "+esc(x.buddy.name)+" - "+esc(x.buddy.language)+' +
+    '(x.buddy?"<br><span class=\'muted\'>class visit: "+esc(x.buddy.name)+' +
+    '(x.buddy.gender?" ("+esc(x.buddy.gender)+")":"")+" - "+esc(x.buddy.language)+' +
     '", "+esc(x.buddy.teacher)+", "+esc(x.buddy.room)+"</span>":"")+' +
+    '(x.buddyGenderMiss?"<br><span class=\'muted\'>no "+esc(x.visitor.gender)+' +
+    '" was free in that class, so this is the closest fit</span>":"")+' +
+    '(x.buddyGenderUnknown?"<br><span class=\'muted\'>no Gender on file for that 5th grader</span>":"")+' +
     '(x.buddyProblem?"<br><b>class visit not assigned - "+esc(x.buddyProblem)+"</b>":"")+' +
     '(x.socShortfall?"<br><b>no student of color was free for this pair</b>":"")+' +
     '(x.genderShortfall?"<br><b>nobody of the visitor\'s own gender was free</b>":"")+' +
