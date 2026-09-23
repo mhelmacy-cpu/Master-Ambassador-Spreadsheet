@@ -100,7 +100,6 @@ const DEFAULT_SETTINGS = [
   ['Guide Grades for Rising 6', '5 and 6'],
   ['Guide Grades for Rising 7', '6 and 7'],
   ['Guide Grades for Rising 8', '7 and 8'],
-  ['Visitor Races Needing a Student of Color Guide', 'African American, Black'],
   ['Max Families Per Route', '1'],
   ['Class Visit Handoff Time', '9:06'],
   ['Wait For', 'Maren']
@@ -445,6 +444,11 @@ function setupProspective_() {
     'For a rising 5th grader you can instead pick one of the 5th grade ' +
     'language classes. A 5th grader from that class collects them from the ' +
     'guides and walks them down to the cafeteria at the end.');
+  note_(s, SHEETS.PROSPECTIVE, 'Race',
+    'WP or SOC is fine, so are White, African American, Asian and the rest.\n\n' +
+    'A visitor who is a student of color is given one guide who is too, and ' +
+    'one who is white presenting. No pair is two students of color unless ' +
+    'there is no other way to fill it.');
   note_(s, SHEETS.PROSPECTIVE, 'Class Buddy', 'Filled in by Staff This Wednesday Tour - do not type here.');
   note_(s, SHEETS.PROSPECTIVE, 'Route', 'Filled in by Staff This Wednesday Tour - do not type here.');
   note_(s, SHEETS.PROSPECTIVE, 'Tour Guides', 'Filled in by Staff This Wednesday Tour - do not type here.');
@@ -634,11 +638,7 @@ function setupSettings_() {
   s.getRange(2, 2, Math.max(DEFAULT_SETTINGS.length, 200), 1).setNumberFormat('@');
   s.getRange(2, 1, DEFAULT_SETTINGS.length, 2).setValues(DEFAULT_SETTINGS);
   note_(s, SHEETS.SETTINGS, 'Value',
-    'Visitor Races Needing a Student of Color Guide: a visitor whose Race ' +
-    'is on this list always gets at least one student of color among their ' +
-    'guides. Two is fine. Everyone else carries no race constraint at all - ' +
-    'two white-presenting guides for a white visitor is fine, and the other ' +
-    'races are left open.\n\n' +
+
     'Reply-To Email: leave blank and replies come back to whoever sends. ' +
     'Set it to an admissions address to collect replies there instead.\n\n' +
     'Guide Grades for Rising N: which grade each of a visitor\'s guides comes ' +
@@ -1147,31 +1147,37 @@ function planTour(dateStr) {
        * place, so a pair cannot be completed still owing one. A candidate
        * who settles both is taken first, which keeps the last place from
        * being asked for two things at once. */
+      const haveSoC = chosen.some(function (x) { return isStudentOfColor_(x.presenting); });
       const owedGender = !!v.gender &&
         !chosen.some(function (x) { return norm_(x.gender) === norm_(v.gender); });
-      const owedSoC = needsSoC &&
-        !chosen.some(function (x) { return isStudentOfColor_(x.presenting); });
+      const owedSoC = needsSoC && !haveSoC;
       const owedCount = (owedGender ? 1 : 0) + (owedSoC ? 1 : 0);
       const settles = function (a) {
         return (owedGender && norm_(a.gender) === norm_(v.gender) ? 1 : 0) +
                (owedSoC && isStudentOfColor_(a.presenting) ? 1 : 0);
       };
-      const lastPlace = slot === wantGrades.length - 1;
-      if (lastPlace && owedCount) {
-        const settlesAll = candidates.filter(function (a) { return settles(a) === owedCount; });
-        if (settlesAll.length) candidates = settlesAll;
-        else {
-          const settlesSome = candidates.filter(function (a) { return settles(a) > 0; });
-          if (settlesSome.length) candidates = settlesSome;
-        }
-      }
-      // Whoever settles most of what is still owed, then same borough,
-      // then whoever has done fewest jobs.
+      // A pair should not be two students of color. Once one is on it, the
+      // other place goes to somebody who is not, unless that would leave it
+      // empty.
+      const avoid = function (a) { return haveSoC && isStudentOfColor_(a.presenting); };
+
+      // Best available, relaxing only as far as it has to.
+      const narrow = function (list, test) {
+        const kept = list.filter(test);
+        return kept.length ? kept : list;
+      };
+      candidates = narrow(candidates, function (a) {
+        return settles(a) === owedCount && !avoid(a);
+      });
+      candidates = narrow(candidates, function (a) { return !avoid(a); });
+
       candidates.sort(function (a, b) {
         if (owedCount) {
           const sa = settles(a), sb = settles(b);
           if (sa !== sb) return sb - sa;
         }
+        const aa = avoid(a) ? 1 : 0, ab = avoid(b) ? 1 : 0;
+        if (aa !== ab) return aa - ab;
         const ba = (v.borough && a.borough === v.borough) ? 0 : 1;
         const bb = (v.borough && b.borough === v.borough) ? 0 : 1;
         if (ba !== bb) return ba - bb;
@@ -1359,22 +1365,16 @@ function planTour(dateStr) {
 }
 
 /**
- * Whether at least one of this visitor's guides must be a student of
- * colour, so they meet somebody who reflects them.
+ * Whether this visitor is a student of color, and so should have one
+ * guide who is too.
  *
- * Set on the Settings sheet, as a list of the races it applies to. A
- * visitor whose race is not on that list carries no constraint at all -
- * two white-presenting guides for a white visitor is fine, and the other
- * races are left open.
+ * Read exactly as the ambassadors' column is: anything filled in that is
+ * not white presenting. SOC, POC, African American, Asian and the
+ * spelled-out forms all count; WP, W and White do not; blank is unknown
+ * and carries no requirement.
  */
 function needsSoCGuide_(visitorRace) {
-  const race = norm_(visitorRace);
-  if (!race) return false;
-  return String(setting_('Visitor Races Needing a Student of Color Guide', ''))
-    .split(',')
-    .map(function (x) { return norm_(x); })
-    .filter(Boolean)
-    .some(function (x) { return race === x || race.indexOf(x) !== -1 || x.indexOf(race) !== -1; });
+  return isStudentOfColor_(visitorRace);
 }
 
 /* The Race (Presenting) column gets written all sorts of ways - the full
