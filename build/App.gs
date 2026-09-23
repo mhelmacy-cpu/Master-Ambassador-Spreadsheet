@@ -2809,9 +2809,10 @@ function showStaffDialog() {
     'if(p.overallMix){h+="<h3>Everyone assigned ("+p.assignedCount+")</h3><div class=\'muted\'>"+' +
     'esc(p.overallMix)+(p.overallRaceMix?"<br>"+esc(p.overallRaceMix):"")+"</div>";}' +
     'h+="</div>";' +
-    'if(p.free.length){h+="<div class=\'free\'><b>Your panel - tick who you want</b>' +
-    '<div class=\'panel\'>"+p.free.map(function(f){' +
-    'return "<label><input type=\'checkbox\' class=\'pan\' value=\""+esc(f.name)+"\""+' +
+    'if(p.free.length){window.__free=p.free;' +
+    'h+="<div class=\'free\'><b>Your panel - tick who you want</b>' +
+    '<div class=\'panel\'>"+p.free.map(function(f,i){' +
+    'return "<label><input type=\'checkbox\' class=\'pan\' value=\'"+i+"\'"+' +
     '(f.onPanel?" checked":"")+"> "+esc(f.name)+" <span class=\'muted\'>"+(f.grade?"gr "+' +
     'esc(f.grade)+", ":"")+(f.tours||0)+"</span>"+(f.yellow?" <b class=\'yel\'>check ' +
     'first</b>":"")+"</label>";}).join("")+"</div>"+' +
@@ -2840,9 +2841,10 @@ function showStaffDialog() {
     '" taken off":"")+".":"")+"</div>";})' +
     '.withFailureHandler(fail).api_commitTour(document.getElementById("d").value,' +
     'document.getElementById("keep").checked,panelPicked());}' +
-    'function panelPicked(){var out=[];' +
+    'function panelPicked(){var out=[];var f=window.__free||[];' +
     'var boxes=document.querySelectorAll("input.pan");' +
-    'for(var i=0;i<boxes.length;i++){if(boxes[i].checked){out.push(boxes[i].value);}}' +
+    'for(var i=0;i<boxes.length;i++){if(boxes[i].checked){' +
+    'var k=Number(boxes[i].value);if(f[k]){out.push(f[k].name);}}}' +
     'return out;}' +
     '<\/script>';
   dialog_(html, 'Staff This Wednesday Tour', 640, 620);
