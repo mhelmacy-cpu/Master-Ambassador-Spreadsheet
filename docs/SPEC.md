@@ -80,17 +80,59 @@ thirty rostered ambassadors are that case.
 
 ## Emails
 
-Four rounds, sent Monday 2pm, Tuesday 8am and Wednesday 7:30am (Google
-spreads these over roughly fifteen minutes either side):
+Two audiences, on separate schedules.
 
-1. the student - their job, and to be in the cafeteria at 8:25
-2. their advisor - "your advisee(s) are out"
-3. the teacher whose class they are missing - worked out from the split
-4. the teacher receiving visitors
+### Teachers and advisors - two sends
 
-Sent from whichever account authorizes the script and switches the
-triggers on, so setup must be done signed in as mhelmacy@lrei.org.
-Display name and Reply-To are both set on the Settings sheet.
+    Monday     2:00 PM
+    Wednesday  7:45 AM
+
+Three rounds go out together each time:
+
+- the advisor - "your advisee(s) are out"
+- the teacher whose class the student is missing - worked out from the
+  student's split, not their homeroom
+- the teacher whose class is receiving visitors
+
+### Students - three sends
+
+    Monday     3:30 PM
+    Tuesday   12:00 PM
+    Wednesday  7:45 AM
+
+One round: the student's own job, and to be in the cafeteria at 8:25.
+
+### How the wording adapts
+
+The same message goes out on three different days, so it never says a
+flat "today". It reads Today, Tomorrow, or the weekday by name, worked
+out from when it is actually being sent.
+
+### Timing in practice
+
+Apps Script takes whole hours, so the half-hours use `nearMinute`, and
+Google runs every time-based trigger within about fifteen minutes either
+side of the time asked for. So:
+
+    Monday 2:00 PM  ->  roughly 1:45 - 2:15 PM
+    Monday 3:30 PM  ->  roughly 3:15 - 3:45 PM
+    Tuesday noon    ->  roughly 11:45 AM - 12:15 PM
+    Wednesday 7:45  ->  roughly 7:30 - 8:00 AM
+
+None of these windows overlap, so Monday's teacher send always lands
+before Monday's student send. The Wednesday send is the tight one: at
+the late end it arrives 8:00 AM, still twenty-five minutes before
+ambassadors are due in the cafeteria at 8:25.
+
+### Who they come from
+
+Whichever account authorizes the script and switches the triggers on, so
+setup must be done signed in as mhelmacy@lrei.org. Display name and
+Reply-To are both set on the Settings sheet.
+
+A tour that has not been staffed yet is skipped rather than mailed to
+nobody, so staff the tour before Monday afternoon for the first send to
+go out.
 
 ## Still needed from the office
 
