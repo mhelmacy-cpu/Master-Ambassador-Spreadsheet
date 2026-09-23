@@ -37,6 +37,11 @@ per ambassador (tours done, jobs done, last tour) are computed from this,
 not typed.
 
 ### Jobs and Eligibility
+
+Every ambassador gets an Eligibility row automatically - staffing tops
+the sheet up before it plans, so a name typed onto the Ambassadors sheet
+is never quietly left out. New rows default to Yes for every job; a No
+set by hand is never overwritten.
 Unchanged: Panelist, Lobby Greeter, Table Greeter, Tour Guide, and the
 matrix of who can do which.
 
@@ -46,7 +51,18 @@ One command, run once the prospective students are entered. It assigns:
 
 - **Tour Guides** - two per prospective student, matched on borough,
   grade and gender. Grade and gender are requirements; borough is a
-  preference. Each guide pair is assigned a **tour route** (one family
+  preference. Most tours are rising 6th graders, so that pair reads
+  `6 and 6 or 8`: a 6th grader first, and a second 6th grader where
+  there is one free, an 8th grader where there is not. Only if a place
+  would otherwise go empty does it widen further, since one guide and a
+  gap is worse than a guide from another year.
+
+  A visitor marked **Full Pay** or **Well Connected** on Prospective
+  Students is paired first, and their guides come from the **High**
+  Strength ambassadors, then Medium (which is what a blank counts as).
+  A Low is used only if nobody else fits at all, and the dialog says so
+  when that happens. It never overrides grade, gender or race - it only
+  decides who is picked among the ones who already fit. Each guide pair is assigned a **tour route** (one family
   per route, seven routes available), for the Wednesday morning slot.
   With more families than routes, the list starts again at route 1 and
   the sharing is flagged in the dialog.
@@ -167,6 +183,9 @@ Three rounds go out together each time:
     Wednesday  7:45 AM
 
 One round: the student's own job, and to be in the cafeteria at 8:25.
+No route number: they are handed their route on paper on the morning,
+and a number in an email the day before only confuses them. The locker
+slips leave it out for the same reason.
 
 ### How the wording adapts
 

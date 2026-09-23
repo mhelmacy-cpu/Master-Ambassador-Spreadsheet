@@ -34,9 +34,9 @@ const SHEETS = {
 const HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
   'Borough', 'Gender', 'Race (Presenting)', 'Student Email', 'Parent 1 Name', 'Parent 1 Email',
-  'Parent 2 Name', 'Parent 2 Email', 'Light', 'Active'];
+  'Parent 2 Name', 'Parent 2 Email', 'Light', 'Strength', 'Active'];
 HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'School', 'Grade', 'Gender', 'Race', 'Borough',
-  'Class Visit', 'Route', 'Tour Guides', 'Class Buddy', 'Notes'];
+  'Full Pay', 'Well Connected', 'Class Visit', 'Route', 'Tour Guides', 'Class Buddy', 'Notes'];
 HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route', 'Notes'];
 const CLASS_VISIT_WITH_GUIDE = 'With tour guide';
 HEADERS[SHEETS.JOBS] = ['Job Name', 'Description', 'Active', 'Out of Class From', 'Out of Class To'];
@@ -88,6 +88,14 @@ const PRESENTING_OPTIONS = ['White presenting', 'Student of color'];
 /* Green goes on a tour without asking. Yellow is offered the same way but
  * held back at the point of saving, for a second look first. */
 const LIGHT_OPTIONS = ['Green', 'Yellow'];
+/**
+ * How much of a showing an ambassador gives a family.
+ *
+ * Nothing to do with the Light, which is about whether they can be
+ * trusted with the job at all. This is who she would put in front of a
+ * family she especially wants to land.
+ */
+const STRENGTH_OPTIONS = ['High', 'Medium', 'Low'];
 const RACE_OPTIONS = ['White', 'African American', 'Asian'];
 const BOROUGHS = ['M', 'B', 'Q', 'X', 'S', 'J'];
 const BOROUGH_NAMES = { M: 'Manhattan', B: 'Brooklyn', Q: 'Queens', X: 'Bronx', S: 'Staten Island', J: 'New Jersey' };
@@ -112,7 +120,7 @@ const DEFAULT_SETTINGS = [
   ['Table Greeters Needed', '2'],
   ['Tour Guides Per Visiting Student', '2'],
   ['Guide Grades for Rising 5', '6 and 6'],
-  ['Guide Grades for Rising 6', '5 and 6'],
+  ['Guide Grades for Rising 6', '6 and 6 or 8'],
   ['Guide Grades for Rising 7', '6 and 7'],
   ['Guide Grades for Rising 8', '7 and 8'],
   ['Max Families Per Route', '1'],
@@ -246,6 +254,30 @@ function blankRow_(name) {
 
 function norm_(v) { return String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' '); }
 function trim_(v) { return String(v == null ? '' : v).trim(); }
+function isYes_(v) { return norm_(v) === 'yes'; }
+
+/**
+ * 3 High, 2 Medium, 1 Low. A blank counts as Medium: not somebody she
+ * has picked out, but not somebody to keep away from a family either.
+ */
+function strengthRank_(v) {
+  const t = norm_(v);
+  if (t === 'high') return 3;
+  if (t === 'low') return 1;
+  return 2;
+}
+
+/** A family worth putting her strongest ambassadors in front of. */
+function isPriorityVisitor_(v) { return !!(v.fullPay || v.wellConnected); }
+
+/** Why this family counts as one, in words, or '' when they do not. */
+function priorityWhy_(v) {
+  const why = [];
+  if (v.fullPay) why.push('full pay');
+  if (v.wellConnected) why.push('well connected');
+  return why.join(', ');
+}
+
 function capitalize_(v) { const t = trim_(v); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
 
 /** "6B", "6 B", "b" -> "B". The office writes the grade in front of it. */
@@ -379,6 +411,15 @@ function setupSpreadsheet() {
   if (ensureJobHourColumns_()) {
     added.push('Out of Class From/To on Jobs');
   }
+  if (ensureColumn_(SHEETS.AMBASSADORS, 'Strength', STRENGTH_OPTIONS)) {
+    added.push('Strength on Ambassadors');
+  }
+  if (ensureColumn_(SHEETS.PROSPECTIVE, 'Full Pay', YES_NO)) {
+    added.push('Full Pay on Prospective Students');
+  }
+  if (ensureColumn_(SHEETS.PROSPECTIVE, 'Well Connected', YES_NO)) {
+    added.push('Well Connected on Prospective Students');
+  }
   clearReadCache_();               // columns just changed under it
 
   setupAmbassadors_();
@@ -439,6 +480,7 @@ function setupAmbassadors_() {
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Gender') + 1, GENDERS, true);
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Borough') + 1, BOROUGHS);
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Light') + 1, LIGHT_OPTIONS);
+  dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Strength') + 1, STRENGTH_OPTIONS, true);
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Active') + 1, YES_NO);
 
   note_(s, SHEETS.AMBASSADORS, 'Split',
@@ -464,6 +506,11 @@ function setupAmbassadors_() {
     'Green or blank: put on a tour like anyone else.\n\n' +
     'Yellow: check with me first. They are still picked in the normal way, ' +
     'but the tour cannot be saved until you have said yes to each of them.');
+  note_(s, SHEETS.AMBASSADORS, 'Strength',
+    'How good a showing this one gives a family. High means put them in front of ' +
+    'anyone. A visitor marked Full Pay or Well Connected is given High guides first, ' +
+    'where the grade and gender rules still allow it. Leave it blank and they are ' +
+    'treated as Medium.');
   note_(s, SHEETS.AMBASSADORS, 'Student Email',
     'Their lrei.org address. Without it they never get told they are on duty.');
   s.autoResizeColumns(1, h.length);
@@ -477,6 +524,8 @@ function setupProspective_() {
   dropdown_(s, last, col_(SHEETS.PROSPECTIVE, 'Grade') + 1, GRADES, true);
   dropdown_(s, last, col_(SHEETS.PROSPECTIVE, 'Gender') + 1, GENDERS, true);
   dropdown_(s, last, col_(SHEETS.PROSPECTIVE, 'Borough') + 1, BOROUGHS, true);
+  dropdown_(s, last, col_(SHEETS.PROSPECTIVE, 'Full Pay') + 1, YES_NO, true);
+  dropdown_(s, last, col_(SHEETS.PROSPECTIVE, 'Well Connected') + 1, YES_NO, true);
   s.getRange(2, col_(SHEETS.PROSPECTIVE, 'Tour Date') + 1, Math.max(last - 1, 200), 1)
     .setNumberFormat('yyyy-mm-dd');
   note_(s, SHEETS.PROSPECTIVE, 'Tour Date', 'The Wednesday they are visiting.');
@@ -493,6 +542,10 @@ function setupProspective_() {
     'For a rising 5th grader you can instead pick one of the 5th grade ' +
     'language classes. A 5th grader from that class collects them from the ' +
     'guides and walks them down to the cafeteria at the end.');
+  note_(s, SHEETS.PROSPECTIVE, 'Full Pay',
+    'Yes on either this or Well Connected and their guides are picked from the ' +
+    'High Strength ambassadors first. It never overrides the grade, gender or ' +
+    'race rules - it only decides who is chosen among the ones who already fit.');
   note_(s, SHEETS.PROSPECTIVE, 'Race',
     'WP or SOC is fine, so are White, African American, Asian and the rest.\n\n' +
     'A visitor who is a student of color is given one guide who is too, and ' +
@@ -633,21 +686,40 @@ function awayWindow_(jobNames) {
   return w ? timeLabel_(w.from) + ' - ' + timeLabel_(w.to) : '';
 }
 
+/**
+ * Every ambassador has a row on Eligibility, new ones included.
+ *
+ * She adds a name to the Ambassadors sheet and expects it to turn up
+ * here, so this runs at the start of staffing as well as at setup.
+ * Rows already there are never touched: a No she has set stays set.
+ */
 function setupEligibility_() {
   const s = sheet_(SHEETS.ELIGIBILITY);
   const h = HEADERS[SHEETS.ELIGIBILITY];
   const fresh = s.getLastRow() < 2;
-  const names = rows_(SHEETS.AMBASSADORS)
-    .map(function (r) { return fullName_(r[0], r[1]); })
+  const A = SHEETS.AMBASSADORS;
+  const names = rows_(A)
+    .map(function (r) {
+      return fullName_(r[col_(A, 'First Name')], r[col_(A, 'Last Name')]);
+    })
     .filter(function (n) { return n !== ''; });
   const existing = {};
   rows_(SHEETS.ELIGIBILITY).forEach(function (r, i) { existing[norm_(r[0])] = i + 2; });
-  const add = names.filter(function (n) { return !existing[norm_(n)]; });
+  const add = [];
+  names.forEach(function (n) {
+    if (existing[norm_(n)]) return;
+    existing[norm_(n)] = true;          // a name twice on the sheet gets one row
+    add.push(n);
+  });
   if (add.length) {
     const start = s.getLastRow() + 1;
     s.getRange(start, 1, add.length, h.length).setValues(add.map(function (n) {
       return [n, 'Yes', 'Yes', 'Yes', 'Yes'];
     }));
+    // No dropdown call here: the validation laid down at setup already
+    // covers 200 rows, and re-applying it would tread on anything she
+    // has set by hand since.
+    delete READ_CACHE_.eligibility;
   }
   if (!fresh) return;
   const last = Math.max(s.getLastRow(), 2);
@@ -1037,6 +1109,7 @@ function ambassadors_() {
         presenting: trim_(cell_(r, N, 'Race (Presenting)')),
         email: trim_(r[col_(N, 'Student Email')]),
         light: trim_(cell_(r, N, 'Light')),
+      strength: trim_(cell_(r, N, 'Strength')),
         active: norm_(r[col_(N, 'Active')]) === 'yes'
       };
     }).filter(function (a) { return a.name !== ''; });
@@ -1101,6 +1174,21 @@ function activeJobs_() {
  * Each of these is a row on the Settings sheet - one grade per guide,
  * in order. Two guides and one grade listed means both come from it.
  */
+/**
+ * Which grade each of a visitor's guides comes from, one entry per
+ * guide, each entry the grades that will do in order of preference.
+ *
+ * Most tours are rising 6th graders, so that pair is the one that has
+ * to bend: the first place is a 6th grader, and the second is another
+ * 6th grader where there is one and an 8th grader where there is not.
+ */
+const BUILT_IN_GUIDE_GRADES_ = {
+  '5': [['6'], ['6']],
+  '6': [['6'], ['6', '8']],
+  '7': [['6'], ['7']],
+  '8': [['7'], ['8']]
+};
+
 function guideGradesFor_(applyingForGrade, howMany) {
   const g = gradeNumber_(applyingForGrade);
   const want = howMany || 2;
@@ -1108,21 +1196,25 @@ function guideGradesFor_(applyingForGrade, howMany) {
   if (!g) return out;
   const n = Number(g);
   const list = gradeList_(settingRaw_('Guide Grades for Rising ' + g));
+  const fallback = BUILT_IN_GUIDE_GRADES_[g] || [];
   for (let i = 0; i < want; i++) {
     if (list.length) { out.push(list[Math.min(i, list.length - 1)]); continue; }
-    // No setting to go on. Their own grade and the one above it - except at
-    // the bottom, where the grade below does not exist here, so both guides
-    // come from the year above instead.
-    if (n <= LOWEST_GRADE_) { out.push(String(LOWEST_GRADE_ + 1)); continue; }
-    out.push(i === 0 ? String(n - 1) : String(Math.min(n, HIGHEST_GRADE_)));
+    if (fallback.length) { out.push(fallback[Math.min(i, fallback.length - 1)]); continue; }
+    // Nothing to go on at all: their own grade and the one above it.
+    out.push([String(i === 0 ? Math.max(n - 1, LOWEST_GRADE_) : Math.min(n, HIGHEST_GRADE_))]);
   }
   // Whatever the setting says, never ask for a grade this school does not
   // have. A rising fifth grader is never given a fourth grader.
-  return out.map(function (x) {
-    const v = Number(x);
-    if (!v || v < LOWEST_GRADE_) return String(LOWEST_GRADE_ + 1);
-    if (v > HIGHEST_GRADE_) return String(HIGHEST_GRADE_);
-    return String(v);
+  return out.map(function (slot) {
+    const kept = [];
+    slot.forEach(function (x) {
+      let v = Number(x);
+      if (!v) return;
+      if (v < LOWEST_GRADE_) v = LOWEST_GRADE_ + 1;
+      if (v > HIGHEST_GRADE_) v = HIGHEST_GRADE_;
+      if (kept.indexOf(String(v)) === -1) kept.push(String(v));
+    });
+    return kept.length ? kept : [String(LOWEST_GRADE_ + 1)];
   });
 }
 
@@ -1135,19 +1227,26 @@ function guideGradesFor_(applyingForGrade, howMany) {
  * grade that does have somebody. So a rising 5th grader gets two 6th
  * graders whatever the setting has been changed to.
  */
+/**
+ * The same list, with any grade nobody is in swapped for the nearest
+ * grade somebody is in. A slot that already names a grade with people
+ * in it is left exactly as it is.
+ */
 function usableGrades_(wanted, pool) {
   const have = {};
   pool.forEach(function (a) { if (a.grade) have[a.grade] = true; });
   if (!Object.keys(have).length) return wanted;
-  return wanted.map(function (g) {
-    if (have[g]) return g;
+  return wanted.map(function (slot) {
+    const kept = slot.filter(function (g) { return have[g]; });
+    if (kept.length) return kept;
+    const g = slot[0];
     for (let up = Number(g) + 1; up <= HIGHEST_GRADE_; up++) {
-      if (have[String(up)]) return String(up);
+      if (have[String(up)]) return [String(up)];
     }
     for (let down = Number(g) - 1; down >= LOWEST_GRADE_; down--) {
-      if (have[String(down)]) return String(down);
+      if (have[String(down)]) return [String(down)];
     }
-    return g;
+    return slot;
   });
 }
 
@@ -1165,10 +1264,22 @@ function gradeNumber_(value) {
  * it as the 7th of June - so the value is refused rather than mined for
  * digits, which is how a grade once came out as 2026.
  */
+/**
+ * "6 and 6 or 8" -> [['6'], ['6', '8']].
+ *
+ * One entry per guide, split on "and". Inside an entry, "or" lists
+ * grades that will do, best first: a rising 6th grader wants two 6th
+ * graders, and takes an 8th grader for the second place when the 6th
+ * grade is used up.
+ */
 function gradeList_(raw) {
   if (raw instanceof Date) return [];
-  return trim_(raw).split(/[^0-9]+/)
-    .filter(function (x) { return x !== '' && x.length <= 2; });
+  return trim_(raw).split(/\band\b|,|;|\+|&/i)
+    .map(function (part) {
+      return String(part).split(/[^0-9]+/)
+        .filter(function (x) { return x !== '' && x.length <= 2; });
+    })
+    .filter(function (slot) { return slot.length > 0; });
 }
 
 /** A setting's value as it really is, Date and all. */
@@ -1196,6 +1307,8 @@ function prospectiveFor_(dateVal) {
       gender: trim_(r[col_(N, 'Gender')]),
       race: trim_(cell_(r, N, 'Race')),
       classVisit: trim_(cell_(r, N, 'Class Visit')),
+      fullPay: isYes_(cell_(r, N, 'Full Pay')),
+      wellConnected: isYes_(cell_(r, N, 'Well Connected')),
       borough: trim_(r[col_(N, 'Borough')]).toUpperCase()
     });
   });
@@ -1279,6 +1392,10 @@ function planTour(dateStr, keepExisting) {
       '. Add them to Prospective Students first, with that date in the Tour Date column.');
   }
 
+  // A name typed onto the Ambassadors sheet since the last run gets its
+  // Eligibility row now, rather than being quietly left out.
+  setupEligibility_();
+
   const all = ambassadors_();
   const elig = eligibility_();
   const hist = jobHistory_();
@@ -1321,7 +1438,19 @@ function planTour(dateStr, keepExisting) {
   const byAmbName = {};
   all.forEach(function (a) { byAmbName[norm_(a.name)] = a; });
 
-  const pairs = visitors.map(function (v) {
+  // A family marked Full Pay or Well Connected is paired before the
+  // others, so the High ambassadors are still there to give them. The
+  // list is put back in sheet order afterwards.
+  const order = visitors.map(function (v, i) { return { v: v, i: i }; });
+  order.sort(function (a, b) {
+    const pa = isPriorityVisitor_(a.v) ? 0 : 1;
+    const pb = isPriorityVisitor_(b.v) ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    return a.i - b.i;
+  });
+
+  const pairs = order.map(function (entry) {
+    const v = entry.v;
     const wantGrades = usableGrades_(guideGradesFor_(v.grade, perVisitor), pool);
     const needsSoC = needsSoCGuide_(v.race);
 
@@ -1332,13 +1461,18 @@ function planTour(dateStr, keepExisting) {
         return byAmbName[norm_(n)] || { name: n, grade: '', gender: '', presenting: '' };
       });
       return {
-        visitor: v, kept: true,
+        visitor: v, kept: true, order: entry.i,
         guides: asAmb.map(function (a) {
           return a.name + (a.grade ? ' (grade ' + a.grade + ')' : '');
         }),
         guideNames: asAmb.map(function (a) { return a.name; }),
         wantGrades: wantGrades, needsSoC: needsSoC,
         guideMix: traitMix_(asAmb.map(function (a) { return a.name; }), pool, 'presenting'),
+        priority: priorityWhy_(v),
+        strengths: asAmb.map(function (a) {
+          return a.name + ' (' + (trim_(a.strength) || 'no strength set') + ')';
+        }).join(', '),
+        weakGuide: false,
         route: kept.route[norm_(v.name)] || '', routeShared: false,
         socShortfall: false, genderShortfall: false,
         short: Math.max(0, perVisitor - asAmb.length), why: ''
@@ -1348,13 +1482,32 @@ function planTour(dateStr, keepExisting) {
     // at a time rather than taken off a single ranked list.
     const chosen = [];
     const missing = [];
+    // Every grade this pair will accept anywhere, for the case where a
+    // place would otherwise go empty. One guide from the year below
+    // beats one guide and a gap.
+    const anyGrade = [];
+    wantGrades.forEach(function (slot) {
+      slot.forEach(function (g) { if (anyGrade.indexOf(g) === -1) anyGrade.push(g); });
+    });
+
     wantGrades.forEach(function (wantGrade, slot) {
-      let candidates = pool.filter(function (a) {
-        if (used[a.name] || !canDo(a, JOBS.GUIDE)) return false;
-        if (!a.grade || !a.gender) return false;
-        if (v.grade && a.grade !== wantGrade) return false;
-        return true;
-      });
+      const freeIn = function (grades) {
+        return pool.filter(function (a) {
+          if (used[a.name] || !canDo(a, JOBS.GUIDE)) return false;
+          if (!a.grade || !a.gender) return false;
+          if (v.grade && grades.indexOf(a.grade) === -1) return false;
+          return true;
+        });
+      };
+      // A slot may name more than one grade, best first: a rising 6th
+      // grader takes a 6th grader while there is one and an 8th grader
+      // after that. Only if the whole slot is empty does it widen to
+      // what the other place would have taken.
+      let candidates = [];
+      for (let i = 0; i < wantGrade.length && !candidates.length; i++) {
+        candidates = freeIn([wantGrade[i]]);
+      }
+      if (!candidates.length) candidates = freeIn(anyGrade);
 
       /* Two things a pair owes the visitor, each satisfied by one guide
        * rather than both:
@@ -1383,15 +1536,21 @@ function planTour(dateStr, keepExisting) {
       // empty.
       const avoid = function (a) { return haveSoC && isStudentOfColor_(a.presenting); };
 
+      // A family she especially wants: High first, Medium fine, and no
+      // Low unless there is nobody else who fits at all.
+      const priority = isPriorityVisitor_(v);
+      const tooWeak = function (a) { return priority && strengthRank_(a.strength) === 1; };
+
       // Best available, relaxing only as far as it has to.
       const narrow = function (list, test) {
         const kept = list.filter(test);
         return kept.length ? kept : list;
       };
       candidates = narrow(candidates, function (a) {
-        return settles(a) === owedCount && !avoid(a);
+        return settles(a) === owedCount && !avoid(a) && !tooWeak(a);
       });
-      candidates = narrow(candidates, function (a) { return !avoid(a); });
+      candidates = narrow(candidates, function (a) { return !avoid(a) && !tooWeak(a); });
+      candidates = narrow(candidates, function (a) { return !tooWeak(a); });
 
       candidates.sort(function (a, b) {
         if (owedCount) {
@@ -1400,6 +1559,10 @@ function planTour(dateStr, keepExisting) {
         }
         const aa = avoid(a) ? 1 : 0, ab = avoid(b) ? 1 : 0;
         if (aa !== ab) return aa - ab;
+        if (priority) {
+          const ra = strengthRank_(a.strength), rb = strengthRank_(b.strength);
+          if (ra !== rb) return rb - ra;
+        }
         const ba = (v.borough && a.borough === v.borough) ? 0 : 1;
         const bb = (v.borough && b.borough === v.borough) ? 0 : 1;
         if (ba !== bb) return ba - bb;
@@ -1433,6 +1596,7 @@ function planTour(dateStr, keepExisting) {
 
     return {
       visitor: v,
+      order: entry.i,
       guides: chosen.map(function (a) {
         return a.name + ' (grade ' + a.grade + ')';
       }),
@@ -1440,6 +1604,12 @@ function planTour(dateStr, keepExisting) {
       wantGrades: wantGrades,
       needsSoC: needsSoC,
       guideMix: traitMix_(chosen.map(function (a) { return a.name; }), pool, 'presenting'),
+      priority: priorityWhy_(v),
+      strengths: chosen.map(function (a) {
+        return a.name + ' (' + (trim_(a.strength) || 'no strength set') + ')';
+      }).join(', '),
+      weakGuide: isPriorityVisitor_(v) &&
+        chosen.some(function (a) { return strengthRank_(a.strength) === 1; }),
       route: route,
       routeShared: routeShared,
       socShortfall: needsSoC && chosen.length > 0 &&
@@ -1453,6 +1623,10 @@ function planTour(dateStr, keepExisting) {
         : (missing.length ? guideMissReason_(v, missing, pool, used, canDo, all.length) : '')
     };
   });
+
+  // Back into the order she typed them in, whatever order they were
+  // paired in.
+  pairs.sort(function (a, b) { return a.order - b.order; });
 
   /* ---- 5th grade class visits ---- */
   const buddyPool = buddies_().filter(function (b) { return b.canHost; });
@@ -1690,15 +1864,17 @@ function genderMix_(names, pool) { return traitMix_(names, pool, 'gender'); }
 function guideMissReason_(v, missing, pool, used, canDo, total) {
   if (!total) return 'the Ambassadors sheet is empty';
   if (!pool.length) return 'no ambassador is marked Active - put Yes in the Active column';
-  const parts = missing.map(function (g) {
-    const inGrade = pool.filter(function (a) { return a.grade === g; });
-    if (!inGrade.length) return 'no grade ' + g + ' ambassador on the sheet at all';
+  const parts = missing.map(function (slot) {
+    const grades = [].concat(slot);
+    const label = 'grade ' + grades.join(' or ');
+    const inGrade = pool.filter(function (a) { return grades.indexOf(a.grade) !== -1; });
+    if (!inGrade.length) return 'no ' + label + ' ambassador on the sheet at all';
     const free = inGrade.filter(function (a) { return !used[a.name] && canDo(a, JOBS.GUIDE); });
-    if (!free.length) return 'every grade ' + g + ' ambassador is already assigned';
+    if (!free.length) return 'every ' + label + ' ambassador is already assigned';
 
     const noDetails = free.filter(function (a) { return !a.grade || !a.gender; }).length;
-    if (noDetails) return noDetails + ' grade ' + g + ' ambassador(s) have no Gender filled in';
-    return 'no grade ' + g + ' ambassador available';
+    if (noDetails) return noDetails + ' ' + label + ' ambassador(s) have no Gender filled in';
+    return 'no ' + label + ' ambassador available';
   });
   return parts.join('; ');
 }
@@ -1718,7 +1894,11 @@ function shortfallReason_(v, pool, used, canDo, total, wantGrades) {
     return 'everyone eligible is already assigned';
   }
   const noDetails = left.filter(function (a) { return !a.grade || !a.gender; }).length;
-  const want = wantGrades && wantGrades.length ? wantGrades : [v.grade];
+  const slots = wantGrades && wantGrades.length ? wantGrades : [[v.grade]];
+  const want = [];
+  slots.forEach(function (slot) {
+    [].concat(slot).forEach(function (g) { if (want.indexOf(g) === -1) want.push(g); });
+  });
   const label = 'grade ' + want.join(' or ');
   const gradeOk = left.filter(function (a) { return !v.grade || want.indexOf(a.grade) !== -1; });
   if (!gradeOk.length) {
@@ -2248,10 +2428,8 @@ function lockerSlipData_(dateVal) {
       // of them gets sorted before it reaches the lockers.
       where: who ? [who.pod, who.advisor].filter(Boolean).join(' - ') : '',
       jobs: grouped[name].map(function (j) {
-        let line = j.job;
-        if (j.visitor) line += ' for ' + j.visitor;
-        if (j.route) line += ' - route ' + j.route;
-        return line;
+        // Same as the email: the route is on the sheet they are handed.
+        return j.job + (j.visitor ? ' for ' + j.visitor : '');
       })
     };
   });
@@ -2577,10 +2755,11 @@ function sendStudentEmails(dateStr) {
     });
     const backBy = backAt === null ? timeLabelOrRaw_(endTime) : timeLabel_(backAt);
 
+    // No route number here. They are given their route on paper on the
+    // morning, and a number in an email the day before only confuses them.
     const items = jobs.map(function (j) {
       let line = escapeHtml_(j.job);
       if (j.visitor) line += ' for ' + escapeHtml_(j.visitor);
-      if (j.route) line += ' - route ' + escapeHtml_(j.route);
       return '<li>' + line + '</li>';
     }).join('');
 
@@ -2966,11 +3145,15 @@ function showStaffDialog() {
     'p.pairs.forEach(function(x){h+="<tr><td>"+esc(x.visitor.name)+' +
     '(x.visitor.grade?" <span class=\'muted\'>grade "+esc(x.visitor.grade)+"</span>":"")+' +
     '(x.visitor.race?" <span class=\'muted\'>"+esc(x.visitor.race)+(x.needsSoC?" - needs a student of color":"")+"</span>":"")+' +
+    '(x.priority?" <b class=\'yel\'>"+esc(x.priority)+"</b>":"")+' +
     '(x.visitor.school?" <span class=\'muted\'><br>("+esc(x.visitor.school)+")</span>":"")+"</td><td>"+' +
     '(x.guides.length?esc(x.guides.join(", ")):"<b>none found</b>")+' +
     '(x.wantGrades&&x.wantGrades.length?"<br><span class=\'muted\'>looking for grade "+' +
-    'esc(x.wantGrades.join(" + "))+"</span>":"")+' +
+    'esc(x.wantGrades.map(function(g){return [].concat(g).join(" or ");}).join(" + "))+' +
+    '"</span>":"")+' +
     '(x.guideMix?"<br><span class=\'muted\'>"+esc(x.guideMix)+"</span>":"")+' +
+    '(x.priority&&x.strengths?"<br><span class=\'muted\'>"+esc(x.strengths)+"</span>":"")+' +
+    '(x.weakGuide?"<br><b>a Low ambassador was the only one who fit</b>":"")+' +
     '(x.buddy?"<br><span class=\'muted\'>class visit: "+esc(x.buddy.name)+' +
     '(x.buddy.gender?" ("+esc(x.buddy.gender)+")":"")+" - "+esc(x.buddy.language)+' +
     '", "+esc(x.buddy.teacher)+", "+esc(x.buddy.room)+"</span>":"")+' +
