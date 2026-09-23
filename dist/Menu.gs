@@ -45,7 +45,7 @@ function onOpen() {
       .addItem('Turn ON dashboard auto-refresh (10 min)', 'enableDashboardAutoRefresh')
       .addItem('Turn OFF dashboard auto-refresh', 'disableDashboardAutoRefresh')
       .addSeparator()
-      .addItem('Turn ON tour reminders (Mon/Tue PM, Wed AM)', 'enableTourReminders')
+      .addItem('Turn ON tour reminders (Mon 2pm, Tue 8am, Wed 7:30am)', 'enableTourReminders')
       .addItem('Turn OFF tour reminders', 'disableTourReminders'))
     .addToUi();
 }
