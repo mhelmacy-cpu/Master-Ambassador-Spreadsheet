@@ -951,27 +951,46 @@ function planTour(dateStr) {
         if (used[a.name] || !canDo(a, JOBS.GUIDE)) return false;
         if (!a.grade || !a.gender) return false;
         if (v.grade && a.grade !== wantGrade) return false;
-        if (v.gender && norm_(a.gender) !== norm_(v.gender)) return false;
         return true;
       });
-      // Where the visitor's race calls for it, at least one guide has to be
-      // a student of color. It is preferred on every place and required on
-      // the last one, so the pair cannot finish without it. Two students of
-      // color is fine. Every other visitor carries no race constraint.
-      const haveSoC = chosen.some(function (x) { return isStudentOfColor_(x.presenting); });
-      const stillOwed = needsSoC && !haveSoC;
+
+      /* Two things a pair owes the visitor, each satisfied by one guide
+       * rather than both:
+       *
+       *   gender  at least one guide of the visitor's own gender, so a
+       *           girl is never given two boys and a boy never two girls.
+       *           Two of her own is fine.
+       *   race    at least one student of color, where the visitor's race
+       *           calls for it. Two is fine.
+       *
+       * Each is preferred while places remain and required on the last
+       * place, so a pair cannot be completed still owing one. A candidate
+       * who settles both is taken first, which keeps the last place from
+       * being asked for two things at once. */
+      const owedGender = !!v.gender &&
+        !chosen.some(function (x) { return norm_(x.gender) === norm_(v.gender); });
+      const owedSoC = needsSoC &&
+        !chosen.some(function (x) { return isStudentOfColor_(x.presenting); });
+      const owedCount = (owedGender ? 1 : 0) + (owedSoC ? 1 : 0);
+      const settles = function (a) {
+        return (owedGender && norm_(a.gender) === norm_(v.gender) ? 1 : 0) +
+               (owedSoC && isStudentOfColor_(a.presenting) ? 1 : 0);
+      };
       const lastPlace = slot === wantGrades.length - 1;
-      if (stillOwed && lastPlace) {
-        const only = candidates.filter(function (a) { return isStudentOfColor_(a.presenting); });
-        if (only.length) candidates = only;
+      if (lastPlace && owedCount) {
+        const settlesAll = candidates.filter(function (a) { return settles(a) === owedCount; });
+        if (settlesAll.length) candidates = settlesAll;
+        else {
+          const settlesSome = candidates.filter(function (a) { return settles(a) > 0; });
+          if (settlesSome.length) candidates = settlesSome;
+        }
       }
-      // Owed one and places left: take a student of color where there is a
-      // choice. Then same borough, then whoever has done least.
+      // Whoever settles most of what is still owed, then same borough,
+      // then whoever has done fewest jobs.
       candidates.sort(function (a, b) {
-        if (stillOwed) {
-          const sa = isStudentOfColor_(a.presenting) ? 0 : 1;
-          const sb = isStudentOfColor_(b.presenting) ? 0 : 1;
-          if (sa !== sb) return sa - sb;
+        if (owedCount) {
+          const sa = settles(a), sb = settles(b);
+          if (sa !== sb) return sb - sa;
         }
         const ba = (v.borough && a.borough === v.borough) ? 0 : 1;
         const bb = (v.borough && b.borough === v.borough) ? 0 : 1;
@@ -1007,6 +1026,8 @@ function planTour(dateStr) {
       route: route,
       socShortfall: needsSoC && chosen.length > 0 &&
         !chosen.some(function (a) { return isStudentOfColor_(a.presenting); }),
+      genderShortfall: !!v.gender && chosen.length > 0 &&
+        !chosen.some(function (a) { return norm_(a.gender) === norm_(v.gender); }),
       short: Math.max(0, perVisitor - chosen.length),
       why: missing.length
         ? guideMissReason_(v, missing, pool, used, canDo, all.length)
@@ -1145,9 +1166,7 @@ function guideMissReason_(v, missing, pool, used, canDo, total) {
     if (!inGrade.length) return 'no grade ' + g + ' ambassador on the sheet at all';
     const free = inGrade.filter(function (a) { return !used[a.name] && canDo(a, JOBS.GUIDE); });
     if (!free.length) return 'every grade ' + g + ' ambassador is already assigned';
-    if (v.gender && !free.filter(function (a) { return norm_(a.gender) === norm_(v.gender); }).length) {
-      return 'no grade ' + g + ' ambassador of that gender is free';
-    }
+
     const noDetails = free.filter(function (a) { return !a.grade || !a.gender; }).length;
     if (noDetails) return noDetails + ' grade ' + g + ' ambassador(s) have no Gender filled in';
     return 'no grade ' + g + ' ambassador available';
@@ -1672,6 +1691,7 @@ function showStaffDialog() {
     '(x.guides.length?esc(x.guides.join(", ")):"<b>none found</b>")+' +
     '(x.guideMix?"<br><span class=\'muted\'>"+esc(x.guideMix)+"</span>":"")+' +
     '(x.socShortfall?"<br><b>no student of color was free for this pair</b>":"")+' +
+    '(x.genderShortfall?"<br><b>nobody of the visitor\'s own gender was free</b>":"")+' +
     '(x.short?" <span class=\'muted\'>short "+x.short+(x.why?" - "+esc(x.why):"")+"</span>":"")+' +
     '"</td><td>"+esc(x.route||"-")+"</td></tr>";});' +
     'h+="</table>";' +
