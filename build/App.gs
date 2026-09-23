@@ -1510,24 +1510,33 @@ function setupWarnings_(all, visitors) {
   }).length;
   if (noTeacherEmail) w.push(noTeacherEmail + ' teacher(s) have no email address on the Teachers sheet.');
 
+  const SUGGESTED_ = { '5': '6 and 6', '6': '6 and 6', '7': '6 and 7', '8': '7 and 8' };
+  const spoiled = [];
   ['5', '6', '7', '8'].forEach(function (g) {
-    const raw = settingRaw_('Guide Grades for Rising ' + g);
-    if (raw instanceof Date) {
-      w.push('Settings: "Guide Grades for Rising ' + g + '" has been turned into a date by ' +
-        'Google Sheets. Format column B of Settings as Plain text (Format > Number > ' +
-        'Plain text), then retype it as "6 and 7". Until then that grade falls back to ' +
-        'the grade below and the grade itself.');
-    }
+    if (settingRaw_('Guide Grades for Rising ' + g) instanceof Date) spoiled.push(g);
   });
+  if (spoiled.length) {
+    w.push('Google Sheets has turned ' + (spoiled.length === 1 ? 'one of the "Guide Grades" ' +
+      'settings' : 'the "Guide Grades" settings') + ' into a date, because "6, 7" reads to ' +
+      'it as the 7th of June. Nothing is broken - those tours are still being paired ' +
+      'correctly - but to put it right: select column B on Settings, Format > Number > ' +
+      'Plain text, then retype ' +
+      spoiled.map(function (g) {
+        return 'Rising ' + g + ' as "' + SUGGESTED_[g] + '"';
+      }).join(', ') + '.');
+  }
 
   const needed = {};
   visitors.forEach(function (v) {
-    guideGradesFor_(v.grade, 2).forEach(function (g) { if (g) needed[g] = true; });
+    usableGrades_(guideGradesFor_(v.grade, 2), active).forEach(function (g) {
+      if (g) needed[g] = true;
+    });
   });
   Object.keys(needed).sort().forEach(function (g) {
     if (!active.filter(function (a) { return a.grade === g; }).length) {
-      w.push('No grade ' + g + ' ambassador is on the sheet, but a visitor this week needs one. ' +
-        'Change "Guide Grades for Rising ..." on Settings, or that place stays empty.');
+      w.push('No grade ' + g + ' ambassador is on the sheet, and a visitor this week needs ' +
+        'one. Put a grade ' + g + ' ambassador on the Ambassadors sheet, or change ' +
+        '"Guide Grades for Rising ..." on Settings.');
     }
   });
 
