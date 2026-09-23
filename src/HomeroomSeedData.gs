@@ -14,16 +14,13 @@
  *             language period as all three at once, so this is what
  *             turns it into one class and one teacher.
  *
- * Two honest gaps, both left blank rather than guessed:
- *
- * 1. Fifth grade does not have a fixed language - MMS rotates through
- *    all three. The rotation below is the first one only (Sept 8 to
- *    Oct 2), which is as far as the workbook was filled in. After Oct 2
- *    these are stale: update them on the Ambassadors sheet when the
- *    office sets the next rotation, or re-run Sync Homerooms once this
- *    file is updated.
- * 2. Three eighth graders take no language at all, so theirs is blank
- *    on purpose.
+ * Language is blank for fifth grade, which rotates through all three
+ * rather than picking one, and for the three eighth graders who take no
+ * language at all. Nothing is guessed in either case: a language period
+ * with no language on file is reported back for a human to forward
+ * rather than mailed to whichever teacher seemed likeliest. Typing the
+ * language into the Ambassadors sheet is all it takes to make those
+ * send themselves.
  */
 const MS_ROSTER_ = [
   { name: 'Banks Bauer', email: '31BanksB@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'B', language: 'French' },
@@ -150,29 +147,26 @@ const MS_ROSTER_ = [
   { name: 'Frances Cooper', email: '33FrancesC@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'A', language: 'Mandarin' },
   { name: 'Hugh Nottingham', email: '33HughN@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'B', language: 'Mandarin' },
   { name: 'Jordan Gary', email: '33JordanG@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'A', language: 'Mandarin' },
-  { name: 'Aeon Anjargolian', email: '34AeonA@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: 'French' },
-  { name: 'Alexander Rogoff', email: '34AlexanderR@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: 'Spanish' },
-  { name: 'Archimedes Gutmann', email: '34ArchimedesG@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: 'French' },
-  { name: 'Isabella Dike', email: '34IsabellaD@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: 'Mandarin' },
-  { name: 'Olivia Lee', email: '34OliviaL@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: 'Spanish' },
-  { name: 'Rhea Kaiser', email: '34RheaK@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'B', language: 'Mandarin' },
-  { name: 'Roger Sierant', email: '34RogerS@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'B', language: 'Spanish' },
-  { name: 'Ellis Ahmed', email: '34EllisA@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'A', language: 'Spanish' },
-  { name: 'Ezra Fisher', email: '34EzraF@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B', language: 'French' },
-  { name: 'Matteo Keklikian', email: '34MatteoK@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B', language: 'Spanish' },
-  { name: 'McKenna Rodzevicius', email: '34McKennaR@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'A', language: 'French' },
-  { name: 'Perla Dunn', email: '34PerlaD@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B', language: 'French' },
-  { name: 'Tobik Maczka', email: '34TobikM@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B', language: 'French' },
-  { name: 'Aiden Tedder', email: '34AidenT@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'A', language: 'Mandarin' },
-  { name: 'Edie Gerson', email: '34EdieG@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B', language: 'Mandarin' },
-  { name: 'Joakim Leon-McCool', email: '34JoakimL@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B', language: 'Spanish' },
-  { name: 'Liv Feldman', email: '34LivF@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B', language: 'Spanish' },
-  { name: 'Luka Cuparic', email: '34LukaC@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B', language: 'Mandarin' },
-  { name: 'Miles Titus', email: '34MilesT@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'A', language: 'Mandarin' }
+  { name: 'Aeon Anjargolian', email: '34AeonA@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: '' },
+  { name: 'Alexander Rogoff', email: '34AlexanderR@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: '' },
+  { name: 'Archimedes Gutmann', email: '34ArchimedesG@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: '' },
+  { name: 'Isabella Dike', email: '34IsabellaD@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: '' },
+  { name: 'Olivia Lee', email: '34OliviaL@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: '' },
+  { name: 'Rhea Kaiser', email: '34RheaK@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'B', language: '' },
+  { name: 'Roger Sierant', email: '34RogerS@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'B', language: '' },
+  { name: 'Ellis Ahmed', email: '34EllisA@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'A', language: '' },
+  { name: 'Ezra Fisher', email: '34EzraF@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B', language: '' },
+  { name: 'Matteo Keklikian', email: '34MatteoK@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B', language: '' },
+  { name: 'McKenna Rodzevicius', email: '34McKennaR@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'A', language: '' },
+  { name: 'Perla Dunn', email: '34PerlaD@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B', language: '' },
+  { name: 'Tobik Maczka', email: '34TobikM@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B', language: '' },
+  { name: 'Aiden Tedder', email: '34AidenT@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'A', language: '' },
+  { name: 'Edie Gerson', email: '34EdieG@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B', language: '' },
+  { name: 'Joakim Leon-McCool', email: '34JoakimL@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B', language: '' },
+  { name: 'Liv Feldman', email: '34LivF@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B', language: '' },
+  { name: 'Luka Cuparic', email: '34LukaC@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B', language: '' },
+  { name: 'Miles Titus', email: '34MilesT@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'A', language: '' }
 ];
-
-/** The date the seeded fifth-grade language rotation stops being true. */
-const FIFTH_GRADE_LANGUAGE_ROTATION_ENDS_ = '2026-10-02';
 
 function getAllAdvisorNames_() {
   const names = {};

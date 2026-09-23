@@ -887,7 +887,6 @@ function syncAmbassadorHomerooms() {
   const lookup = buildHomeroomLookup_();
   let matched = 0;
   const unmatched = [];
-  const fifthGradeLanguage = [];
   const flaggedGraduated = [];
 
   rows.forEach((r, i) => {
@@ -905,7 +904,6 @@ function syncAmbassadorHomerooms() {
       if (!String(r[emailCol] || '').trim() && hit.email) {
         sheet.getRange(sheetRow, emailCol + 1).setValue(hit.email);
       }
-      if (hit.grade === '5' && hit.language) fifthGradeLanguage.push(name);
       matched++;
       return;
     }
@@ -929,8 +927,7 @@ function syncAmbassadorHomerooms() {
     }
   });
 
-  return { matched: matched, unmatched: unmatched, flaggedGraduated: flaggedGraduated,
-    fifthGradeLanguage: fifthGradeLanguage };
+  return { matched: matched, unmatched: unmatched, flaggedGraduated: flaggedGraduated };
 }
 
 function syncAmbassadorHomeroomsFromMenu_() {
@@ -938,13 +935,6 @@ function syncAmbassadorHomeroomsFromMenu_() {
   let msg = 'Matched ' + result.matched + ' ambassador(s) to the 2026-27 roster. ' +
     'Grade, Homeroom Pod, Advisor, Split and Language are filled in, and a blank ' +
     'Student Email is filled in too (an address already there is left alone).';
-  if (result.fifthGradeLanguage.length > 0) {
-    msg += '\n\nFifth grade rotates through the three languages rather than picking one. ' +
-      'The language set for ' + result.fifthGradeLanguage.join(', ') + ' is the rotation ' +
-      'running to ' + FIFTH_GRADE_LANGUAGE_ROTATION_ENDS_ + '. After that date, correct it ' +
-      'on the Ambassadors sheet when the office sets the next rotation - otherwise the ' +
-      'wrong language teacher gets the email.';
-  }
   if (result.flaggedGraduated.length > 0) {
     msg += '\n\nMarked Inactive (not in this year\'s MS roster - likely graduated): ' +
       result.flaggedGraduated.join(', ');

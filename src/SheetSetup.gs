@@ -94,7 +94,9 @@ function setupAmbassadorsSheet_() {
     'The schedule prints the language period as all three at once ' +
     '(French - M207 / Mandarin - M208 / Spanish - M209), so without this ' +
     'the tool cannot tell which teacher to email and hands the period ' +
-    'back to you instead. Fill it in and that period sends itself.');
+    'back to you instead. Fill it in and that period sends itself.\n' +
+    'Blank for fifth grade, which rotates through all three rather than ' +
+    'picking one, and for the few students who take no language.');
   sheet.getRange(1, colNum_(headers, 'Split')).setNote(
     '1 or 2, for the pods that split in half for some periods.\n' +
     'Leave blank if you do not know - the tool then reports both halves ' +
