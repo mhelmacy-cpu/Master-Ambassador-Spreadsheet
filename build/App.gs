@@ -55,6 +55,10 @@ const YES_NO = ['Yes', 'No'];
 const SPLITS = ['A', 'B', 'C'];
 const PODS = ['MMS', 'DJM', 'AOS', 'CCM', 'EEL', 'MSB', 'CJM', 'RSS'];
 const GRADES = ['5', '6', '7', '8'];
+// The Middle School starts at fifth. A rising fifth grader is in fourth,
+// and there is no fourth grade here, so nobody below this can ever guide.
+const LOWEST_GRADE_ = 5;
+const HIGHEST_GRADE_ = 8;
 const GENDERS = ['Female', 'Male', 'Non-binary', 'Other'];
 
 /* Both of these are dropdowns that allow anything, so the list is a
@@ -557,10 +561,11 @@ function setupSettings_() {
     'races are left open.\n\n' +
     'Reply-To Email: leave blank and replies come back to whoever sends. ' +
     'Set it to an admissions address to collect replies there instead.\n\n' +
-    'Guide Grades for Rising N: which ambassador grades may guide a visitor ' +
-    'entering grade N. A rising 5th grader is in 4th now, so a 6th grader is ' +
-    'the one who has just lived the year they are about to start. Separate ' +
-    'several with commas.');
+    'Guide Grades for Rising N: which grade each of a visitor\'s guides comes ' +
+    'from, one per guide, written as "6 and 7".\n\n' +
+    'A rising 5th grader gets two 6th graders - they are in 4th now, and there ' +
+    'is no 4th grade here, so nothing below 5th is ever asked for whatever ' +
+    'this says.');
   s.autoResizeColumns(1, 2);
 }
 
@@ -871,12 +876,24 @@ function guideGradesFor_(applyingForGrade, howMany) {
   const want = howMany || 2;
   const out = [];
   if (!g) return out;
+  const n = Number(g);
   const list = gradeList_(settingRaw_('Guide Grades for Rising ' + g));
   for (let i = 0; i < want; i++) {
-    if (list.length) out.push(list[Math.min(i, list.length - 1)]);
-    else out.push(i === 0 ? String(Number(g) - 1) : g);   // their grade, then the next
+    if (list.length) { out.push(list[Math.min(i, list.length - 1)]); continue; }
+    // No setting to go on. Their own grade and the one above it - except at
+    // the bottom, where the grade below does not exist here, so both guides
+    // come from the year above instead.
+    if (n <= LOWEST_GRADE_) { out.push(String(LOWEST_GRADE_ + 1)); continue; }
+    out.push(i === 0 ? String(n - 1) : String(Math.min(n, HIGHEST_GRADE_)));
   }
-  return out;
+  // Whatever the setting says, never ask for a grade this school does not
+  // have. A rising fifth grader is never given a fourth grader.
+  return out.map(function (x) {
+    const v = Number(x);
+    if (!v || v < LOWEST_GRADE_) return String(LOWEST_GRADE_ + 1);
+    if (v > HIGHEST_GRADE_) return String(HIGHEST_GRADE_);
+    return String(v);
+  });
 }
 
 /** "6th", 6, " 7 " -> "6". A date is not a grade, so it gives nothing. */
