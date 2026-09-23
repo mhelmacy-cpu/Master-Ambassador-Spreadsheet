@@ -34,7 +34,7 @@ const SHEETS = {
 const HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
   'Borough', 'Gender', 'Race (Presenting)', 'Student Email', 'Parent 1 Name', 'Parent 1 Email',
-  'Parent 2 Name', 'Parent 2 Email', 'Active'];
+  'Parent 2 Name', 'Parent 2 Email', 'Light', 'Active'];
 HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'School', 'Grade', 'Gender', 'Race', 'Borough',
   'Class Visit', 'Route', 'Tour Guides', 'Class Buddy', 'Notes'];
 HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route', 'Notes'];
@@ -69,6 +69,10 @@ const GENDERS = ['Female', 'Male', 'Non-binary', 'Other'];
  * starting point rather than a limit - type a value that is not on it
  * and it is kept, not rejected. */
 const PRESENTING_OPTIONS = ['White presenting', 'Student of color'];
+
+/* Green goes on a tour without asking. Yellow is offered the same way but
+ * held back at the point of saving, for a second look first. */
+const LIGHT_OPTIONS = ['Green', 'Yellow'];
 const RACE_OPTIONS = ['White', 'African American', 'Asian'];
 const BOROUGHS = ['M', 'B', 'Q', 'X', 'S', 'J'];
 const BOROUGH_NAMES = { M: 'Manhattan', B: 'Brooklyn', Q: 'Queens', X: 'Bronx', S: 'Staten Island', J: 'New Jersey' };
@@ -325,6 +329,9 @@ function setupSpreadsheet() {
   if (ensureColumn_(SHEETS.BUDDIES, 'Gender', GENDERS)) {
     added.push('Gender on 5th Grade Buddies');
   }
+  if (ensureColumn_(SHEETS.AMBASSADORS, 'Light', LIGHT_OPTIONS)) {
+    added.push('Light on Ambassadors');
+  }
 
   setupAmbassadors_();
   setupProspective_();
@@ -383,6 +390,7 @@ function setupAmbassadors_() {
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Grade') + 1, GRADES);
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Gender') + 1, GENDERS, true);
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Borough') + 1, BOROUGHS);
+  dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Light') + 1, LIGHT_OPTIONS);
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Active') + 1, YES_NO);
 
   note_(s, SHEETS.AMBASSADORS, 'Split',
@@ -404,6 +412,10 @@ function setupAmbassadors_() {
     'Student of color. They all read correctly.\n\n' +
     'Anything filled in that is not white presenting counts as a student ' +
     'of color. Blank means they are left out of the balancing.');
+  note_(s, SHEETS.AMBASSADORS, 'Light',
+    'Green or blank: put on a tour like anyone else.\n\n' +
+    'Yellow: check with me first. They are still picked in the normal way, ' +
+    'but the tour cannot be saved until you have said yes to each of them.');
   note_(s, SHEETS.AMBASSADORS, 'Student Email',
     'Their lrei.org address. Without it they never get told they are on duty.');
   s.autoResizeColumns(1, h.length);
@@ -882,6 +894,7 @@ function ambassadors_() {
       gender: trim_(r[col_(N, 'Gender')]),
       presenting: trim_(cell_(r, N, 'Race (Presenting)')),
       email: trim_(r[col_(N, 'Student Email')]),
+      light: trim_(cell_(r, N, 'Light')),
       active: norm_(r[col_(N, 'Active')]) === 'yes'
     };
   }).filter(function (a) { return a.name !== ''; });
@@ -1286,12 +1299,32 @@ function planTour(dateStr) {
   pairs.forEach(function (p) { p.guideNames.forEach(function (g) { everyone.push(g); }); });
   greeters.forEach(function (c) { c.chosen.forEach(function (n) { everyone.push(n); }); });
 
+  // Anyone on a yellow light who has ended up with a job.
+  const byName = {};
+  all.forEach(function (a) { byName[norm_(a.name)] = a; });
+  const needConfirm = [];
+  pairs.forEach(function (p) {
+    p.guideNames.forEach(function (g) {
+      const a = byName[norm_(g)];
+      if (a && norm_(a.light) === 'yellow') {
+        needConfirm.push({ name: g, job: JOBS.GUIDE, withWhom: p.visitor.name });
+      }
+    });
+  });
+  greeters.forEach(function (c) {
+    c.chosen.forEach(function (n) {
+      const a = byName[norm_(n)];
+      if (a && norm_(a.light) === 'yellow') needConfirm.push({ name: n, job: c.job, withWhom: '' });
+    });
+  });
+
   return {
     date: dateKey_(dateVal),
     dateLabel: longDate_(dateVal),
     pairs: pairs,
     greeters: greeters,
     free: free,
+    needConfirm: needConfirm,
     overallMix: genderMix_(everyone, pool),
     overallRaceMix: traitMix_(everyone, pool, 'presenting'),
     assignedCount: everyone.length,
@@ -2132,6 +2165,11 @@ const DIALOG_CSS_ =
   'h3{font-size:13px;margin:14px 0 6px;}' +
   '.warn{background:#fdf3e7;border:1px solid #e8c89a;border-radius:6px;padding:10px;margin-top:12px;}' +
   '.warn b{color:#8a5a12;}' +
+  '.check-first{background:#fff8e1;border:2px solid #e0a800;border-radius:6px;padding:12px;margin-top:12px;}' +
+  '.check-first h4{margin:0 0 8px;font-size:13px;color:#8a5a12;}' +
+  '.check-first ul{margin:0 0 10px;padding-left:20px;}' +
+  '.check-first label{display:flex;align-items:center;gap:8px;font-weight:bold;cursor:pointer;margin:0;}' +
+  '.check-first input{width:16px;height:16px;cursor:pointer;}' +
   '.free{background:#eef5ee;border:1px solid #bcd6bf;border-radius:6px;padding:10px;margin-top:12px;}' +
   '.muted{color:#777;}';
 
@@ -2155,7 +2193,7 @@ function showStaffDialog() {
     '.api_planTour(document.getElementById("d").value);}' +
     'function fail(e){busy(false);document.getElementById("out").innerHTML=' +
     '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
-    'function render(p){busy(false);document.getElementById("save").disabled=false;' +
+    'function render(p){busy(false);' +
     'var h="<div class=\'out\'><h3>"+esc(p.dateLabel)+"</h3><table><tr><th>Visiting student</th>' +
     '<th>Guides</th><th>Route</th></tr>";' +
     'p.pairs.forEach(function(x){h+="<tr><td>"+esc(x.visitor.name)+' +
@@ -2189,8 +2227,18 @@ function showStaffDialog() {
     '"<br><span class=\'muted\'>The number is how many jobs they have done, fewest first.</span></div>";}' +
     'if(p.warnings.length){h+="<div class=\'warn\'><b>Worth fixing first</b><ul>"+' +
     'p.warnings.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>";}' +
-    'document.getElementById("out").innerHTML=h;}' +
-    'function doSave(){document.getElementById("save").disabled=true;' +
+    'if(p.needConfirm&&p.needConfirm.length){' +
+    'h+="<div class=\'check-first\'><h4>Check these "+p.needConfirm.length+' +
+    '" before saving</h4><ul>"+p.needConfirm.map(function(c){' +
+    'return "<li>"+esc(c.name)+" - "+esc(c.job)+(c.withWhom?" for "+esc(c.withWhom):"")+"</li>";' +
+    '}).join("")+"</ul><label><input type=\'checkbox\' id=\'okd\' onchange=\'gate()\'>' +
+    'I have checked each of them and they are fine</label></div>";}' +
+    'document.getElementById("out").innerHTML=h;' +
+    'window.__needs=(p.needConfirm||[]).length;gate();}' +
+    'function gate(){var box=document.getElementById("okd");' +
+    'document.getElementById("save").disabled=!!window.__needs&&!(box&&box.checked);}' +
+    'function doSave(){if(window.__needs){var b=document.getElementById("okd");' +
+    'if(!b||!b.checked){return;}}document.getElementById("save").disabled=true;' +
     'google.script.run.withSuccessHandler(function(r){' +
     'document.getElementById("out").innerHTML="<div class=\'free\'><b>Saved.</b> "+r.written+' +
     '" row(s) written to the Tour Tracker, and the routes and guides filled in on Prospective Students.</div>";})' +
@@ -2254,7 +2302,7 @@ function showRouteSheetDialog() {
     'google.script.run.withSuccessHandler(function(r){' +
     'document.getElementById("go").disabled=false;' +
     'document.getElementById("out").innerHTML="<div class=\'free\'><b>"+r.pages+' +
-    '" page(s) ready.</b><br><a href=\""+r.url+"\" target=\"_blank\">Open "+esc(r.name)+' +
+    '" page(s) ready.</b><br><a href=\'"+r.url+"\' target=\'_blank\'>Open "+esc(r.name)+' +
     '"</a><br><span class=\'muted\'>It is in your Drive. File &rsaquo; Print when you are happy with it.</span></div>";})' +
     '.withFailureHandler(function(e){document.getElementById("go").disabled=false;' +
     'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";})' +
