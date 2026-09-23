@@ -6,7 +6,8 @@ rebuild is built from; `data/school-data.json` holds the data it runs on.
 ## Sheets
 
 ### Ambassadors
-Seeded with the 31 student names. Everything else is entered by the office.
+Seeded with the 31 student names and nothing else - every other column
+is entered by the office.
 
     First Name | Last Name | Homeroom | Split | Grade | Advisor | Borough |
     Gender | Parent 1 Name | Parent 1 Email | Parent 2 Name |
@@ -38,6 +39,26 @@ not typed.
 ### Jobs and Eligibility
 Unchanged: Panelist, Lobby Greeter, Table Greeter, Tour Guide, and the
 matrix of who can do which.
+
+## What the staffing command does
+
+One command, run once the prospective students are entered. It assigns:
+
+- **Tour Guides** - two per prospective student, matched on borough,
+  grade and gender. Grade and gender are requirements; borough is a
+  preference. Each guide pair is assigned a **tour route** (one family
+  per route, seven routes available), for the Wednesday morning slot.
+- **Lobby Greeters** - three.
+- **Table Greeters** - two.
+
+It does **not** assign **Panelists**. Those are chosen by hand.
+
+Because of that, the command finishes by listing every ambassador it did
+not use, so the panel can be picked from that list without double-booking
+anyone who is already guiding or greeting.
+
+Nobody is given two jobs in the same slot. Whoever has done fewest jobs
+so far is offered first, so the work spreads evenly across the year.
 
 ### Reference sheets
 Bell Schedule, Teachers, Tour Routes, Settings.
@@ -76,4 +97,5 @@ Display name and Reply-To are both set on the Settings sheet.
 - `Gender` for all 31 ambassadors - not present in any file supplied.
 - Teacher email addresses on the Teachers sheet; names and initials are
   filled in automatically. Nothing sends without these.
-- Confirm whether Ozzy Gutmann is Oscar Gutmann (6th, DJM).
+Ozzy Gutmann is Oscar Gutmann - confirmed by the office and corrected,
+so all 31 ambassadors now match the roster.

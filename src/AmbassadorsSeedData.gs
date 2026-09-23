@@ -18,7 +18,7 @@ const AMBASSADOR_SEED_TUPLES_ = [
   ['Camille Bedeau', '5th', 'B', 'Kevin Bedeau', 'bedeau.kevin@gmail.com', 'Theresa Bedeau', 'bedeau.theresa@gmail.com'],
   ['Avery Griffiths', '5th', 'M', 'Eksupar Griffiths', 'eksupar@gmail.com', 'Randy Griffiths', 'randydann@gmail.com'],
   ['Jordan Gary', '5th', 'M', 'Erin Gary', 'eringary@icloud.com', 'Kelvin Gary', 'kelvin.gary@gmail.com'],
-  ['Ozzy Gutmann', '5th', 'B', 'Jen Gutmann', 'jenandrobby@gutmann.nyc', 'Robby Gutmann', 'robby@gutmann.nyc'],
+  ['Oscar Gutmann', '5th', 'B', 'Jen Gutmann', 'jenandrobby@gutmann.nyc', 'Robby Gutmann', 'robby@gutmann.nyc'],
   ['Skylar Bruno', '5th', 'B', 'Jason Bruno', 'brunojason826@gmail.com', 'Sherleen Petion-Bruno', 'spetion@gmail.com'],
   ['Sadie Imperioli', '5th', 'B', 'Christopher Imperioli', 'cmi0222@gmail.com', 'Ryann Imperioli', 'rimperioli@lrei.org'],
   ['Jane Moss', '5th', 'B', 'Brian Moss', 'bmoss@coventryadvisors.com', 'Jennifer Sagum', 'jennifer.sagum@gmail.com'],
