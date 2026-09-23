@@ -214,6 +214,7 @@ function blankRow_(name) {
 
 function norm_(v) { return String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' '); }
 function trim_(v) { return String(v == null ? '' : v).trim(); }
+function capitalize_(v) { const t = trim_(v); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
 
 /** "6B", "6 B", "b" -> "B". The office writes the grade in front of it. */
 function splitLetter_(v) {
@@ -1863,10 +1864,11 @@ function buildLockerSlips(dateStr) {
       ' yet. Run "Staff This Wednesday Tour..." first.');
   }
 
-  const reportTo = setting_('Ambassadors Report To', 'the cafeteria');
+  // Five lines, because it is read in a corridor on the way past.
+  const reportTo = setting_('Ambassadors Report To', 'the cafeteria')
+    .replace(/^the\s+/i, '');
   const reportAt = timeLabelOrRaw_(setting_('Ambassadors Report At', '8:25 AM'));
   const endTime = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
-  const signed = setting_('Sender Display Name', 'LREI Middle School Tours');
 
   const title = 'Locker Slips - ' + longDate_(dateVal);
   const doc = DocumentApp.create(title);
@@ -1874,24 +1876,20 @@ function buildLockerSlips(dateStr) {
   body.clear();
 
   body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING1);
-  body.appendParagraph('Print this, then cut along the boxes. One slip per ambassador.');
+  body.appendParagraph('Print and cut along the boxes.');
 
   slips.forEach(function (slip) {
     const cell = body.appendTable([['']]).getCell(0, 0);
-    cell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(10).setPaddingRight(10);
+    cell.setPaddingTop(6).setPaddingBottom(6).setPaddingLeft(10).setPaddingRight(10);
 
     const head = cell.getChild(0).asParagraph();
     head.setText(slip.name.toUpperCase() + (slip.where ? '   (' + slip.where + ')' : ''));
     head.editAsText().setBold(true);
 
-    cell.appendParagraph('Tour duty ' + longDate_(dateVal));
-    cell.appendParagraph('');
-    slip.jobs.forEach(function (j) { cell.appendParagraph('   ' + j); });
-    cell.appendParagraph('');
-    cell.appendParagraph('Come to ' + reportTo + ' at ' + reportAt + '.');
-    cell.appendParagraph('You will be back in class by ' + endTime +
-      '. Your teachers already know you are out.');
-    cell.appendParagraph('Thank you for doing this.  - ' + signed);
+    cell.appendParagraph(longDate_(dateVal));
+    slip.jobs.forEach(function (j) { cell.appendParagraph(j); });
+    cell.appendParagraph(capitalize_(reportTo) + ' ' + reportAt + '. Back in class by ' +
+      endTime + '.');
 
     body.appendParagraph('');
   });

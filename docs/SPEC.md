@@ -87,12 +87,19 @@ morning before they reach the printer.
 
 - **Print Tour Routes** - one page per visiting student: their guides,
   their route, their class visit, and the handoff note at the bottom.
-- **Print Locker Slips** - one slip per ambassador, saying what their
-  email says, several to a page in bordered boxes so the page cuts into
-  strips. Each carries the ambassador's homeroom and advisor, their jobs
-  with the visitor and route, and where to report. The 5th grade class
-  visit buddies are left out, the same as the emails - they are told in
-  person, and their instructions print on the visitor's route sheet.
+- **Print Locker Slips** - one slip per ambassador, several to a page in
+  bordered boxes so the page cuts into strips. They go up on lockers on
+  Tuesday morning, so each one is four lines and no more: name (with
+  homeroom and advisor, for sorting the pile), the date in full, the job
+  with the visitor and route, and where to be and when they are back.
+  The 5th grade class visit buddies are left out, the same as the emails
+  - they are told in person, and their instructions print on the
+  visitor's route sheet.
+
+      AURELIA WALKER   (CCM - Marco)
+      Wednesday, October 7
+      Tour Guide for Visitor 1 - route 1
+      Cafeteria 8:25 AM. Back in class by 9:25 AM.
 
 ## Emails
 
