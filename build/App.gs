@@ -2882,6 +2882,10 @@ const DIALOG_CSS_ =
   '.panel label{display:flex;align-items:center;gap:6px;font-weight:normal;margin:0;' +
   'width:calc(50% - 14px);cursor:pointer;}' +
   '.panel input{width:15px;height:15px;cursor:pointer;}' +
+  'label.opt{display:flex;align-items:flex-start;gap:8px;font-weight:normal;' +
+  'margin:12px 0 0;cursor:pointer;line-height:1.45;}' +
+  'label.opt input{width:16px;height:16px;margin-top:1px;flex:none;cursor:pointer;}' +
+  'label.opt b{font-weight:bold;}' +
   '.panel .yel{color:#8a5a12;font-size:11px;}' +
   '.muted{color:#777;}';
 
@@ -2893,9 +2897,10 @@ function showStaffDialog() {
     'Panelists are left for you.</p>' +
     '<label for="d">Tour date</label>' +
     '<input type="date" id="d" value="' + nextWednesday() + '">' +
-    '<p style="margin:12px 0 0;"><label><input type="checkbox" id="keep" checked> ' +
-    '<b>Keep what is already assigned</b> - only staff students who have no guides yet, ' +
-    'for someone who signed up late</label></p>' +
+    '<label class="opt"><input type="checkbox" id="keep" checked>' +
+    '<span><b>Keep what is already assigned.</b> Only students with no guides yet are ' +
+    'staffed, for someone who signed up late. Untick to start this date over.' +
+    '</span></label>' +
     '<div style="margin-top:12px;">' +
     '<button id="preview" onclick="doPreview()">Preview</button>' +
     '<button id="save" class="ghost" onclick="doSave()" disabled>Save to Tour Tracker</button>' +
@@ -2996,10 +3001,11 @@ function showEmailDialog() {
     'or to check what would go.</p>' +
     '<label for="d">Tour date</label>' +
     '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
-    '<p style="margin:12px 0 0;"><label><input type="checkbox" id="test" checked> ' +
-    '<b>Test</b> - send every copy to me instead, nothing to students or teachers. ' +
-    'You get both sends, the Tuesday one and the Wednesday one, so you can read ' +
-    'each as it will arrive.</label></p>' +
+    '<label class="opt"><input type="checkbox" id="test" checked>' +
+    '<span><b>Test.</b> Nothing goes to students or teachers. One copy of each kind ' +
+    'comes to you instead - one per job, one advisor, one class teacher - for the ' +
+    'Tuesday send and the Wednesday send, so you can read each as it will arrive.' +
+    '</span></label>' +
     '<div style="margin-top:12px;">' +
     '<button onclick="go(\'students\')">Send to students</button>' +
     '<button onclick="go(\'teachers\')">Send to teachers and advisors</button>' +
