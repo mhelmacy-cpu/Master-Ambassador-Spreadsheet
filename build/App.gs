@@ -1597,6 +1597,46 @@ function readCell_(name, row, header) {
   return sheet_(name).getRange(row, i + 1).getValue();
 }
 
+/**
+ * Where each guide goes when the walking is over, and who has the visitor.
+ *
+ * Both guides are out of the same period, so if that period is the same
+ * class for both of them they simply take the visitor in together. Where
+ * they are in different classes only one can, so one takes the visitor
+ * and the other is finished.
+ */
+function guideHandback_(page, dateVal) {
+  const names = page.guides.map(function (g) { return g.replace(/\s*\(.*$/, ''); });
+  if (!names.length) return '';
+  const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
+  if (names.length === 1) {
+    return names[0] + ', take ' + page.visitor.name + ' to class with you, and bring ' +
+      'them down to the cafeteria at ' + endsAt + '.';
+  }
+
+  const startMin = toMinutes_(setting_('Class Visit Handoff Time', '9:06'));
+  const endMin = toMinutes_(setting_('Tour End Time', '9:25'));
+  const amb = {};
+  ambassadors_().forEach(function (a) { amb[norm_(a.name)] = a; });
+  const classOf = function (name) {
+    const a = amb[norm_(name)];
+    if (!a || (!a.pod && !a.split)) return '';
+    const blocks = classesMissed_(a.pod, a.split, a.grade, dateVal, startMin, endMin);
+    const usable = blocks.filter(function (b) { return !b.needsYou; });
+    return usable.length ? usable[0].what : '';
+  };
+  const first = classOf(names[0]);
+  const second = classOf(names[1]);
+
+  if (first && second && norm_(first) === norm_(second)) {
+    return names.join(' and ') + ', take ' + page.visitor.name + ' to class with you, ' +
+      'and bring them down to the cafeteria at ' + endsAt + '.';
+  }
+  return names[0] + ', take ' + page.visitor.name + ' to class with you, and bring them ' +
+    'down to the cafeteria at ' + endsAt + '.  ' +
+    names[1] + ', go back to class. You are finished.';
+}
+
 /** "Take Nora to SPANISH with Alexander Rogoff. ..." */
 function handoffForGuides_(page) {
   const b = page.buddy;
@@ -1666,6 +1706,12 @@ function buildRouteSheets(dateStr) {
       body.appendParagraph('For ' + page.buddyName)
         .setHeading(DocumentApp.ParagraphHeading.HEADING3);
       body.appendParagraph(handoffForBuddy_(page));
+    } else {
+      const back = guideHandback_(page, dateVal);
+      if (back) {
+        body.appendParagraph('');
+        body.appendParagraph(handoffAt + '  ' + back).setBold(true);
+      }
     }
   });
 
