@@ -1510,6 +1510,12 @@ function planTour(dateStr, keepExisting) {
         }).join(', '),
         weakGuide: false,
         route: kept.route[norm_(v.name)] || '', routeShared: false,
+        socMet: needsSoC ? asAmb.filter(function (a) {
+          return isStudentOfColor_(a.presenting);
+        }).map(function (a) { return a.name; }).join(' and ') : '',
+        genderMet: v.gender ? asAmb.filter(function (a) {
+          return norm_(a.gender) === norm_(v.gender);
+        }).map(function (a) { return a.name; }).join(' and ') : '',
         socShortfall: false, genderShortfall: false,
         short: Math.max(0, perVisitor - asAmb.length), why: ''
       };
@@ -1663,8 +1669,14 @@ function planTour(dateStr, keepExisting) {
         chosen.some(function (a) { return strengthRank_(a.strength) === 1; }),
       route: route,
       routeShared: routeShared,
+      socMet: needsSoC ? chosen.filter(function (a) {
+        return isStudentOfColor_(a.presenting);
+      }).map(function (a) { return a.name; }).join(' and ') : '',
       socShortfall: needsSoC && chosen.length > 0 &&
         !chosen.some(function (a) { return isStudentOfColor_(a.presenting); }),
+      genderMet: v.gender ? chosen.filter(function (a) {
+        return norm_(a.gender) === norm_(v.gender);
+      }).map(function (a) { return a.name; }).join(' and ') : '',
       genderShortfall: !!v.gender && chosen.length > 0 &&
         !chosen.some(function (a) { return norm_(a.gender) === norm_(v.gender); }),
       short: Math.max(0, perVisitor - chosen.length),
@@ -3219,7 +3231,7 @@ function showStaffDialog() {
     '"nothing new to staff; ")+"everything else is left exactly as it was.</p>";}' +
     'p.pairs.forEach(function(x){h+="<tr><td>"+esc(x.visitor.name)+' +
     '(x.visitor.grade?" <span class=\'muted\'>grade "+esc(x.visitor.grade)+"</span>":"")+' +
-    '(x.visitor.race?" <span class=\'muted\'>"+esc(x.visitor.race)+(x.needsSoC?" - needs a student of color":"")+"</span>":"")+' +
+    '(x.visitor.race?" <span class=\'muted\'>"+esc(x.visitor.race)+"</span>":"")+' +
     '(x.priority?" <b class=\'yel\'>"+esc(x.priority)+"</b>":"")+' +
     '(x.visitor.school?" <span class=\'muted\'><br>("+esc(x.visitor.school)+")</span>":"")+"</td><td>"+' +
     '(x.guides.length?esc(x.guides.join(", ")):"<b>none found</b>")+' +
@@ -3237,7 +3249,11 @@ function showStaffDialog() {
     '" was free in that class, so this is the closest fit</span>":"")+' +
     '(x.buddyGenderUnknown?"<br><span class=\'muted\'>no Gender on file for that 5th grader</span>":"")+' +
     '(x.buddyProblem?"<br><b>class visit not assigned - "+esc(x.buddyProblem)+"</b>":"")+' +
-    '(x.socShortfall?"<br><b>no student of color was free for this pair</b>":"")+' +
+    '(x.socMet?"<br><span class=\'muted\'>student of color on the pair: "+esc(x.socMet)+' +
+    '"</span>":"")+' +
+    '(x.socShortfall?"<br><b>needs a student of color, and none was free</b>":"")+' +
+    '(x.genderMet?"<br><span class=\'muted\'>same gender as the visitor: "+esc(x.genderMet)+' +
+    '"</span>":"")+' +
     '(x.genderShortfall?"<br><b>nobody of the visitor\'s own gender was free</b>":"")+' +
     '(x.short?" <span class=\'muted\'>short "+x.short+(x.why?" - "+esc(x.why):"")+"</span>":"")+' +
     '(x.kept?"<br><span class=\'muted\'>already assigned - left alone</span>":"")+' +
