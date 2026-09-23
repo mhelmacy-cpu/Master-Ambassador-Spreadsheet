@@ -39,7 +39,7 @@ HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'School', 'Grade', 'Gender',
   'Class Visit', 'Route', 'Tour Guides', 'Class Buddy', 'Notes'];
 HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route', 'Notes'];
 const CLASS_VISIT_WITH_GUIDE = 'With tour guide';
-HEADERS[SHEETS.JOBS] = ['Job Name', 'Description', 'Active'];
+HEADERS[SHEETS.JOBS] = ['Job Name', 'Description', 'Active', 'Out of Class From', 'Out of Class To'];
 HEADERS[SHEETS.ELIGIBILITY] = ['Ambassador', 'Panelist', 'Lobby Greeter', 'Table Greeter', 'Tour Guide'];
 HEADERS[SHEETS.TEACHERS] = ['Teacher Name', 'Initials', 'Teacher Email', 'Room / Notes'];
 HEADERS[SHEETS.BELL] = ['Day', 'Homeroom', 'Split', 'Start', 'End', 'What / Teacher / Room'];
@@ -54,6 +54,21 @@ const JOBS = {
   GUIDE: 'Tour Guide',
   BUDDY: 'Class Buddy'
 };
+
+/**
+ * How long each job actually keeps somebody out of class.
+ *
+ * This is what a teacher wants to know, and it is not the length of the
+ * period they are missing - a greeter is back well before the bell. The
+ * Jobs sheet holds the real values and can be edited there; these are
+ * only what a new sheet starts with.
+ */
+const JOB_HOURS_ = {};
+JOB_HOURS_[JOBS.PANELIST] = ['8:25 AM', '9:05 AM'];
+JOB_HOURS_[JOBS.LOBBY] = ['8:25 AM', '8:55 AM'];
+JOB_HOURS_[JOBS.TABLE] = ['8:25 AM', '8:55 AM'];
+JOB_HOURS_[JOBS.GUIDE] = ['8:25 AM', '9:05 AM'];
+JOB_HOURS_[JOBS.BUDDY] = ['9:05 AM', '9:25 AM'];
 
 const YES_NO = ['Yes', 'No'];
 const SPLITS = ['A', 'B', 'C'];
@@ -343,6 +358,9 @@ function setupSpreadsheet() {
   if (ensureColumn_(SHEETS.AMBASSADORS, 'Light', LIGHT_OPTIONS)) {
     added.push('Light on Ambassadors');
   }
+  if (ensureJobHourColumns_()) {
+    added.push('Out of Class From/To on Jobs');
+  }
 
   setupAmbassadors_();
   setupProspective_();
@@ -523,18 +541,70 @@ function setupBuddies_() {
 function setupJobs_() {
   const s = sheet_(SHEETS.JOBS);
   const fresh = s.getLastRow() < 2;
-  if (fresh) {
-    s.getRange(2, 1, 4, 3).setValues([
-      [JOBS.PANELIST, 'Speaks on the student panel. Chosen by hand, not by the staffing command.', 'Yes'],
-      [JOBS.LOBBY, 'Greets visiting families as they arrive in the lobby.', 'Yes'],
-      [JOBS.TABLE, 'Staffs the welcome and sign-in table.', 'Yes'],
-      [JOBS.GUIDE, 'Walks a prospective student round the building on a set route.', 'Yes'],
-      [JOBS.BUDDY, 'A 5th grader hosting a visiting student in their own class after the tour.', 'Yes']
-    ]);
-  }
   if (!fresh) return;
+  const rows = [
+    [JOBS.PANELIST, 'Speaks on the student panel. Chosen by hand, not by the staffing command.', 'Yes'],
+    [JOBS.LOBBY, 'Greets visiting families as they arrive in the lobby.', 'Yes'],
+    [JOBS.TABLE, 'Staffs the welcome and sign-in table.', 'Yes'],
+    [JOBS.GUIDE, 'Walks a prospective student round the building on a set route.', 'Yes'],
+    [JOBS.BUDDY, 'A 5th grader hosting a visiting student in their own class after the tour.', 'Yes']
+  ].map(function (r) {
+    const hours = JOB_HOURS_[r[0]] || ['', ''];
+    return r.concat([hours[0], hours[1]]);
+  });
+  s.getRange(2, 4, rows.length, 2).setNumberFormat('@');
+  s.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
   dropdown_(s, Math.max(s.getLastRow(), 2), 3, YES_NO);
-  s.autoResizeColumns(1, 3);
+  note_(s, SHEETS.JOBS, 'Out of Class From',
+    'When this job takes somebody out of class, and when they are back. This is what ' +
+    'the teacher email says - not the length of the period they are missing.');
+  s.autoResizeColumns(1, 5);
+}
+
+/**
+ * The out-of-class window for each job, from the Jobs sheet, falling
+ * back to the defaults where a cell is blank or the sheet predates the
+ * columns.
+ */
+function jobHours_() {
+  const N = SHEETS.JOBS;
+  const out = {};
+  Object.keys(JOB_HOURS_).forEach(function (j) {
+    out[norm_(j)] = { from: JOB_HOURS_[j][0], to: JOB_HOURS_[j][1] };
+  });
+  rows_(N).forEach(function (r) {
+    const job = trim_(r[col_(N, 'Job Name')]);
+    if (!job) return;
+    const from = timeCell_(cell_(r, N, 'Out of Class From'));
+    const to = timeCell_(cell_(r, N, 'Out of Class To'));
+    if (!from && !to) return;
+    const have = out[norm_(job)] || { from: '', to: '' };
+    out[norm_(job)] = { from: from || have.from, to: to || have.to };
+  });
+  return out;
+}
+
+/** A time cell, however Sheets chose to store it. */
+function timeCell_(v) {
+  if (v instanceof Date) return timeLabel_(v.getHours() * 60 + v.getMinutes());
+  return trim_(v);
+}
+
+/** The whole time somebody is away, across every job they are doing. */
+function awayWindow_(jobNames) {
+  const hours = jobHours_();
+  let from = null;
+  let to = null;
+  jobNames.forEach(function (j) {
+    const h = hours[norm_(j)];
+    if (!h) return;
+    const a = toMinutes_(h.from);
+    const b = toMinutes_(h.to);
+    if (a != null && (from === null || a < from)) from = a;
+    if (b != null && (to === null || b > to)) to = b;
+  });
+  if (from === null || to === null) return '';
+  return timeLabel_(from) + ' - ' + timeLabel_(to);
 }
 
 function setupEligibility_() {
@@ -668,6 +738,33 @@ function setupSettings_() {
  * nothing else on the sheet is touched. The new header copies the
  * formatting of the one beside it so it matches the rest of the row.
  */
+/**
+ * The two out-of-class columns on a Jobs sheet that was made before
+ * they existed, filled in for the jobs we know about. Anything she has
+ * added herself is left blank for her to fill.
+ */
+function ensureJobHourColumns_() {
+  const N = SHEETS.JOBS;
+  const a = ensureColumn_(N, 'Out of Class From');
+  const b = ensureColumn_(N, 'Out of Class To');
+  if (!a && !b) return false;
+  const s = sheet_(N);
+  const from = col_(N, 'Out of Class From') + 1;
+  const to = col_(N, 'Out of Class To') + 1;
+  const data = rows_(N);
+  if (data.length) {
+    s.getRange(2, from, data.length, 1).setNumberFormat('@');
+    s.getRange(2, to, data.length, 1).setNumberFormat('@');
+  }
+  data.forEach(function (r, i) {
+    const hours = JOB_HOURS_[trim_(r[col_(N, 'Job Name')])];
+    if (!hours) return;
+    if (a) s.getRange(i + 2, from).setValue(hours[0]);
+    if (b) s.getRange(i + 2, to).setValue(hours[1]);
+  });
+  return true;
+}
+
 function ensureColumn_(name, header, options) {
   const s = sheet_(name);
   if (headerIndex_(name)[header] !== undefined) return false;
@@ -2023,6 +2120,7 @@ function sendStudentEmails(dateStr) {
   const reportTo = setting_('Ambassadors Report To', 'the cafeteria');
   const reportAt = setting_('Ambassadors Report At', '8:25 AM');
   const endTime = setting_('Tour End Time', '9:25');
+  const hours = jobHours_();
 
   const grouped = {};
   assignments.forEach(function (a) {
@@ -2037,6 +2135,15 @@ function sendStudentEmails(dateStr) {
     const who = byName[norm_(name)];
     if (!who || !who.email) { skipped.push(name); return; }
     const jobs = grouped[name];
+    // Back in class when their own last job ends, not when the tour does.
+    let backAt = null;
+    jobs.forEach(function (j) {
+      const h = hours[norm_(j.job)];
+      const m = h ? toMinutes_(h.to) : null;
+      if (m != null && (backAt === null || m > backAt)) backAt = m;
+    });
+    const backBy = backAt === null ? timeLabelOrRaw_(endTime) : timeLabel_(backAt);
+
     const items = jobs.map(function (j) {
       let line = escapeHtml_(j.job);
       if (j.visitor) line += ' for ' + escapeHtml_(j.visitor);
@@ -2049,7 +2156,7 @@ function sendStudentEmails(dateStr) {
       '<p>You are on the tour schedule for ' + escapeHtml_(when.body) + ':</p>' +
       '<ul>' + items + '</ul>' +
       '<p><b>Please come to ' + escapeHtml_(reportTo) + ' at ' + escapeHtml_(reportAt) + '.</b></p>' +
-      '<p>You will be back in class by ' + escapeHtml_(timeLabelOrRaw_(endTime)) + '. ' +
+      '<p>You will be back in class by ' + escapeHtml_(backBy) + '. ' +
       'Your teachers already know you are out.</p>' +
       '<p>Thank you for doing this.<br>' +
       escapeHtml_(setting_('Sender Display Name', 'LREI Middle School Tours')) + '</p></div>';
@@ -2168,7 +2275,11 @@ function sendTeacherEmails(dateStr) {
         if (!byTeacher[t.email]) byTeacher[t.email] = { name: t.name, rows: [] };
         byTeacher[t.email].rows.push({
           student: name, job: jobText, what: b.what,
-          start: b.start, end: b.end, guiding: guiding
+          // What the teacher is owed is when their student is gone, which
+          // is the job's own window - a greeter is back before the bell.
+          away: awayWindow_(jobs.map(function (j) { return j.job; })) ||
+            (b.start + ' - ' + b.end),
+          guiding: guiding
         });
       });
     });
@@ -2197,7 +2308,7 @@ function sendTeacherEmails(dateStr) {
     const anyGuiding = e.rows.some(function (r) { return r.guiding; });
     const body = e.rows.map(function (r) {
       return '<tr><td style="' + TD_ + '">' + escapeHtml_(r.student) + '</td>' +
-        '<td style="' + TD_ + '">' + escapeHtml_(r.start) + ' - ' + escapeHtml_(r.end) + '</td>' +
+        '<td style="' + TD_ + '">' + escapeHtml_(r.away) + '</td>' +
         '<td style="' + TD_ + '">' + escapeHtml_(r.what) + '</td>' +
         '<td style="' + TD_ + '">' + escapeHtml_(r.job) + '</td></tr>';
     }).join('');
@@ -2206,7 +2317,7 @@ function sendTeacherEmails(dateStr) {
       '<p>The student(s) below will be out of your class ' + escapeHtml_(when.body) +
       ' for a Middle School tour:</p>' +
       '<table style="' + TABLE_STYLE_ + '">' +
-      '<tr><th style="' + TH_ + '">Student</th><th style="' + TH_ + '">Time</th>' +
+      '<tr><th style="' + TH_ + '">Student</th><th style="' + TH_ + '">Out of class</th>' +
       '<th style="' + TH_ + '">Class</th><th style="' + TH_ + '">Tour job</th></tr>' +
       body + '</table>' +
       (anyGuiding

@@ -65,6 +65,20 @@ so far is offered first, so the work spreads evenly across the year.
 ### Reference sheets
 Bell Schedule, Teachers, Tour Routes, Settings.
 
+Jobs also carries `Out of Class From` and `Out of Class To` - how long
+each job really keeps somebody away, which is not the length of the
+period they are missing. A greeter is back before the bell.
+
+    Panelist        8:25 AM - 9:05 AM
+    Lobby Greeter   8:25 AM - 8:55 AM
+    Table Greeter   8:25 AM - 8:55 AM
+    Tour Guide      8:25 AM - 9:05 AM
+    Class Buddy     9:05 AM - 9:25 AM
+
+The teacher email prints this window, and the student email uses the end
+of it for "back in class by". Both follow the sheet, so changing a time
+there changes what goes out.
+
 ## Reading the schedule
 
 Every student belongs to two cross-cutting groups: a homeroom pod (their
