@@ -6,6 +6,12 @@
  * Blake Glenn intentionally appears twice (once per borough) - that's how
  * the source list pairs him with tours from either borough, not a data
  * error.
+ *
+ * Last year's eighth graders have been taken off - they are in the High
+ * School now and are not on the Middle School roster this tool works
+ * from. Grades here are the grade each student was in when the list was
+ * written, so they run a year behind; Sync Homerooms overwrites them
+ * with the current grade from the roster.
  */
 const AMBASSADOR_SEED_TUPLES_ = [
   ['Aurelia Walker', '5th', 'B', 'Sophia James', 'sjames20002000@yahoo.com', 'Michael Walker', 'michaelowalker14@gmail.com'],
@@ -47,19 +53,7 @@ const AMBASSADOR_SEED_TUPLES_ = [
   ['Pascale Destin', '7th', 'B', 'Mark Anthony Destin', 'destinmark@gmail.com', 'Starr Blackshere-Destin', 'starr.blackshere@gmail.com'],
   ['Jackson Atienza', '7th', 'Q', 'Michelle Atienza', 'matienza@lrei.org', 'Rethier Atienza', 'rethier.atienza@gmail.com'],
   ['Cecilia Melzer', '7th', 'M', 'Isabel Melzer', 'isabelmelzer1@gmail.com', 'Thiago Melzer', 'tmelzer@gmail.com'],
-  ['Leo Sabag', '7th', 'M', 'Sovina Doan', 'sovina@erezsabag.com', 'Erez Sabag', 'info@erezsabag.com'],
   ['Kay Chisling', '7th', 'M', 'Brian Chisling', 'bchisling1@gmail.com', 'Pamela Chisling', 'pamela.chisling@gmail.com'],
-  ['Elliott Crawford', '8th', 'M', 'Kate Crawford', 'kate@katecrawford.net', 'Jason Schultz', 'lawgeek@gmail.com'],
-  ['Kadin Khorasani', '8th', 'M', 'Cindy Khorasani', 'ckhorasani@gmail.com', 'Hooman Khorasani', 'hooman.khorasani@gmail.com'],
-  ['Pia Tejada', '8th', 'B', 'Nicole LePage-Tejada', 'nicolelepage@gmail.com', 'Justin Tejada', 'justintejada1@gmail.com'],
-  ['Stella Malfait', '8th', 'B', 'Min Lew', 'mintylewmin@gmail.com', 'Koen Malfait', 'koenmalfaitrsca@gmail.com'],
-  ['Willa Sullivan', '8th', 'M', 'Margaret (Bensfield) Sullivan', 'margaret.b.sullivan@gmail.com', 'Teddy Sullivan', 'tedsullivan29@gmail.com'],
-  ['Anike Maathey', '8th', 'B', 'Nsenga Bansfield', 'themaatheys@gmail.com', 'Richard Maathey', 'richm14@gmail.com'],
-  ['Antonia Jones', '8th', 'B', 'Adrian Jones', 'awjonesnyc@gmail.com', 'Allison Silverman', 'allisonsilvermanjones@gmail.com'],
-  ['Hannah Small', '8th', 'B', 'Lunie Small', 'lunie.small@gmail.com', 'Ramel Small', 'ramel.small36@gmail.com'],
-  ['Lazer Grover-Scher', '8th', 'M', 'Allison Grover', 'algrover78@gmail.com', 'Susie Scher', 'susie.scher@mac.com'],
-  ['Scarlett Zahedi', '8th', 'B', 'Amanda Field', 'amandakfield@gmail.com', 'Caveh Zahedi', 'cavehzahedi@gmail.com'],
-  ['Hal Cohen', '8th', 'M', 'Cristi Andrews', 'candrewscohen@gmail.com', 'David Oliver Cohen', 'davidolivercohen@gmail.com', 'Flagged "**" in the source list - meaning unspecified, check with the office.']
 ];
 
 function buildAmbassadorSeedRows_() {
