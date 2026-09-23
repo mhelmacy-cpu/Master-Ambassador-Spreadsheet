@@ -48,6 +48,8 @@ One command, run once the prospective students are entered. It assigns:
   grade and gender. Grade and gender are requirements; borough is a
   preference. Each guide pair is assigned a **tour route** (one family
   per route, seven routes available), for the Wednesday morning slot.
+  With more families than routes, the list starts again at route 1 and
+  the sharing is flagged in the dialog.
 - **Lobby Greeters** - three.
 - **Table Greeters** - two.
 
@@ -77,6 +79,20 @@ Each pod column carries exactly one letter all week (DJM=A, AOS=B, CCM=C,
 EEL=A, MSB=B, CJM=A, RSS=B), which is what makes the column look like the
 pod until you check a student whose split differs from it. Sixteen of the
 thirty rostered ambassadors are that case.
+
+## Printouts
+
+Two documents, both built as Google Docs so they can be corrected on the
+morning before they reach the printer.
+
+- **Print Tour Routes** - one page per visiting student: their guides,
+  their route, their class visit, and the handoff note at the bottom.
+- **Print Locker Slips** - one slip per ambassador, saying what their
+  email says, several to a page in bordered boxes so the page cuts into
+  strips. Each carries the ambassador's homeroom and advisor, their jobs
+  with the visitor and route, and where to report. The 5th grade class
+  visit buddies are left out, the same as the emails - they are told in
+  person, and their instructions print on the visitor's route sheet.
 
 ## Emails
 

@@ -1191,12 +1191,21 @@ function planTour(dateStr) {
       }
     });
 
+    // Routes go out in order, up to Max Families Per Route each. Once
+    // every route has had its share the list starts again at route 1
+    // rather than leaving somebody without one - two families on the
+    // same route is better than a blank where the route should be.
     let route = '';
-    for (let i = 0; i < routes.length; i++) {
-      if ((routeUse[routes[i]] || 0) < maxPerRoute) {
-        route = routes[i];
-        routeUse[route] = (routeUse[route] || 0) + 1;
-        break;
+    let routeShared = false;
+    for (let cap = maxPerRoute; !route && cap <= maxPerRoute * (visitors.length + 1);
+         cap += maxPerRoute) {
+      for (let i = 0; i < routes.length; i++) {
+        if ((routeUse[routes[i]] || 0) < cap) {
+          route = routes[i];
+          routeShared = cap > maxPerRoute;
+          routeUse[route] = (routeUse[route] || 0) + 1;
+          break;
+        }
       }
     }
 
@@ -1210,6 +1219,7 @@ function planTour(dateStr) {
       needsSoC: needsSoC,
       guideMix: traitMix_(chosen.map(function (a) { return a.name; }), pool, 'presenting'),
       route: route,
+      routeShared: routeShared,
       socShortfall: needsSoC && chosen.length > 0 &&
         !chosen.some(function (a) { return isStudentOfColor_(a.presenting); }),
       genderShortfall: !!v.gender && chosen.length > 0 &&
@@ -1724,6 +1734,18 @@ function handoffForBuddy_(page) {
     'and wait with them until ' + wait + ' gets back.';
 }
 
+/**
+ * A bold paragraph.
+ *
+ * A Document paragraph has no setBold of its own - bold lives on the
+ * text inside it, which editAsText() reaches.
+ */
+function appendBold_(body, text) {
+  const p = body.appendParagraph(text);
+  p.editAsText().setBold(true);
+  return p;
+}
+
 function buildRouteSheets(dateStr) {
   const dateVal = toDate_(dateStr);
   if (!dateVal) throw new Error('Pick a tour date first.');
@@ -1769,7 +1791,7 @@ function buildRouteSheets(dateStr) {
 
     if (page.buddy) {
       body.appendParagraph('');
-      body.appendParagraph(handoffAt + '  ' + handoffForGuides_(page)).setBold(true);
+      appendBold_(body, handoffAt + '  ' + handoffForGuides_(page));
       body.appendParagraph('');
       body.appendParagraph('For ' + page.buddyName)
         .setHeading(DocumentApp.ParagraphHeading.HEADING3);
@@ -1778,13 +1800,104 @@ function buildRouteSheets(dateStr) {
       const back = guideHandback_(page, dateVal);
       if (back) {
         body.appendParagraph('');
-        body.appendParagraph(handoffAt + '  ' + back).setBold(true);
+        appendBold_(body, handoffAt + '  ' + back);
       }
     }
   });
 
   doc.saveAndClose();
   return { url: doc.getUrl(), name: title, pages: pages.length };
+}
+
+/* =========================================================
+ * Locker slips
+ *
+ * What the student email says, on paper: one slip per ambassador, to
+ * go on lockers the afternoon before. They come out as a Google Doc,
+ * several to a page, each slip in its own bordered box so the page
+ * cuts into strips.
+ *
+ * The date is always written out in full. A slip that said "tomorrow"
+ * would be wrong the moment it outlived the day it was printed, and
+ * these sit on a locker overnight.
+ *
+ * The 5th grade class-visit buddies are not included, the same as the
+ * emails - they hear about it in person, and their instructions are
+ * already printed on the visitor's route sheet.
+ * ========================================================= */
+
+function lockerSlipData_(dateVal) {
+  const assignments = assignmentsOn_(dateVal);
+  const amb = {};
+  ambassadors_().forEach(function (a) { amb[norm_(a.name)] = a; });
+
+  const grouped = {};
+  assignments.forEach(function (a) {
+    if (a.job === JOBS.BUDDY) return;
+    (grouped[a.name] = grouped[a.name] || []).push(a);
+  });
+
+  return Object.keys(grouped).sort().map(function (name) {
+    const who = amb[norm_(name)];
+    return {
+      name: name,
+      // Homeroom and advisor go on the slip because that is how a pile
+      // of them gets sorted before it reaches the lockers.
+      where: who ? [who.pod, who.advisor].filter(Boolean).join(' - ') : '',
+      jobs: grouped[name].map(function (j) {
+        let line = j.job;
+        if (j.visitor) line += ' for ' + j.visitor;
+        if (j.route) line += ' - route ' + j.route;
+        return line;
+      })
+    };
+  });
+}
+
+function buildLockerSlips(dateStr) {
+  const dateVal = toDate_(dateStr);
+  if (!dateVal) throw new Error('Pick a tour date first.');
+  const slips = lockerSlipData_(dateVal);
+  if (!slips.length) {
+    throw new Error('Nothing is staffed for ' + longDate_(dateVal) +
+      ' yet. Run "Staff This Wednesday Tour..." first.');
+  }
+
+  const reportTo = setting_('Ambassadors Report To', 'the cafeteria');
+  const reportAt = timeLabelOrRaw_(setting_('Ambassadors Report At', '8:25 AM'));
+  const endTime = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
+  const signed = setting_('Sender Display Name', 'LREI Middle School Tours');
+
+  const title = 'Locker Slips - ' + longDate_(dateVal);
+  const doc = DocumentApp.create(title);
+  const body = doc.getBody();
+  body.clear();
+
+  body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  body.appendParagraph('Print this, then cut along the boxes. One slip per ambassador.');
+
+  slips.forEach(function (slip) {
+    const cell = body.appendTable([['']]).getCell(0, 0);
+    cell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(10).setPaddingRight(10);
+
+    const head = cell.getChild(0).asParagraph();
+    head.setText(slip.name.toUpperCase() + (slip.where ? '   (' + slip.where + ')' : ''));
+    head.editAsText().setBold(true);
+
+    cell.appendParagraph('Tour duty ' + longDate_(dateVal));
+    cell.appendParagraph('');
+    slip.jobs.forEach(function (j) { cell.appendParagraph('   ' + j); });
+    cell.appendParagraph('');
+    cell.appendParagraph('Come to ' + reportTo + ' at ' + reportAt + '.');
+    cell.appendParagraph('You will be back in class by ' + endTime +
+      '. Your teachers already know you are out.');
+    cell.appendParagraph('Thank you for doing this.  - ' + signed);
+
+    body.appendParagraph('');
+  });
+
+  doc.saveAndClose();
+  return { url: doc.getUrl(), name: title, slips: slips.length };
 }
 
 /* =========================================================
@@ -2162,6 +2275,7 @@ function onOpen() {
     .addSeparator()
     .addItem('Staff This Wednesday Tour...', 'showStaffDialog')
     .addItem('Print Tour Routes...', 'showRouteSheetDialog')
+    .addItem('Print Locker Slips...', 'showLockerSlipDialog')
     .addItem('Send Emails Now...', 'showEmailDialog')
     .addSeparator()
     .addSubMenu(SpreadsheetApp.getUi().createMenu('Automation')
@@ -2249,7 +2363,9 @@ function showStaffDialog() {
     '(x.socShortfall?"<br><b>no student of color was free for this pair</b>":"")+' +
     '(x.genderShortfall?"<br><b>nobody of the visitor\'s own gender was free</b>":"")+' +
     '(x.short?" <span class=\'muted\'>short "+x.short+(x.why?" - "+esc(x.why):"")+"</span>":"")+' +
-    '"</td><td>"+esc(x.route||"-")+"</td></tr>";});' +
+    '"</td><td>"+esc(x.route||"-")+' +
+    '(x.routeShared?"<br><span class=\'muted\'>shared - every route was already ' +
+    'taken</span>":"")+"</td></tr>";});' +
     'h+="</table>";' +
     'p.greeters.forEach(function(c){h+="<h3>"+esc(c.job)+" ("+c.chosen.length+" of "+c.needed+")</h3><div>"+' +
     '(c.chosen.length?esc(c.chosen.join(", ")):"<b>none available</b>")+' +
@@ -2348,6 +2464,35 @@ function showRouteSheetDialog() {
   dialog_(html, 'Print Tour Routes', 600, 460);
 }
 
+function showLockerSlipDialog() {
+  const next = nextTourDate_();
+  const html =
+    '<style>' + DIALOG_CSS_ + '</style>' +
+    '<h2>Print locker slips</h2>' +
+    '<p class="sub">One slip per ambassador, saying what their email says. Opens as a ' +
+    'Google Doc - print it, then cut along the boxes. The 5th grade class-visit buddies ' +
+    'are not included; you tell them in person.</p>' +
+    '<label for="d">Tour date</label>' +
+    '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
+    '<div style="margin-top:14px;"><button id="go" onclick="make()">Build the document</button></div>' +
+    '<div id="out"></div>' +
+    '<script>' +
+    'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
+    'function make(){document.getElementById("go").disabled=true;' +
+    'document.getElementById("out").innerHTML="<p class=\'muted\'>Building...</p>";' +
+    'google.script.run.withSuccessHandler(function(r){' +
+    'document.getElementById("go").disabled=false;' +
+    'document.getElementById("out").innerHTML="<div class=\'free\'><b>"+r.slips+' +
+    '" slip(s) ready.</b><br><a href=\'"+r.url+"\' target=\'_blank\'>Open "+esc(r.name)+' +
+    '"</a><br><span class=\'muted\'>It is in your Drive. File &rsaquo; Print, then cut.</span></div>";})' +
+    '.withFailureHandler(function(e){document.getElementById("go").disabled=false;' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";})' +
+    '.api_buildLockerSlips(document.getElementById("d").value);}' +
+    '<\/script>';
+  dialog_(html, 'Print Locker Slips', 600, 460);
+}
+
+function api_buildLockerSlips(dateStr) { return buildLockerSlips(dateStr); }
 function api_buildRouteSheets(dateStr) { return buildRouteSheets(dateStr); }
 function api_planTour(dateStr) { return planTour(dateStr); }
 function api_commitTour(dateStr) { return commitTour(dateStr); }
