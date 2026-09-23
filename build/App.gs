@@ -171,6 +171,22 @@ const HEADER_ALIASES_ = {
   'Name': ['Student Name', 'Full Name']
 };
 
+/** Headings that appear more than once on a sheet, which is always a trap. */
+function duplicateHeaders_(name) {
+  const s = sheet_(name);
+  const width = Math.max(s.getLastColumn(), HEADERS[name].length);
+  const row = s.getRange(1, 1, 1, width).getValues()[0];
+  const seen = {};
+  const dupes = [];
+  row.forEach(function (cell) {
+    const key = trim_(cell);
+    if (!key) return;
+    if (seen[key] && dupes.indexOf(key) === -1) dupes.push(key);
+    seen[key] = true;
+  });
+  return dupes;
+}
+
 function headerIndex_(name) {
   if (HEADER_CACHE_[name]) return HEADER_CACHE_[name];
   const s = sheet_(name);
@@ -265,6 +281,18 @@ function strengthRank_(v) {
   if (t === 'high') return 3;
   if (t === 'low') return 1;
   return 2;
+}
+
+/**
+ * What the script read off the sheet for one guide, in their own words.
+ *
+ * Printed under every pair, so a cell that says something other than
+ * what she thinks it says is visible at the moment it matters instead
+ * of being noticed weeks later.
+ */
+function guideRead_(a) {
+  return a.name + ': ' + (trim_(a.gender) || 'no gender') + ', ' +
+    (trim_(a.presenting) || 'no race') + ', ' + (trim_(a.borough) || 'no borough');
 }
 
 /** A family worth putting her strongest ambassadors in front of. */
@@ -1475,6 +1503,7 @@ function planTour(dateStr, keepExisting) {
         guideNames: asAmb.map(function (a) { return a.name; }),
         wantGrades: wantGrades, needsSoC: needsSoC,
         guideMix: traitMix_(asAmb.map(function (a) { return a.name; }), pool, 'presenting'),
+        guideRead: asAmb.map(guideRead_).join('  |  '),
         priority: priorityWhy_(v),
         strengths: asAmb.map(function (a) {
           return a.name + ' (' + (trim_(a.strength) || 'no strength set') + ')';
@@ -1553,13 +1582,27 @@ function planTour(dateStr, keepExisting) {
         const kept = list.filter(test);
         return kept.length ? kept : list;
       };
+      // Best case first: somebody who settles everything still owed and
+      // breaks nothing.
       candidates = narrow(candidates, function (a) {
         return settles(a) === owedCount && !avoid(a) && !tooWeak(a);
       });
+      // Then gender, which is not negotiable. A girl is never given two
+      // boys while any girl is free, even if taking her means a second
+      // student of color or a Low on the pair.
+      candidates = narrow(candidates, function (a) {
+        return !owedGender || norm_(a.gender) === norm_(v.gender);
+      });
       candidates = narrow(candidates, function (a) { return !avoid(a) && !tooWeak(a); });
       candidates = narrow(candidates, function (a) { return !tooWeak(a); });
+      candidates = narrow(candidates, function (a) { return !avoid(a); });
 
       candidates.sort(function (a, b) {
+        if (owedGender) {
+          const ga = norm_(a.gender) === norm_(v.gender) ? 0 : 1;
+          const gb = norm_(b.gender) === norm_(v.gender) ? 0 : 1;
+          if (ga !== gb) return ga - gb;
+        }
         if (owedCount) {
           const sa = settles(a), sb = settles(b);
           if (sa !== sb) return sb - sa;
@@ -1611,6 +1654,7 @@ function planTour(dateStr, keepExisting) {
       wantGrades: wantGrades,
       needsSoC: needsSoC,
       guideMix: traitMix_(chosen.map(function (a) { return a.name; }), pool, 'presenting'),
+      guideRead: chosen.map(guideRead_).join('  |  '),
       priority: priorityWhy_(v),
       strengths: chosen.map(function (a) {
         return a.name + ' (' + (trim_(a.strength) || 'no strength set') + ')';
@@ -1951,6 +1995,25 @@ function setupWarnings_(all, visitors) {
   missing('pod', 'Homeroom');
   missing('email', 'Student Email - they will not be told they are on duty');
   missing('advisor', 'Advisor - their advisor will not be told');
+
+  // A blank Race cell reads as neither, so that ambassador can never
+  // satisfy the student of color rule and never trips the two-of-them
+  // rule either. Worth saying out loud, because it looks like nothing.
+  const noRace = active.filter(function (a) { return !a.presenting; });
+  if (noRace.length) {
+    w.push(noRace.length + ' active ambassador(s) have nothing in Race (Presenting), so ' +
+      'they count as neither: ' + noRace.slice(0, 8).map(function (a) { return a.name; }).join(', ') +
+      (noRace.length > 8 ? ' and ' + (noRace.length - 8) + ' more' : '') + '.');
+  }
+
+  // Two columns with the same heading: the script reads the first, she
+  // types in the other, and the values never arrive.
+  const twice = duplicateHeaders_(SHEETS.AMBASSADORS);
+  if (twice.length) {
+    w.push('The Ambassadors sheet has two columns headed ' + twice.join(', ') +
+      '. Only the leftmost is read, so anything typed in the other is ignored. ' +
+      'Delete or rename the spare.');
+  }
 
   const buddyNoGender = buddies_().filter(function (b) { return b.canHost && !b.gender; }).length;
   if (buddyNoGender && visitors.some(function (v) { return classVisitLanguage_(v.classVisit); })) {
@@ -3164,7 +3227,7 @@ function showStaffDialog() {
     'used</span>":(x.wantGrades&&x.wantGrades.length?"<br><span class=\'muted\'>looking for ' +
     'grade "+esc(x.wantGrades.map(function(g){return [].concat(g).join(" or ");}).join(" + "))+' +
     '"</span>":""))+' +
-    '(x.guideMix?"<br><span class=\'muted\'>"+esc(x.guideMix)+"</span>":"")+' +
+    '(x.guideRead?"<br><span class=\'muted\'>"+esc(x.guideRead)+"</span>":"")+' +
     '(x.priority&&x.strengths?"<br><span class=\'muted\'>"+esc(x.strengths)+"</span>":"")+' +
     '(x.weakGuide?"<br><b>a Low ambassador was the only one who fit</b>":"")+' +
     '(x.buddy?"<br><span class=\'muted\'>class visit: "+esc(x.buddy.name)+' +

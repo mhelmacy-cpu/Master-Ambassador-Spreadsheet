@@ -71,6 +71,12 @@ One command, run once the prospective students are entered. It assigns:
   would otherwise go empty does it widen further, since one guide and a
   gap is worse than a guide from another year.
 
+  The pair always includes at least one guide of the visitor's own
+  gender while anyone of that gender is free. That outranks every other
+  preference, including "never two students of color" and "no Low for a
+  priority family"; only the grade comes first. Where nobody of that
+  gender is free at all, the pair is made anyway and the dialog says so.
+
   A visitor marked **Full Pay** or **Well Connected** on Prospective
   Students is paired first, and their guides come from the **High**
   Strength ambassadors, then Medium (which is what a blank counts as).
