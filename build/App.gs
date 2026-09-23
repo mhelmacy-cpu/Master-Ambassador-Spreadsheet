@@ -1193,7 +1193,13 @@ function guideGradesFor_(applyingForGrade, howMany) {
   const g = gradeNumber_(applyingForGrade);
   const want = howMany || 2;
   const out = [];
-  if (!g) return out;
+  // No grade on the visitor: an empty slot means any grade will do.
+  // A blank column is her leaving that rule out, not a reason to send
+  // the family round with nobody.
+  if (!g) {
+    for (let i = 0; i < want; i++) out.push([]);
+    return out;
+  }
   const n = Number(g);
   const list = gradeList_(settingRaw_('Guide Grades for Rising ' + g));
   const fallback = BUILT_IN_GUIDE_GRADES_[g] || [];
@@ -1237,6 +1243,7 @@ function usableGrades_(wanted, pool) {
   pool.forEach(function (a) { if (a.grade) have[a.grade] = true; });
   if (!Object.keys(have).length) return wanted;
   return wanted.map(function (slot) {
+    if (!slot.length) return slot;          // any grade will do
     const kept = slot.filter(function (g) { return have[g]; });
     if (kept.length) return kept;
     const g = slot[0];
@@ -1617,10 +1624,8 @@ function planTour(dateStr, keepExisting) {
       genderShortfall: !!v.gender && chosen.length > 0 &&
         !chosen.some(function (a) { return norm_(a.gender) === norm_(v.gender); }),
       short: Math.max(0, perVisitor - chosen.length),
-      why: !wantGrades.length
-        ? 'no usable Grade on this visitor - put the grade they are applying for ' +
-          '(a number) in the Grade column, or nobody can be matched to them'
-        : (missing.length ? guideMissReason_(v, missing, pool, used, canDo, all.length) : '')
+      anyGrade: !v.grade,
+      why: missing.length ? guideMissReason_(v, missing, pool, used, canDo, all.length) : ''
     };
   });
 
@@ -1866,6 +1871,7 @@ function guideMissReason_(v, missing, pool, used, canDo, total) {
   if (!pool.length) return 'no ambassador is marked Active - put Yes in the Active column';
   const parts = missing.map(function (slot) {
     const grades = [].concat(slot);
+    if (!grades.length) return 'nobody eligible is free';
     const label = 'grade ' + grades.join(' or ');
     const inGrade = pool.filter(function (a) { return grades.indexOf(a.grade) !== -1; });
     if (!inGrade.length) return 'no ' + label + ' ambassador on the sheet at all';
@@ -1973,24 +1979,30 @@ function setupWarnings_(all, visitors) {
       }).join(', ') + '.');
   }
 
+  // A slot that would go unfilled because the school has nobody in the
+  // grades it asks for. A slot naming several grades is only a problem
+  // when every one of them is empty, and a slot naming none at all - a
+  // visitor with no Grade on file - asks for nothing in particular.
   const needed = {};
   visitors.forEach(function (v) {
-    usableGrades_(guideGradesFor_(v.grade, 2), active).forEach(function (g) {
-      if (g) needed[g] = true;
+    usableGrades_(guideGradesFor_(v.grade, 2), active).forEach(function (slot) {
+      const grades = [].concat(slot).filter(Boolean);
+      if (!grades.length) return;
+      if (grades.some(function (g) {
+        return active.some(function (a) { return a.grade === g; });
+      })) return;
+      needed[grades.join(' or ')] = true;
     });
   });
-  Object.keys(needed).sort().forEach(function (g) {
-    if (!active.filter(function (a) { return a.grade === g; }).length) {
-      w.push('No grade ' + g + ' ambassador is on the sheet, and a visitor this week needs ' +
-        'one. Put a grade ' + g + ' ambassador on the Ambassadors sheet, or change ' +
-        '"Guide Grades for Rising ..." on Settings.');
-    }
+  Object.keys(needed).sort().forEach(function (label) {
+    w.push('No grade ' + label + ' ambassador is on the sheet, and a visitor this week ' +
+      'needs one. Put one on the Ambassadors sheet, or change "Guide Grades for ' +
+      'Rising ..." on Settings.');
   });
 
-  visitors.forEach(function (v) {
-    if (!v.grade) w.push('Visitor "' + v.name + '" has no Grade, so guides cannot be grade-matched.');
-    if (!v.gender) w.push('Visitor "' + v.name + '" has no Gender, so guides cannot be gender-matched.');
-  });
+  // Nothing here about a visitor with no Grade, Gender, Race or Borough.
+  // A blank column is her leaving that rule out on purpose, and the
+  // staffing dialog already says so on the visitor's own row.
   return w;
 }
 
@@ -3148,9 +3160,10 @@ function showStaffDialog() {
     '(x.priority?" <b class=\'yel\'>"+esc(x.priority)+"</b>":"")+' +
     '(x.visitor.school?" <span class=\'muted\'><br>("+esc(x.visitor.school)+")</span>":"")+"</td><td>"+' +
     '(x.guides.length?esc(x.guides.join(", ")):"<b>none found</b>")+' +
-    '(x.wantGrades&&x.wantGrades.length?"<br><span class=\'muted\'>looking for grade "+' +
-    'esc(x.wantGrades.map(function(g){return [].concat(g).join(" or ");}).join(" + "))+' +
-    '"</span>":"")+' +
+    '(x.anyGrade?"<br><span class=\'muted\'>no grade on this visitor, so any grade was ' +
+    'used</span>":(x.wantGrades&&x.wantGrades.length?"<br><span class=\'muted\'>looking for ' +
+    'grade "+esc(x.wantGrades.map(function(g){return [].concat(g).join(" or ");}).join(" + "))+' +
+    '"</span>":""))+' +
     '(x.guideMix?"<br><span class=\'muted\'>"+esc(x.guideMix)+"</span>":"")+' +
     '(x.priority&&x.strengths?"<br><span class=\'muted\'>"+esc(x.strengths)+"</span>":"")+' +
     '(x.weakGuide?"<br><b>a Low ambassador was the only one who fit</b>":"")+' +

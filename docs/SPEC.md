@@ -22,6 +22,20 @@ is entered by the office.
 
 ### Prospective Students
 
+Only the tour date and the name are needed. Every other column is a rule
+she can leave out by leaving it blank:
+
+- **Grade** blank: any grade will do, and the dialog says so on that row.
+- **Gender** blank: no gender rule for that visitor.
+- **Race** blank: no student of color is required for them. The separate
+  rule that a pair is never two students of color still applies, because
+  that one is about the pair, not about the visitor.
+- **Borough** blank: borough stops being a tiebreak for them.
+- **Full Pay / Well Connected** blank: an ordinary family.
+- **Class Visit** blank: no class visit.
+
+A blank column never means the family gets nobody.
+
     Name | School | Gender | Borough | Grade
 
 Grade is the one addition to what was asked for: guide pairing matches on
