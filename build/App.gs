@@ -98,7 +98,8 @@ const DEFAULT_SETTINGS = [
   ['Guide Grades for Rising 8', '7 and 8'],
   ['Visitor Races Needing a Student of Color Guide', 'African American, Black'],
   ['Max Families Per Route', '1'],
-  ['Class Visit Handoff Time', '9:06']
+  ['Class Visit Handoff Time', '9:06'],
+  ['Wait For', 'Maren']
 ];
 
 const HANDLER_TEACHER_EMAILS = 'sendTeacherEmailsForNextTour';
@@ -1545,6 +1546,134 @@ function commitTour(dateStr) {
 }
 
 /* =========================================================
+ * The printable route sheets
+ *
+ * One page per visiting student, in a Google Doc so it can be corrected
+ * on the morning before it goes to the printer.
+ *
+ * Where a visitor has a 5th grade class visit, the last two lines of the
+ * route are replaced: the guides hand over at 9:06 and are finished, and
+ * the sheet itself goes with the visitor to the 5th grader, whose own
+ * instructions are printed underneath.
+ * ========================================================= */
+
+function routeSheetData_(dateVal) {
+  const P = SHEETS.PROSPECTIVE;
+  const visitors = prospectiveFor_(dateVal);
+  const assignments = assignmentsOn_(dateVal);
+  const routes = {};
+  rows_(SHEETS.ROUTES).forEach(function (r) {
+    routes[trim_(r[0])] = { direction: trim_(r[1]), itinerary: String(r[4] || '') };
+  });
+  const buddyIndex = {};
+  buddies_().forEach(function (b) { buddyIndex[norm_(b.name)] = b; });
+  const ambIndex = {};
+  ambassadors_().forEach(function (a) { ambIndex[norm_(a.name)] = a; });
+
+  return visitors.map(function (v) {
+    const mine = assignments.filter(function (a) { return norm_(a.visitor) === norm_(v.name); });
+    const guides = mine.filter(function (a) { return a.job === JOBS.GUIDE; })
+      .map(function (a) {
+        const amb = ambIndex[norm_(a.name)];
+        return a.name + (amb && amb.grade ? ' (' + amb.grade + 'th)' : '');
+      });
+    const buddyRow = mine.filter(function (a) { return a.job === JOBS.BUDDY; })[0];
+    const buddy = buddyRow ? buddyIndex[norm_(buddyRow.name)] : null;
+    const routeNo = trim_(readCell_(P, v.row, 'Route')) ||
+      (mine.length ? trim_(mine[0].route) : '');
+    const route = routes[routeNo] || { direction: '', itinerary: '' };
+    return {
+      visitor: v, guides: guides, buddy: buddy,
+      buddyName: buddyRow ? buddyRow.name : '',
+      routeNo: routeNo, direction: route.direction,
+      lines: route.itinerary.split('\n').map(function (x) { return trim_(x); }).filter(Boolean)
+    };
+  });
+}
+
+function readCell_(name, row, header) {
+  const i = optionalCol_(name, header);
+  if (i === -1) return '';
+  return sheet_(name).getRange(row, i + 1).getValue();
+}
+
+/** "Take Nora to SPANISH with Alexander Rogoff. ..." */
+function handoffForGuides_(page) {
+  const b = page.buddy;
+  const who = page.buddyName || (b && b.name) || '';
+  const lang = b && b.language ? b.language.toUpperCase() : 'their class';
+  return 'Take ' + page.visitor.name + ' to ' + lang + ' with ' + who +
+    '. Give them the tour route, your name tag, the clock, and go back to your ' +
+    'OWN CLASS. You are finished.';
+}
+
+/** What the 5th grader does once the sheet reaches them. */
+function handoffForBuddy_(page) {
+  const who = page.buddyName || (page.buddy && page.buddy.name) || '';
+  const wait = setting_('Wait For', 'Maren');
+  return who + '. Introduce yourself and welcome your buddy to your class by ' +
+    'telling them what you are working on. Take your buddy back to the cafeteria ' +
+    'and wait with them till ' + wait + ' gets back.';
+}
+
+function buildRouteSheets(dateStr) {
+  const dateVal = toDate_(dateStr);
+  if (!dateVal) throw new Error('Pick a tour date first.');
+  const pages = routeSheetData_(dateVal);
+  if (!pages.length) {
+    throw new Error('No visiting students listed for ' + longDate_(dateVal) + '.');
+  }
+
+  const handoffAt = timeLabelOrRaw_(setting_('Class Visit Handoff Time', '9:06'));
+  const title = 'Tour Routes - ' + longDate_(dateVal);
+  const doc = DocumentApp.create(title);
+  const body = doc.getBody();
+  body.clear();
+
+  pages.forEach(function (page, i) {
+    if (i > 0) body.appendPageBreak();
+
+    body.appendParagraph(page.visitor.name.toUpperCase())
+      .setHeading(DocumentApp.ParagraphHeading.HEADING1);
+
+    const sub = [];
+    if (page.visitor.school) sub.push(page.visitor.school);
+    if (page.visitor.grade) sub.push('applying for grade ' + page.visitor.grade);
+    body.appendParagraph(sub.join('  -  ')).setHeading(DocumentApp.ParagraphHeading.NORMAL);
+
+    body.appendParagraph(longDate_(dateVal) +
+      (page.routeNo ? '  -  Route ' + page.routeNo : '') +
+      (page.direction ? ' (' + page.direction + ')' : ''));
+
+    body.appendParagraph('Tour guides: ' + (page.guides.join(', ') || 'not assigned'));
+    if (page.buddy) {
+      body.appendParagraph('Class visit: ' + page.buddyName + '  -  ' +
+        page.buddy.language + ', ' + page.buddy.teacher + ', ' + page.buddy.room);
+    }
+    body.appendParagraph('');
+
+    // The walk itself, minus the two closing lines when there is a handoff.
+    const closing = /Bring visitors to class|Bring visitor down to cafeteria/;
+    page.lines.forEach(function (line) {
+      if (page.buddy && closing.test(line)) return;
+      body.appendParagraph(line);
+    });
+
+    if (page.buddy) {
+      body.appendParagraph('');
+      body.appendParagraph(handoffAt + '  ' + handoffForGuides_(page)).setBold(true);
+      body.appendParagraph('');
+      body.appendParagraph('For ' + page.buddyName)
+        .setHeading(DocumentApp.ParagraphHeading.HEADING3);
+      body.appendParagraph(handoffForBuddy_(page));
+    }
+  });
+
+  doc.saveAndClose();
+  return { url: doc.getUrl(), name: title, pages: pages.length };
+}
+
+/* =========================================================
  * Emails
  *
  * Teachers and advisors hear twice: Monday 11am and Wednesday 7:45am.
@@ -1918,6 +2047,7 @@ function onOpen() {
     .addItem('First-Time Setup', 'setupSpreadsheet')
     .addSeparator()
     .addItem('Staff This Wednesday Tour...', 'showStaffDialog')
+    .addItem('Print Tour Routes...', 'showRouteSheetDialog')
     .addItem('Send Emails Now...', 'showEmailDialog')
     .addSeparator()
     .addSubMenu(SpreadsheetApp.getUi().createMenu('Automation')
@@ -2060,6 +2190,34 @@ function showEmailDialog() {
 
 /* ---------- what the dialogs call ---------- */
 
+function showRouteSheetDialog() {
+  const next = nextTourDate_();
+  const html =
+    '<style>' + DIALOG_CSS_ + '</style>' +
+    '<h2>Print tour routes</h2>' +
+    '<p class="sub">One page per visiting student, with their guides, their route and ' +
+    'their class visit. Opens as a Google Doc you can edit before printing.</p>' +
+    '<label for="d">Tour date</label>' +
+    '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
+    '<div style="margin-top:14px;"><button id="go" onclick="make()">Build the document</button></div>' +
+    '<div id="out"></div>' +
+    '<script>' +
+    'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
+    'function make(){document.getElementById("go").disabled=true;' +
+    'document.getElementById("out").innerHTML="<p class=\'muted\'>Building...</p>";' +
+    'google.script.run.withSuccessHandler(function(r){' +
+    'document.getElementById("go").disabled=false;' +
+    'document.getElementById("out").innerHTML="<div class=\'free\'><b>"+r.pages+' +
+    '" page(s) ready.</b><br><a href=\""+r.url+"\" target=\"_blank\">Open "+esc(r.name)+' +
+    '"</a><br><span class=\'muted\'>It is in your Drive. File &rsaquo; Print when you are happy with it.</span></div>";})' +
+    '.withFailureHandler(function(e){document.getElementById("go").disabled=false;' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";})' +
+    '.api_buildRouteSheets(document.getElementById("d").value);}' +
+    '<\/script>';
+  dialog_(html, 'Print Tour Routes', 600, 460);
+}
+
+function api_buildRouteSheets(dateStr) { return buildRouteSheets(dateStr); }
 function api_planTour(dateStr) { return planTour(dateStr); }
 function api_commitTour(dateStr) { return commitTour(dateStr); }
 function api_sendEmails(which, dateStr) {
