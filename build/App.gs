@@ -376,6 +376,11 @@ function setupAmbassadors_() {
     'Teachers sheet.');
   note_(s, SHEETS.AMBASSADORS, 'Borough',
     Object.keys(BOROUGH_NAMES).map(function (c) { return c + ' = ' + BOROUGH_NAMES[c]; }).join('\n'));
+  note_(s, SHEETS.AMBASSADORS, 'Race (Presenting)',
+    'WP or SOC is fine - so are W, White, White presenting, POC and ' +
+    'Student of color. They all read correctly.\n\n' +
+    'Anything filled in that is not white presenting counts as a student ' +
+    'of color. Blank means they are left out of the balancing.');
   note_(s, SHEETS.AMBASSADORS, 'Student Email',
     'Their lrei.org address. Without it they never get told they are on duty.');
   s.autoResizeColumns(1, h.length);
@@ -1132,10 +1137,27 @@ function needsSoCGuide_(visitorRace) {
     .some(function (x) { return race === x || race.indexOf(x) !== -1 || x.indexOf(race) !== -1; });
 }
 
-/** "Student of color", as the Ambassadors sheet writes it. */
+/* The Race (Presenting) column gets written all sorts of ways - the full
+ * words, or WP and SOC, or just W. All of these read the same. */
+const WHITE_PRESENTING_ = ['wp', 'w', 'white', 'white presenting', 'whitepresenting',
+  'white-presenting', 'white present', 'caucasian'];
+const STUDENT_OF_COLOR_ = ['soc', 'poc', 's of c', 'student of color', 'student of colour',
+  'students of color', 'of color', 'of colour', 'color', 'colour', 'studentofcolor'];
+
+function isWhitePresenting_(presenting) {
+  return WHITE_PRESENTING_.indexOf(norm_(presenting)) !== -1;
+}
+
+/** Anything filled in that is not white presenting counts as a student of color. */
 function isStudentOfColor_(presenting) {
   const v = norm_(presenting);
-  return v !== '' && v !== 'white presenting' && v.indexOf('white') === -1;
+  return v !== '' && !isWhitePresenting_(v);
+}
+
+/** A value in that column that matches neither list - most likely a typo. */
+function unrecognisedPresenting_(presenting) {
+  const v = norm_(presenting);
+  return v !== '' && !isWhitePresenting_(v) && STUDENT_OF_COLOR_.indexOf(v) === -1;
 }
 
 /** Two blank traits do not count as a match, or blanks would all clump. */
@@ -1219,6 +1241,17 @@ function setupWarnings_(all, visitors) {
     if (n) w.push(n + ' active ambassador(s) have no ' + label + '.');
   };
   missing('presenting', 'Race (Presenting) - they are left out of the balancing');
+  const odd = {};
+  active.forEach(function (a) {
+    if (unrecognisedPresenting_(a.presenting)) odd[trim_(a.presenting)] = true;
+  });
+  if (Object.keys(odd).length) {
+    w.push('Race (Presenting) has value(s) I do not recognise: ' +
+      Object.keys(odd).map(function (x) { return '"' + x + '"'; }).join(', ') +
+      '. Anything that is not white presenting is counted as a student of color, ' +
+      'so check those are not typos. WP, W, White and White presenting all read as ' +
+      'white presenting; SOC, POC and Student of color all read as a student of color.');
+  }
   missing('grade', 'Grade - they can never be picked as a guide');
   missing('gender', 'Gender - they can never be picked as a guide');
   missing('split', 'Split - their teacher cannot be worked out');
