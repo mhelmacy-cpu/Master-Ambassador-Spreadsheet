@@ -84,7 +84,7 @@ Two audiences, on separate schedules.
 
 ### Teachers and advisors - two sends
 
-    Monday     2:00 PM
+    Monday    11:00 AM
     Wednesday  7:45 AM
 
 Three rounds go out together each time:
@@ -110,18 +110,18 @@ out from when it is actually being sent.
 
 ### Timing in practice
 
-Apps Script takes whole hours, so the half-hours use `nearMinute`, and
-Google runs every time-based trigger within about fifteen minutes either
-side of the time asked for. So:
+Apps Script takes whole hours, so the times that are not on the hour use
+`nearMinute`, and Google runs every time-based trigger within about
+fifteen minutes either side of the time asked for. So:
 
-    Monday 2:00 PM  ->  roughly 1:45 - 2:15 PM
+    Monday 11:00 AM ->  roughly 10:45 - 11:15 AM
     Monday 3:30 PM  ->  roughly 3:15 - 3:45 PM
     Tuesday noon    ->  roughly 11:45 AM - 12:15 PM
     Wednesday 7:45  ->  roughly 7:30 - 8:00 AM
 
-None of these windows overlap, so Monday's teacher send always lands
-before Monday's student send. The Wednesday send is the tight one: at
-the late end it arrives 8:00 AM, still twenty-five minutes before
+Monday's two sends are four and a half hours apart, so the teachers
+always hear well before the students. The Wednesday send is the tight
+one: at the late end it arrives 8:00 AM, still twenty-five minutes before
 ambassadors are due in the cafeteria at 8:25.
 
 ### Who they come from
