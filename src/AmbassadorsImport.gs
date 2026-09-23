@@ -5,7 +5,7 @@
  * Upserts by (Name, Borough) - not name alone - since the same student
  * can legitimately appear twice under different boroughs (see Blake
  * Glenn). Re-pasting the same list is safe: matching rows are updated
- * in place (grade + parent info only; Teacher/Student Email/Active/Notes
+ *  in place (grade + parent info only; Advisor/Student Email/Split/Language/Active/Notes
  * are left alone so hand-curated data isn't clobbered), new rows are
  * appended.
  */
@@ -98,7 +98,7 @@ function importAmbassadors(text) {
   const lastRow = sheet.getLastRow();
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Active'), YES_NO);
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Borough'), BOROUGH_CODES);
-  applyTeacherDropdown_(sheet, lastRow, colNum_(headers, 'Teacher'));
+  applyTeacherDropdown_(sheet, lastRow, colNum_(headers, 'Advisor'));
   sheet.autoResizeColumns(1, headers.length);
 
   rebuildEligibilityMatrix();

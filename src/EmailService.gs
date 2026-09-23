@@ -21,7 +21,7 @@ function sendWeeklyTeacherEmails() {
   const endCol = colNum_(headers, 'End Time') - 1;
   const jobCol = colNum_(headers, 'Job') - 1;
   const ambassadorCol = colNum_(headers, 'Ambassador') - 1;
-  const teacherCol = colNum_(headers, 'Ambassador Teacher') - 1;
+  const teacherCol = colNum_(headers, 'Ambassador Advisor') - 1;
   const tourCol = colNum_(headers, 'Tour ID') - 1;
   const statusCol = colNum_(headers, 'Status') - 1;
 

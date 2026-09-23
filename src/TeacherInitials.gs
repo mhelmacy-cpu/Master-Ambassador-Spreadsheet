@@ -40,14 +40,18 @@ const SEEDED_TEACHER_INITIALS_ = {
   'Eliza': 'EZ',
   'Sharyn': 'M207',
   'Janet': 'M208',
-  'Mary Katherine': 'M209'
+  'Mary Katherine': 'M209',
+  'Jeremiah Demster': 'M306'
 };
 
 /** Teachers who run classes but do not hold an advisory, so aren't on the roster. */
 const EXTRA_TEACHERS_ = [
   { name: 'Layla Alter', initials: 'LA', note: 'Choices.' },
   { name: 'Brian', initials: 'BR', note: 'PE.' },
-  { name: 'Lila', initials: 'LL', note: "Subbing for Eliza (EZ) through the first half of the year; the schedule lists them together, so both are emailed." }
+  { name: 'Lila', initials: 'LL', note: "Subbing for Eliza (EZ) through the first half of the year; the schedule lists them together, so both are emailed." },
+  { name: 'Jeremiah Demster', initials: 'M306',
+    note: 'Art. The schedule prints every Art block as "Art A M306" with no initials at all, ' +
+          'so the room is what identifies the teacher - keep M306 in the Initials column.' }
 ];
 
 const ROOM_CODE_ = /^(M\d{3}|L\d{3}|TSAC|PAPAS|Charlton|Thompson|Auditorium)$/;
@@ -115,14 +119,60 @@ function getTeacherByInitials_() {
   return map;
 }
 
+const SPLIT_GROUP_RE_ = /\s*\(split group (\d)\)\s*$/;
+
+/** '1' / '2' for a half-pod block, '' for an ordinary one. */
+function splitGroupOf_(text) {
+  const m = SPLIT_GROUP_RE_.exec(String(text || ''));
+  return m ? m[1] : '';
+}
+
+/**
+ * "Hum Bs ES+SdB M107 M108" + split "2" -> "Hum Bs SdB M108".
+ *
+ * Returns null unless the block really is parallel sections: as many
+ * rooms as teachers, and more than one of each. Co-teaching ("Science A
+ * LL/EZ M307" - two teachers, one room) is deliberately left alone, and
+ * so is the language block, whose "initials" are really room codes.
+ */
+function pickParallelSection_(text, split) {
+  const inits = extractInitials_(text);
+  const rooms = extractRooms_(text);
+  const idx = Number(split) - 1;
+  if (inits.length < 2 || inits.length !== rooms.length) return null;
+  if (inits[0] === rooms[0]) return null;
+  if (!(idx >= 0 && idx < inits.length)) return null;
+  const tokens = String(text).split(/\s+/);
+  const prefix = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (rooms.indexOf(t) !== -1 || inits.some(v => t.split(/[+\/]/).indexOf(v) !== -1)) break;
+    prefix.push(t);
+  }
+  return (prefix.join(' ') + ' ' + inits[idx] + ' ' + rooms[idx]).trim();
+}
+
+/** True for the period printed as all three language options at once. */
+function isLanguageChoiceBlock_(text) {
+  const t = String(text || '');
+  return /\bFrench\b/.test(t) && /\bMandarin\b/.test(t) && /\bSpanish\b/.test(t);
+}
+
 /**
  * Which class an ambassador is missing during a tour, and who teaches it.
  *
- * Returns {block, teachers: [{initials, name, email}], unresolved: [initials],
- * ambiguous: bool}. Ambiguous means the block is a parallel-group period,
- * so the teachers listed are candidates rather than one answer.
+ * Returns [{what, start, end, teachers: [{initials, name, email}],
+ * unresolved: [initials], ambiguous}]. Ambiguous means the block is a
+ * parallel-group period, so the teachers listed are candidates rather
+ * than one answer.
+ *
+ * prefs is the ambassador's {split, language} from the Ambassadors sheet.
+ * Those two answers are exactly what the schedule leaves out, so where
+ * they are filled in the period resolves to one class and one teacher;
+ * where they are blank nothing is guessed and the period comes back
+ * ambiguous for a human to forward.
  */
-function findMissedClass_(pod, dateVal, startMin, endMin) {
+function findMissedClass_(pod, dateVal, startMin, endMin, prefs) {
   const dayName = WEEKDAY_NAMES_[dateVal.getDay()];
   const schedule = getBellSchedule_();
   const daySchedule = schedule[dayName];
@@ -134,16 +184,42 @@ function findMissedClass_(pod, dateVal, startMin, endMin) {
     .sort((x, y) => x.s - y.s);
   if (overlapping.length === 0) return null;
 
+  const split = String((prefs && prefs.split) || '').trim();
+  const language = String((prefs && prefs.language) || '').trim();
+
   const byInitials = getTeacherByInitials_();
   const results = [];
   overlapping.forEach(x => {
-    const text = x.b.text;
+    let text = x.b.text;
     // Homeroom, lunch and recess have no class teacher to notify.
     if (/Morning Homeroom|MS Meeting|Lunch|Recess|IWP/.test(text)) return;
 
-    const initialsList = x.b.initials && x.b.initials.length
-      ? x.b.initials
-      : extractInitials_(text);
+    // Half-pod periods: keep only this student's half where we know it.
+    const group = splitGroupOf_(text);
+    let narrowed = false;
+    if (group && split) {
+      if (group !== split) return;
+      text = text.replace(SPLIT_GROUP_RE_, '');
+      narrowed = true;
+    }
+    // Language: turn the three-way block into the one class they take.
+    if (isLanguageChoiceBlock_(text) && LANGUAGE_ROOMS_[language]) {
+      text = language + ' - ' + LANGUAGE_ROOMS_[language];
+      narrowed = true;
+    }
+    // Paired sections running at the same time in two rooms
+    // ("Hum Bs ES+SdB M107 M108"): several teachers, one room each. The
+    // schedule lists them in a fixed order, so Split 1 is the first
+    // teacher named and Split 2 the second. Blank Split leaves it
+    // ambiguous rather than picking one.
+    if (!group && split) {
+      const picked = pickParallelSection_(text, split);
+      if (picked) { text = picked; narrowed = true; }
+    }
+
+    const initialsList = narrowed || !(x.b.initials && x.b.initials.length)
+      ? extractInitials_(text)
+      : x.b.initials;
     const teachers = [];
     const unresolved = [];
     initialsList.forEach(i => {

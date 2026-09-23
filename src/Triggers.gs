@@ -59,7 +59,7 @@ function capitalize_(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/* ---- Tour-day reminders: Monday PM, Tuesday PM, Wednesday AM ---- */
+/* ---- Tour-day reminders: Mon 2pm, Tue 8am, Wed 7:30am ---- */
 
 /**
  * Each of the three sends covers whichever tour is coming up, so the
@@ -99,19 +99,25 @@ function sendUpcomingTourReminders() {
 function enableTourReminders() {
   deleteTriggersFor_(HANDLER_TOUR_REMINDERS);
   [
-    { day: ScriptApp.WeekDay.MONDAY, hour: 14 },
-    { day: ScriptApp.WeekDay.TUESDAY, hour: 14 },
-    { day: ScriptApp.WeekDay.WEDNESDAY, hour: 6 }
+    { day: ScriptApp.WeekDay.MONDAY, hour: 14, minute: 0 },
+    { day: ScriptApp.WeekDay.TUESDAY, hour: 8, minute: 0 },
+    { day: ScriptApp.WeekDay.WEDNESDAY, hour: 7, minute: 30 }
   ].forEach(slot => {
-    ScriptApp.newTrigger(HANDLER_TOUR_REMINDERS)
+    const trigger = ScriptApp.newTrigger(HANDLER_TOUR_REMINDERS)
       .timeBased()
       .onWeekDay(slot.day)
-      .atHour(slot.hour)
-      .create();
+      .atHour(slot.hour);
+    if (slot.minute) trigger.nearMinute(slot.minute);
+    trigger.create();
   });
   SpreadsheetApp.getUi().alert('Tour reminders are on. Students, advisors and class teachers will ' +
-    'be emailed about any tour in the coming week on Monday afternoon, Tuesday afternoon, and ' +
-    'Wednesday morning.\n\nA tour that has not been staffed yet is skipped, so staff the tour ' +
+    'be emailed about any tour in the coming week:\n\n' +
+    '  Monday at 2:00 PM\n' +
+    '  Tuesday at 8:00 AM\n' +
+    '  Wednesday at 7:30 AM\n\n' +
+    'Google runs these within about fifteen minutes either side of the time, ' +
+    'so treat them as "around 2pm" rather than on the dot.\n\n' +
+    'A tour that has not been staffed yet is skipped, so staff the tour ' +
     'before Monday afternoon for the first send to go out.');
 }
 

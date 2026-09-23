@@ -1,7 +1,7 @@
 /**
  * Matches Ambassadors sheet rows against HOMEROOM_DATA_ by exact
- * (normalized) full name, and fills in Grade / Homeroom Pod / Teacher
- * (=Advisor) from the official roster. Re-runnable each year with an
+ * (normalized) full name, and fills in Grade / Homeroom Pod / Advisor
+ * from the official roster. Re-runnable each year with an
  * updated HOMEROOM_DATA_.
  *
  * A student who isn't found and was last known to be in 8th grade is
@@ -19,7 +19,7 @@ function syncAmbassadorHomerooms() {
   const lastCol = colNum_(headers, 'Last Name') - 1;
   const gradeCol = colNum_(headers, 'Grade') - 1;
   const podCol = colNum_(headers, 'Homeroom Pod') - 1;
-  const teacherCol = colNum_(headers, 'Teacher') - 1;
+  const teacherCol = colNum_(headers, 'Advisor') - 1;
   const activeCol = colNum_(headers, 'Active') - 1;
   const notesCol = colNum_(headers, 'Notes') - 1;
 

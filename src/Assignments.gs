@@ -24,7 +24,7 @@ function assignAmbassador(data) {
   const firstCol = colNum_(ambassadorHeaders, 'First Name') - 1;
   const lastCol = colNum_(ambassadorHeaders, 'Last Name') - 1;
   const activeCol = colNum_(ambassadorHeaders, 'Active') - 1;
-  const teacherCol = colNum_(ambassadorHeaders, 'Teacher') - 1;
+  const teacherCol = colNum_(ambassadorHeaders, 'Advisor') - 1;
   const ambassadorRow = ambassadorRows.find(r => fullName_(r[firstCol], r[lastCol]) === data.ambassador);
   if (!ambassadorRow) throw new Error('Ambassador not found on the Ambassadors sheet.');
   if (String(ambassadorRow[activeCol]).trim().toLowerCase() !== 'yes') {
@@ -67,7 +67,7 @@ function assignAmbassador(data) {
       case 'End Time': return end;
       case 'Job': return data.job;
       case 'Ambassador': return data.ambassador;
-      case 'Ambassador Teacher': return ambassadorRow[teacherCol] || '';
+      case 'Ambassador Advisor': return ambassadorRow[teacherCol] || '';
       case 'Touring Student': return data.touringStudent || '';
       case 'Status': return 'Scheduled';
       case 'Notes': return data.notes || '';

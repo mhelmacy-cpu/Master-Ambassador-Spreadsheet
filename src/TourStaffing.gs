@@ -223,7 +223,9 @@ function getAmbassadorDirectory_() {
   const lastCol = colNum_(headers, 'Last Name') - 1;
   const gradeCol = colNum_(headers, 'Grade') - 1;
   const homeroomPodCol = colNum_(headers, 'Homeroom Pod') - 1;
-  const teacherCol = colNum_(headers, 'Teacher') - 1;
+  const teacherCol = colNum_(headers, 'Advisor') - 1;
+  const splitCol = colNum_(headers, 'Split') - 1;
+  const languageCol = colNum_(headers, 'Language') - 1;
   const boroughCol = colNum_(headers, 'Borough') - 1;
   const genderCol = colNum_(headers, 'Gender') - 1;
   const activeCol = colNum_(headers, 'Active') - 1;
@@ -236,6 +238,8 @@ function getAmbassadorDirectory_() {
       grade: parseGradeNum_(r[gradeCol]),
       homeroomPod: String(r[homeroomPodCol] || '').trim(),
       teacher: String(r[teacherCol] || '').trim(),
+      split: String(r[splitCol] || '').trim(),
+      language: String(r[languageCol] || '').trim(),
       borough: String(r[boroughCol] || '').trim().toUpperCase(),
       gender: String(r[genderCol] || '').trim(),
       active: String(r[activeCol]).trim().toLowerCase() === 'yes',

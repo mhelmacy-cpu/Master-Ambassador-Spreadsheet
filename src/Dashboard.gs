@@ -23,7 +23,7 @@ function refreshDashboard() {
   const endCol = colNum_(headers, 'End Time') - 1;
   const jobCol = colNum_(headers, 'Job') - 1;
   const ambassadorCol = colNum_(headers, 'Ambassador') - 1;
-  const teacherCol = colNum_(headers, 'Ambassador Teacher') - 1;
+  const teacherCol = colNum_(headers, 'Ambassador Advisor') - 1;
   const tourCol = colNum_(headers, 'Tour ID') - 1;
   const statusCol = colNum_(headers, 'Status') - 1;
 
@@ -70,7 +70,7 @@ function writeSection_(sheet, row, title, items, headerColor, bandColor) {
   sheet.getRange(row, 1).setValue(title).setFontSize(12).setFontWeight('bold').setFontColor(headerColor);
   row += 1;
 
-  const tableHeaders = ['Ambassador', 'Teacher', 'Job', 'Tour', 'Start', 'End', 'Status'];
+  const tableHeaders = ['Ambassador', 'Advisor', 'Job', 'Tour', 'Start', 'End', 'Status'];
   sheet.getRange(row, 1, 1, tableHeaders.length).setValues([tableHeaders])
     .setFontWeight('bold').setBackground(headerColor).setFontColor('#ffffff');
   row += 1;

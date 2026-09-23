@@ -175,7 +175,7 @@ function sendWeeklyTeacherEmails() {
   const endCol = colNum_(headers, 'End Time') - 1;
   const jobCol = colNum_(headers, 'Job') - 1;
   const ambassadorCol = colNum_(headers, 'Ambassador') - 1;
-  const teacherCol = colNum_(headers, 'Ambassador Teacher') - 1;
+  const teacherCol = colNum_(headers, 'Ambassador Advisor') - 1;
   const tourCol = colNum_(headers, 'Tour ID') - 1;
   const statusCol = colNum_(headers, 'Status') - 1;
 
@@ -297,8 +297,8 @@ function sendWeeklyTeacherEmailsFromMenu_() {
 /**
  * How to refer to the tour date in an email sent today.
  *
- * The same message goes out Monday afternoon, Tuesday afternoon and
- * Wednesday morning, so a fixed "Today" would be wrong on two of the
+ * The same message goes out Monday at 2pm, Tuesday at 8am and
+ * Wednesday at 7:30am, so a fixed "Today" would be wrong on two of the
  * three. This says Today, Tomorrow, or the weekday, according to when
  * it is actually being sent.
  */
@@ -337,7 +337,7 @@ function sendTourDayEmails(tourId) {
     end: colNum_(headers, 'End Time') - 1,
     job: colNum_(headers, 'Job') - 1,
     ambassador: colNum_(headers, 'Ambassador') - 1,
-    teacher: colNum_(headers, 'Ambassador Teacher') - 1,
+    teacher: colNum_(headers, 'Ambassador Advisor') - 1,
     touringStudent: colNum_(headers, 'Touring Student') - 1,
     status: colNum_(headers, 'Status') - 1
   };
@@ -499,7 +499,8 @@ function sendMissedClassEmails_(tourRows, cols, ambassadorByName, when, whenSubj
     const endMin = timeToMinutes_(formatTime_(r[cols.end]));
     if (!dateVal || startMin == null || endMin == null) return;
 
-    const blocks = findMissedClass_(ambassador.homeroomPod, dateVal, startMin, endMin);
+    const blocks = findMissedClass_(ambassador.homeroomPod, dateVal, startMin, endMin,
+      { split: ambassador.split, language: ambassador.language });
     if (!blocks) return;
 
     blocks.forEach(block => {
@@ -751,7 +752,7 @@ function capitalize_(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/* ---- Tour-day reminders: Monday PM, Tuesday PM, Wednesday AM ---- */
+/* ---- Tour-day reminders: Mon 2pm, Tue 8am, Wed 7:30am ---- */
 
 /**
  * Each of the three sends covers whichever tour is coming up, so the
@@ -791,19 +792,25 @@ function sendUpcomingTourReminders() {
 function enableTourReminders() {
   deleteTriggersFor_(HANDLER_TOUR_REMINDERS);
   [
-    { day: ScriptApp.WeekDay.MONDAY, hour: 14 },
-    { day: ScriptApp.WeekDay.TUESDAY, hour: 14 },
-    { day: ScriptApp.WeekDay.WEDNESDAY, hour: 6 }
+    { day: ScriptApp.WeekDay.MONDAY, hour: 14, minute: 0 },
+    { day: ScriptApp.WeekDay.TUESDAY, hour: 8, minute: 0 },
+    { day: ScriptApp.WeekDay.WEDNESDAY, hour: 7, minute: 30 }
   ].forEach(slot => {
-    ScriptApp.newTrigger(HANDLER_TOUR_REMINDERS)
+    const trigger = ScriptApp.newTrigger(HANDLER_TOUR_REMINDERS)
       .timeBased()
       .onWeekDay(slot.day)
-      .atHour(slot.hour)
-      .create();
+      .atHour(slot.hour);
+    if (slot.minute) trigger.nearMinute(slot.minute);
+    trigger.create();
   });
   SpreadsheetApp.getUi().alert('Tour reminders are on. Students, advisors and class teachers will ' +
-    'be emailed about any tour in the coming week on Monday afternoon, Tuesday afternoon, and ' +
-    'Wednesday morning.\n\nA tour that has not been staffed yet is skipped, so staff the tour ' +
+    'be emailed about any tour in the coming week:\n\n' +
+    '  Monday at 2:00 PM\n' +
+    '  Tuesday at 8:00 AM\n' +
+    '  Wednesday at 7:30 AM\n\n' +
+    'Google runs these within about fifteen minutes either side of the time, ' +
+    'so treat them as "around 2pm" rather than on the dot.\n\n' +
+    'A tour that has not been staffed yet is skipped, so staff the tour ' +
     'before Monday afternoon for the first send to go out.');
 }
 

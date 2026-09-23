@@ -13,8 +13,8 @@
 /**
  * How to refer to the tour date in an email sent today.
  *
- * The same message goes out Monday afternoon, Tuesday afternoon and
- * Wednesday morning, so a fixed "Today" would be wrong on two of the
+ * The same message goes out Monday at 2pm, Tuesday at 8am and
+ * Wednesday at 7:30am, so a fixed "Today" would be wrong on two of the
  * three. This says Today, Tomorrow, or the weekday, according to when
  * it is actually being sent.
  */
@@ -53,7 +53,7 @@ function sendTourDayEmails(tourId) {
     end: colNum_(headers, 'End Time') - 1,
     job: colNum_(headers, 'Job') - 1,
     ambassador: colNum_(headers, 'Ambassador') - 1,
-    teacher: colNum_(headers, 'Ambassador Teacher') - 1,
+    teacher: colNum_(headers, 'Ambassador Advisor') - 1,
     touringStudent: colNum_(headers, 'Touring Student') - 1,
     status: colNum_(headers, 'Status') - 1
   };
@@ -215,7 +215,8 @@ function sendMissedClassEmails_(tourRows, cols, ambassadorByName, when, whenSubj
     const endMin = timeToMinutes_(formatTime_(r[cols.end]));
     if (!dateVal || startMin == null || endMin == null) return;
 
-    const blocks = findMissedClass_(ambassador.homeroomPod, dateVal, startMin, endMin);
+    const blocks = findMissedClass_(ambassador.homeroomPod, dateVal, startMin, endMin,
+      { split: ambassador.split, language: ambassador.language });
     if (!blocks) return;
 
     blocks.forEach(block => {

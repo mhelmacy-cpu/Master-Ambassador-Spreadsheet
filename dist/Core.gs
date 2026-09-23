@@ -34,14 +34,15 @@ const SHEETS = {
 };
 
 const HEADERS = {};
-HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Grade', 'Homeroom Pod', 'Borough', 'Gender',
-  'Parent 1 Name', 'Parent 1 Email', 'Parent 2 Name', 'Parent 2 Email', 'Teacher', 'Student Email', 'Active',
+HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Student Email', 'Grade', 'Homeroom Pod',
+  'Split', 'Advisor', 'Language', 'Borough', 'Gender',
+  'Parent 1 Name', 'Parent 1 Email', 'Parent 2 Name', 'Parent 2 Email', 'Active',
   'Total Tours', 'Jobs Breakdown', 'Last Tour Date', 'Notes'];
 HEADERS[SHEETS.JOBS] = ['Job Name', 'Description', 'Active'];
 HEADERS[SHEETS.TOURS] = ['Tour ID', 'Date', 'Start Time', 'End Time', 'Visiting School / Group', 'Contact Name', 'Contact Email', 'Grade Level', '# of Visitors', 'Jobs Filled', 'Roles Filled', 'Status', 'Notes'];
 HEADERS[SHEETS.TOUR_ROUTES] = ['Route', 'Direction', 'Humanities Teacher', 'Language', 'Itinerary'];
 HEADERS[SHEETS.TOURING_STUDENTS] = ['Tour ID', 'First Name', 'Last Name', 'Grade', 'Borough', 'Gender', 'Route', 'School', 'Allergies / Medical Notes', 'Chaperone Name', 'Chaperone Contact', 'Notes'];
-HEADERS[SHEETS.ASSIGNMENTS] = ['Assignment ID', 'Tour ID', 'Date', 'Start Time', 'End Time', 'Job', 'Ambassador', 'Ambassador Teacher', 'Touring Student', 'Status', 'Notes'];
+HEADERS[SHEETS.ASSIGNMENTS] = ['Assignment ID', 'Tour ID', 'Date', 'Start Time', 'End Time', 'Job', 'Ambassador', 'Ambassador Advisor', 'Touring Student', 'Status', 'Notes'];
 HEADERS[SHEETS.TEACHERS] = ['Teacher Name', 'Initials', 'Teacher Email', 'Room / Notes'];
 HEADERS[SHEETS.BELL_SCHEDULE] = ['Day', 'Homeroom Pod', 'Start', 'End', 'What / Teacher / Room', 'Teacher Initials'];
 HEADERS[SHEETS.MEETINGS] = ['Meeting ID', 'Date', 'Start Time', 'End Time', 'Students', 'Purpose', 'Location', 'Classes Missed', 'Status', 'Notes'];
@@ -56,6 +57,19 @@ const BOROUGH_NAMES = { M: 'Manhattan', B: 'Brooklyn', Q: 'Queens', X: 'Bronx', 
 const BOROUGH_LEGEND = BOROUGH_CODES.map(c => c + ' = ' + BOROUGH_NAMES[c]).join('\n');
 
 const GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Other'];
+
+// The language a student takes, and which room that class meets in. The
+// schedule prints the language period as all three options at once
+// ("French - M207 Mandarin - M208 Spanish - M209"), so this column is
+// what turns that into one class and one teacher to email.
+const LANGUAGE_OPTIONS = ['French', 'Mandarin', 'Spanish'];
+const LANGUAGE_ROOMS_ = { French: 'M207', Mandarin: 'M208', Spanish: 'M209' };
+
+// A few pods split in half for some periods, with the two halves swapping
+// subjects. The schedule names both halves but never which one a given
+// student is in, so this column supplies it. Blank is fine - the tool then
+// reports both options instead of guessing.
+const SPLIT_OPTIONS = ['1', '2'];
 
 const TOUR_JOBS = { PANELIST: 'Panelist', LOBBY_GREETER: 'Lobby Greeter', TABLE_GREETER: 'Table Greeter', TOUR_GUIDE: 'Tour Guide' };
 
@@ -331,7 +345,24 @@ function setupAmbassadorsSheet_() {
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Borough'), BOROUGH_CODES);
   sheet.getRange(1, colNum_(headers, 'Borough')).setNote(BOROUGH_LEGEND);
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Gender'), GENDER_OPTIONS, true);
-  applyTeacherDropdown_(sheet, lastRow, colNum_(headers, 'Teacher'));
+  applyTeacherDropdown_(sheet, lastRow, colNum_(headers, 'Advisor'));
+  applyDropdown_(sheet, lastRow, colNum_(headers, 'Language'), LANGUAGE_OPTIONS, true);
+  applyDropdown_(sheet, lastRow, colNum_(headers, 'Split'), SPLIT_OPTIONS, true);
+  sheet.getRange(1, colNum_(headers, 'Advisor')).setNote(
+    'The advisor whose advisory this student sits in. They get the ' +
+    '"your advisee is out" email; the teacher whose class the student ' +
+    'actually walks out of is worked out from the Bell Schedule instead.');
+  sheet.getRange(1, colNum_(headers, 'Language')).setNote(
+    'French, Mandarin or Spanish.\n' +
+    'The schedule prints the language period as all three at once ' +
+    '(French - M207 / Mandarin - M208 / Spanish - M209), so without this ' +
+    'the tool cannot tell which teacher to email and hands the period ' +
+    'back to you instead. Fill it in and that period sends itself.');
+  sheet.getRange(1, colNum_(headers, 'Split')).setNote(
+    '1 or 2, for the pods that split in half for some periods.\n' +
+    'Leave blank if you do not know - the tool then reports both halves ' +
+    'as options rather than guessing. Only MMS splits this year, so this ' +
+    'is blank for everyone else.');
   const computed = 'Computed automatically - do not edit by hand. Refreshed whenever assignments change.';
   sheet.getRange(1, colNum_(headers, 'Total Tours')).setNote(computed);
   sheet.getRange(1, colNum_(headers, 'Jobs Breakdown')).setNote(computed + '\nHow many times this ambassador has done each job.');

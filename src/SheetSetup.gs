@@ -82,7 +82,24 @@ function setupAmbassadorsSheet_() {
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Borough'), BOROUGH_CODES);
   sheet.getRange(1, colNum_(headers, 'Borough')).setNote(BOROUGH_LEGEND);
   applyDropdown_(sheet, lastRow, colNum_(headers, 'Gender'), GENDER_OPTIONS, true);
-  applyTeacherDropdown_(sheet, lastRow, colNum_(headers, 'Teacher'));
+  applyTeacherDropdown_(sheet, lastRow, colNum_(headers, 'Advisor'));
+  applyDropdown_(sheet, lastRow, colNum_(headers, 'Language'), LANGUAGE_OPTIONS, true);
+  applyDropdown_(sheet, lastRow, colNum_(headers, 'Split'), SPLIT_OPTIONS, true);
+  sheet.getRange(1, colNum_(headers, 'Advisor')).setNote(
+    'The advisor whose advisory this student sits in. They get the ' +
+    '"your advisee is out" email; the teacher whose class the student ' +
+    'actually walks out of is worked out from the Bell Schedule instead.');
+  sheet.getRange(1, colNum_(headers, 'Language')).setNote(
+    'French, Mandarin or Spanish.\n' +
+    'The schedule prints the language period as all three at once ' +
+    '(French - M207 / Mandarin - M208 / Spanish - M209), so without this ' +
+    'the tool cannot tell which teacher to email and hands the period ' +
+    'back to you instead. Fill it in and that period sends itself.');
+  sheet.getRange(1, colNum_(headers, 'Split')).setNote(
+    '1 or 2, for the pods that split in half for some periods.\n' +
+    'Leave blank if you do not know - the tool then reports both halves ' +
+    'as options rather than guessing. Only MMS splits this year, so this ' +
+    'is blank for everyone else.');
   const computed = 'Computed automatically - do not edit by hand. Refreshed whenever assignments change.';
   sheet.getRange(1, colNum_(headers, 'Total Tours')).setNote(computed);
   sheet.getRange(1, colNum_(headers, 'Jobs Breakdown')).setNote(computed + '\nHow many times this ambassador has done each job.');

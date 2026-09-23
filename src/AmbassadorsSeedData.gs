@@ -77,7 +77,7 @@ function buildAmbassadorSeedRows_() {
         case 'Parent 1 Email': return p1Email || '';
         case 'Parent 2 Name': return p2Name || '';
         case 'Parent 2 Email': return p2Email || '';
-        case 'Teacher': return '';
+        case 'Advisor': return '';
         case 'Student Email': return '';
         case 'Active': return 'Yes';
         case 'Notes': return notes || '';
