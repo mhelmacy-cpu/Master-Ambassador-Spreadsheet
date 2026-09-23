@@ -1,0 +1,328 @@
+/**
+ * All the school data the scheduler runs on. Nothing in this file makes
+ * a decision - it is only what the other file reads.
+ *
+ * Sources: the office's MS-Alpha_by_Grade workbook (roster, splits,
+ * advisors), the 2026-27 MS Schedule PDF (bell schedule), and the
+ * admissions office's own tour route sheet.
+ */
+
+/* ---------- Ambassadors: names only. Everything else is typed in. ---------- */
+
+const AMBASSADOR_NAMES_ = [
+  'Aurelia Walker',
+  'Lev David',
+  'Laura Sandoval',
+  'Tessa Fung',
+  'Camille Bedeau',
+  'Avery Griffiths',
+  'Jordan Gary',
+  'Oscar Gutmann',
+  'Skylar Bruno',
+  'Sadie Imperioli',
+  'Jane Moss',
+  'George Orlofsky',
+  'Sadie Toussant',
+  'Caper Helliker',
+  'Charlotte Schwartz',
+  'Diego Ocotl',
+  'Logan Lai',
+  'Emilio Hernandez',
+  'Ama Bediako Whyte',
+  'Michelle Denson',
+  'Afia-Kusiwaa Twumasi',
+  'Blake Glenn',
+  'Reagan Rhau',
+  'Aksel Ozturk',
+  'Sanai Parikh',
+  'Irie Bocchino',
+  'Felix Lopez',
+  'Steevens Jean',
+  'Jessa Shankman',
+  'Pascale Destin',
+  'Cecilia Melzer'
+];
+
+/* ---------- How to read the bell schedule ---------- */
+
+/*
+ * Every MS student belongs to TWO cross-cutting groups: a homeroom pod
+ *  (their advisory) and a split (A/B/C, grade-wide). Roughly half the 
+ * week runs in each.
+ *
+ * A block whose text carries a section letter - Math A, Art B, Science
+ *  C, Hum As/Bs - belongs to the SPLIT group named by that letter, not
+ *  to the pod whose column it is drawn in.
+ *
+ * A block with no letter - Hum DR M211, Music CN M103 - belongs to the
+ *  POD whose column it is drawn in.
+ *
+ * So: lettered block -> look up by the student split. Unlettered block
+ *  -> look up by pod.
+ *
+ */
+
+const POD_LETTER_ = {'DJM':  'A',  'AOS':  'B',  'CCM':  'C',  'EEL':  'A',  'MSB':  'B',  'CJM':  'A',  'RSS':  'B'};
+const GRADE_PODS_ = {'5':  ['MMS'],  '6':  ['DJM',  'AOS',  'CCM'],  '7':  ['EEL',  'MSB'],  '8':  ['CJM',  'RSS']};
+const POD_GRADE_ = {};
+Object.keys(GRADE_PODS_).forEach(function (g) {
+  GRADE_PODS_[g].forEach(function (p) { POD_GRADE_[p] = g; });
+});
+
+const LANGUAGE_ROOMS_ = { M207: 'French', M208: 'Mandarin', M209: 'Spanish' };
+
+/* ---------- Teachers ---------- */
+
+const TEACHER_INITIALS_ = {
+  'Chris': 'CK',
+  'Molly': 'MD',
+  'Amanda': 'AG',
+  'Dan': 'DR',
+  'Marco': 'MS',
+  'Luis': 'LH',
+  'Elizabeth': 'ES',
+  'Sabrina': 'SdB',
+  'Chantilly': 'CB',
+  'Carrie': 'CN',
+  'Mo': 'MN',
+  'Oliver': 'OC',
+  'Sherezada': 'SA',
+  'Momii': 'SMR',
+  'Suzanne': 'SC',
+  'Eliza': 'EZ',
+  'Sharyn': 'M207',
+  'Janet': 'M208',
+  'Mary Katherine': 'M209',
+  'Jeremiah': 'M306'
+};
+
+const EXTRA_TEACHERS_ = [
+  { name: 'Layla Alter', initials: 'LA', note: 'Choices.' },
+  { name: 'Brian', initials: 'BR', note: 'PE.' },
+  { name: 'Lila', initials: 'LL', note: 'Subbing for Eliza (EZ) through the first half of the year; the schedule lists them together, so both are emailed.' }
+];
+
+/* ---------- The 2026-27 roster: 143 students ---------- */
+
+const MS_ROSTER_ = [
+  { name: 'Banks Bauer', email: '31BanksB@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'B' },
+  { name: 'Damien Sandelowsky Weinryt', email: '31DamienS@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'B' },
+  { name: 'Elias Cuaron', email: '31EliasC@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'A' },
+  { name: 'Irie Bocchino', email: '31IrieB@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'A' },
+  { name: 'Lorne Mitchell', email: '31LorneM@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'B' },
+  { name: 'Sanai Parikh', email: '31SanaiP@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'A' },
+  { name: 'Sophia Pena', email: '31SophiaP@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'A' },
+  { name: 'Delphine Lefleur', email: '31DelphineL@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'B' },
+  { name: 'Jackson Atienza', email: '31JacksonA@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'A' },
+  { name: 'Leonie Sabag', email: '31LeonieS@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'B' },
+  { name: 'Naoki Umehara', email: '31NaokiU@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'A' },
+  { name: 'Ori Cunningham', email: '31OriC@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'A' },
+  { name: 'Rhys Quarfordt', email: '31RhysQ@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'A' },
+  { name: 'Zaida Richardson', email: '31ZaidaR@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'B' },
+  { name: 'Cyrus Dancy', email: '31CyrusD@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'B' },
+  { name: 'Ethan Bruno', email: '31EthanB@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'B' },
+  { name: 'Felix Lopez', email: '31FelixL@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'B' },
+  { name: 'Humphrey Squadron', email: '31HumphreyS@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'A' },
+  { name: 'Kay Chisling', email: '31KayC@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'B' },
+  { name: 'Logan Vouvalides', email: '31LoganV@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'A' },
+  { name: 'Paloma White', email: '31PalomaW@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'A' },
+  { name: 'Aksel Ozturk', email: '31AkselO@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'B' },
+  { name: 'Cecilia Melzer', email: '31CeciliaM@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'B' },
+  { name: 'Christopher Dike', email: '31ChristopherD@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'A' },
+  { name: 'Joseph Corwin', email: '31JosephC@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'B' },
+  { name: 'Margo Moss', email: '31MargoM@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'B' },
+  { name: 'Wylie Schwarz', email: '31WylieS@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'B' },
+  { name: 'Zay Casey', email: '31ZayC@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'A' },
+  { name: 'Jessa Shankman', email: '31JessaS@lrei.org', grade: '8', pod: 'RSS', advisor: 'Susannah', split: 'A' },
+  { name: 'Kayla Gary', email: '31KaylaG@lrei.org', grade: '8', pod: 'RSS', advisor: 'Susannah', split: 'B' },
+  { name: 'Nicholas Johnson', email: '31NicholasJ@lrei.org', grade: '8', pod: 'RSS', advisor: 'Susannah', split: 'A' },
+  { name: 'Ricky Rodriguez', email: '31RickyR@lrei.org', grade: '8', pod: 'RSS', advisor: 'Susannah', split: 'A' },
+  { name: 'Soraya Ghavidel', email: '31SorayaG@lrei.org', grade: '8', pod: 'RSS', advisor: 'Susannah', split: 'B' },
+  { name: 'Emersyn Barile', email: '31EmersynB@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'B' },
+  { name: 'Frank Durst', email: '31FrankD@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'B' },
+  { name: 'Harriet (Hattie) Owens', email: '31Harriet (Hattie)O@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'A' },
+  { name: 'Leleanna Supan', email: '31LeleannaS@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'A' },
+  { name: 'Marcel McAlpin', email: '31MarcelM@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'B' },
+  { name: 'Pascale Destin', email: '31PascaleD@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'A' },
+  { name: 'Steevens Jean', email: '31SteevensJ@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'A' },
+  { name: 'Afia-Kusiwaa Twumasi', email: '32Afia-KusiwaaT@lrei.org', grade: '7', pod: 'EEL', advisor: 'Eliza', split: 'A' },
+  { name: 'Anthony Rosen', email: '32AnthonyR@lrei.org', grade: '7', pod: 'EEL', advisor: 'Eliza', split: 'B' },
+  { name: 'Eva Ladd-Greene', email: '32EvaL@lrei.org', grade: '7', pod: 'EEL', advisor: 'Eliza', split: 'A' },
+  { name: 'Oscar Morales', email: '32OscarM@lrei.org', grade: '7', pod: 'EEL', advisor: 'Eliza', split: 'B' },
+  { name: 'Solomon Pearce', email: '32SolomonP@lrei.org', grade: '7', pod: 'EEL', advisor: 'Eliza', split: 'A' },
+  { name: 'Teo Linville Kendall', email: '32TeoL@lrei.org', grade: '7', pod: 'EEL', advisor: 'Eliza', split: 'A' },
+  { name: 'Brixton Chaffee', email: '32BrixtonC@lrei.org', grade: '7', pod: 'EEL', advisor: 'Elizabeth', split: 'A' },
+  { name: 'Leo Askill-Ryan', email: '32LeoA@lrei.org', grade: '7', pod: 'EEL', advisor: 'Elizabeth', split: 'A' },
+  { name: 'Logan Lai', email: '32LoganL@lrei.org', grade: '7', pod: 'EEL', advisor: 'Elizabeth', split: 'A' },
+  { name: 'Lulu De Guzman-Schaffer', email: '32LuluD@lrei.org', grade: '7', pod: 'EEL', advisor: 'Elizabeth', split: 'B' },
+  { name: 'Pierce Shea', email: '32PierceS@lrei.org', grade: '7', pod: 'EEL', advisor: 'Elizabeth', split: 'B' },
+  { name: 'Seren Kaiser', email: '32SerenK@lrei.org', grade: '7', pod: 'EEL', advisor: 'Elizabeth', split: 'B' },
+  { name: 'Blake Glenn', email: '32BlakeG@lrei.org', grade: '7', pod: 'EEL', advisor: 'Luis', split: 'B' },
+  { name: 'Caper Helliker', email: '32CaperH@lrei.org', grade: '7', pod: 'EEL', advisor: 'Luis', split: 'A' },
+  { name: 'Charlotte Schwartz', email: '32CharlotteS@lrei.org', grade: '7', pod: 'EEL', advisor: 'Luis', split: 'A' },
+  { name: 'Isabella Westlake', email: '32IsabellaW@lrei.org', grade: '7', pod: 'EEL', advisor: 'Luis', split: 'B' },
+  { name: 'Julien Kelly-Green', email: '32JulienK@lrei.org', grade: '7', pod: 'EEL', advisor: 'Luis', split: 'B' },
+  { name: 'Michelle Denson', email: '32MichelleD@lrei.org', grade: '7', pod: 'EEL', advisor: 'Luis', split: 'B' },
+  { name: 'Ama Bediako Whyte', email: '32AmaB@lrei.org', grade: '7', pod: 'MSB', advisor: 'Brendan', split: 'B' },
+  { name: 'Arlo Berg', email: '32ArloB@lrei.org', grade: '7', pod: 'MSB', advisor: 'Brendan', split: 'A' },
+  { name: 'August (Gus) Gordon', email: '32August (Gus)G@lrei.org', grade: '7', pod: 'MSB', advisor: 'Brendan', split: 'A' },
+  { name: 'Emma Cobert', email: '32EmmaC@lrei.org', grade: '7', pod: 'MSB', advisor: 'Brendan', split: 'B' },
+  { name: 'Luca Amoia', email: '32LucaA@lrei.org', grade: '7', pod: 'MSB', advisor: 'Brendan', split: 'B' },
+  { name: 'Mika Bocchino', email: '32MikaB@lrei.org', grade: '7', pod: 'MSB', advisor: 'Brendan', split: 'A' },
+  { name: 'Alia Vinet', email: '32AliaV@lrei.org', grade: '7', pod: 'MSB', advisor: 'Mary Katherine', split: 'B' },
+  { name: 'Alma Bradley', email: '32AlmaB@lrei.org', grade: '7', pod: 'MSB', advisor: 'Mary Katherine', split: 'A' },
+  { name: 'Diego Ocotl', email: '32DiegoO@lrei.org', grade: '7', pod: 'MSB', advisor: 'Mary Katherine', split: 'B' },
+  { name: 'Emilio Hernandez', email: '32EmilioH@lrei.org', grade: '7', pod: 'MSB', advisor: 'Mary Katherine', split: 'A' },
+  { name: 'Gabriel Maczka', email: '32GabrielM@lrei.org', grade: '7', pod: 'MSB', advisor: 'Mary Katherine', split: 'A' },
+  { name: 'Kazuma Matsumoto', email: '32KazumaM@lrei.org', grade: '7', pod: 'MSB', advisor: 'Mary Katherine', split: 'B' },
+  { name: 'Alejandrina (Ale) Chapman', email: '32Alejandrina (Ale)C@lrei.org', grade: '7', pod: 'MSB', advisor: 'Sabrina', split: 'A' },
+  { name: 'Daschel McMahon', email: '32DaschelM@lrei.org', grade: '7', pod: 'MSB', advisor: 'Sabrina', split: 'B' },
+  { name: 'Larkin Bagley', email: '32LarkinB@lrei.org', grade: '7', pod: 'MSB', advisor: 'Sabrina', split: 'B' },
+  { name: 'Malcolm Vincent-Gravenhise', email: '32MalcolmV@lrei.org', grade: '7', pod: 'MSB', advisor: 'Sabrina', split: 'A' },
+  { name: 'Reagan Rhau', email: '32ReaganR@lrei.org', grade: '7', pod: 'MSB', advisor: 'Sabrina', split: 'B' },
+  { name: 'Ashur Valdez', email: '33AshurV@lrei.org', grade: '6', pod: 'DJM', advisor: 'Dan', split: 'C' },
+  { name: 'Curtis Rosenberg', email: '33CurtisR@lrei.org', grade: '6', pod: 'DJM', advisor: 'Dan', split: 'B' },
+  { name: 'Harper Yun-Dea', email: '33HarperY@lrei.org', grade: '6', pod: 'DJM', advisor: 'Dan', split: 'B' },
+  { name: 'Jacob Sagner-Washington', email: '33JacobS@lrei.org', grade: '6', pod: 'DJM', advisor: 'Dan', split: 'B' },
+  { name: 'Oscar Gutmann', email: '33OscarG@lrei.org', grade: '6', pod: 'DJM', advisor: 'Dan', split: 'C' },
+  { name: 'Saviour Boxill', email: '33SaviourB@lrei.org', grade: '6', pod: 'DJM', advisor: 'Dan', split: 'B' },
+  { name: 'Charli Cooper', email: '33CharliC@lrei.org', grade: '6', pod: 'DJM', advisor: 'Jeremiah', split: 'C' },
+  { name: 'Errol Grant', email: '33ErrolG@lrei.org', grade: '6', pod: 'DJM', advisor: 'Jeremiah', split: 'A' },
+  { name: 'Jackson Terranova', email: '33JacksonT@lrei.org', grade: '6', pod: 'DJM', advisor: 'Jeremiah', split: 'C' },
+  { name: 'Lev David', email: '33LevD@lrei.org', grade: '6', pod: 'DJM', advisor: 'Jeremiah', split: 'A' },
+  { name: 'Penelope Lansdale', email: '33PenelopeL@lrei.org', grade: '6', pod: 'DJM', advisor: 'Jeremiah', split: 'C' },
+  { name: 'Alice Chen', email: '33AliceC@lrei.org', grade: '6', pod: 'DJM', advisor: 'Mala', split: 'B' },
+  { name: 'George Orlofsky', email: '33GeorgeO@lrei.org', grade: '6', pod: 'DJM', advisor: 'Mala', split: 'C' },
+  { name: 'Leo Nachum', email: '33LeoN@lrei.org', grade: '6', pod: 'DJM', advisor: 'Mala', split: 'A' },
+  { name: 'Mateo Moran', email: '33MateoM@lrei.org', grade: '6', pod: 'DJM', advisor: 'Mala', split: 'A' },
+  { name: 'Sadie Toussant', email: '33SadieT@lrei.org', grade: '6', pod: 'DJM', advisor: 'Mala', split: 'A' },
+  { name: 'Clemente Perez', email: '33ClementeP@lrei.org', grade: '6', pod: 'AOS', advisor: 'Amanda', split: 'B' },
+  { name: 'Edward Dickerson', email: '33EdwardD@lrei.org', grade: '6', pod: 'AOS', advisor: 'Amanda', split: 'A' },
+  { name: 'Ethan Akuffo Djan', email: '33EthanA@lrei.org', grade: '6', pod: 'AOS', advisor: 'Amanda', split: 'A' },
+  { name: 'Piper Bess', email: '33PiperB@lrei.org', grade: '6', pod: 'AOS', advisor: 'Amanda', split: 'B' },
+  { name: 'Sebastian Block', email: '33SebastianB@lrei.org', grade: '6', pod: 'AOS', advisor: 'Amanda', split: 'B' },
+  { name: 'Benjamin Rogoff', email: '33BenjaminR@lrei.org', grade: '6', pod: 'AOS', advisor: 'Oliver', split: 'C' },
+  { name: 'Camille Bedeau', email: '33CamilleB@lrei.org', grade: '6', pod: 'AOS', advisor: 'Oliver', split: 'C' },
+  { name: 'Eleanor Owens', email: '33EleanorO@lrei.org', grade: '6', pod: 'AOS', advisor: 'Oliver', split: 'C' },
+  { name: 'Laura Sandoval', email: '33LauraS@lrei.org', grade: '6', pod: 'AOS', advisor: 'Oliver', split: 'C' },
+  { name: 'Ocea Currie', email: '33OceaC@lrei.org', grade: '6', pod: 'AOS', advisor: 'Oliver', split: 'B' },
+  { name: 'Toby Imberman', email: '33TobyI@lrei.org', grade: '6', pod: 'AOS', advisor: 'Oliver', split: 'B' },
+  { name: 'Cara "Cici" Cohen', email: '33Cara "Cici"C@lrei.org', grade: '6', pod: 'AOS', advisor: 'Sharyn', split: 'B' },
+  { name: 'Liam Silverstein', email: '33LiamS@lrei.org', grade: '6', pod: 'AOS', advisor: 'Sharyn', split: 'C' },
+  { name: 'Malcolm Mensch', email: '33MalcolmM@lrei.org', grade: '6', pod: 'AOS', advisor: 'Sharyn', split: 'A' },
+  { name: 'Milo Dowling Anderson', email: '33MiloD@lrei.org', grade: '6', pod: 'AOS', advisor: 'Sharyn', split: 'B' },
+  { name: 'Sachin Gopal', email: '33SachinG@lrei.org', grade: '6', pod: 'AOS', advisor: 'Sharyn', split: 'C' },
+  { name: 'Tessa Fung', email: '33TessaF@lrei.org', grade: '6', pod: 'AOS', advisor: 'Sharyn', split: 'A' },
+  { name: 'Jane Moss', email: '33JaneM@lrei.org', grade: '6', pod: 'CCM', advisor: 'Carrie', split: 'A' },
+  { name: 'Julian Lopez', email: '33JulianL@lrei.org', grade: '6', pod: 'CCM', advisor: 'Carrie', split: 'B' },
+  { name: 'Marlow Meshberg', email: '33MarlowM@lrei.org', grade: '6', pod: 'CCM', advisor: 'Carrie', split: 'C' },
+  { name: 'Sadie Imperioli', email: '33SadieI@lrei.org', grade: '6', pod: 'CCM', advisor: 'Carrie', split: 'A' },
+  { name: 'Avery Griffiths', email: '33AveryG@lrei.org', grade: '6', pod: 'CCM', advisor: 'Chantilly', split: 'A' },
+  { name: 'Axel Peters', email: '33AxelP@lrei.org', grade: '6', pod: 'CCM', advisor: 'Chantilly', split: 'C' },
+  { name: 'Cassidy Handler', email: '33CassidyH@lrei.org', grade: '6', pod: 'CCM', advisor: 'Chantilly', split: 'B' },
+  { name: 'George McNulty', email: '33GeorgeM@lrei.org', grade: '6', pod: 'CCM', advisor: 'Chantilly', split: 'C' },
+  { name: 'Gus McKay', email: '33GusM@lrei.org', grade: '6', pod: 'CCM', advisor: 'Chantilly', split: 'A' },
+  { name: 'Skylar Bruno', email: '33SkylarB@lrei.org', grade: '6', pod: 'CCM', advisor: 'Chantilly', split: 'C' },
+  { name: 'August Jones', email: '33AugustJ@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'B' },
+  { name: 'Aurelia Walker', email: '33AureliaW@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'B' },
+  { name: 'Elias "Eli" Fernandez', email: '33Elias "Eli"F@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'A' },
+  { name: 'Frances Cooper', email: '33FrancesC@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'A' },
+  { name: 'Hugh Nottingham', email: '33HughN@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'B' },
+  { name: 'Jordan Gary', email: '33JordanG@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'A' },
+  { name: 'Aeon Anjargolian', email: '34AeonA@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A' },
+  { name: 'Alexander Rogoff', email: '34AlexanderR@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A' },
+  { name: 'Archimedes Gutmann', email: '34ArchimedesG@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A' },
+  { name: 'Isabella Dike', email: '34IsabellaD@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A' },
+  { name: 'Olivia Lee', email: '34OliviaL@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A' },
+  { name: 'Rhea Kaiser', email: '34RheaK@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'B' },
+  { name: 'Roger Sierant', email: '34RogerS@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'B' },
+  { name: 'Ellis Ahmed', email: '34EllisA@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'A' },
+  { name: 'Ezra Fisher', email: '34EzraF@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B' },
+  { name: 'Matteo Keklikian', email: '34MatteoK@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B' },
+  { name: 'McKenna Rodzevicius', email: '34McKennaR@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'A' },
+  { name: 'Perla Dunn', email: '34PerlaD@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B' },
+  { name: 'Tobik Maczka', email: '34TobikM@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B' },
+  { name: 'Aiden Tedder', email: '34AidenT@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'A' },
+  { name: 'Edie Gerson', email: '34EdieG@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B' },
+  { name: 'Joakim Leon-McCool', email: '34JoakimL@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B' },
+  { name: 'Liv Feldman', email: '34LivF@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B' },
+  { name: 'Luka Cuparic', email: '34LukaC@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B' },
+  { name: 'Miles Titus', email: '34MilesT@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'A' }
+];
+
+/* ---------- The seven walking tour routes ---------- */
+
+const TOUR_ROUTES_ = [
+  { route: '1', direction: 'Bottom-Up', humanities: 'Elizabeth (M107)', language: 'Mandarin',
+    itinerary: '8:30 Leave cafeteria to start tour\n8:32 Library\n8:34 Sports Bulletin Board (next to front desk, talk about sports)\n8:38 Co-Lab\n8:42 7th Grade Humanities - Elizabeth (M107)\n8:46 Mandarin (M208) - talk about world languages\n8:49 Art (M306)\n8:53 Main Science Lab (M307) - talk about robotics\n8:55 Learning Center\n8:59 8th Grade Math (M308)\n9:03 6th Grade Science (M310)\n9:06 Bring visitors to class - Bring the clock and tour route with you to class.\n9:25 Bring visitor down to cafeteria (wait with them for Maren and parents to get back downstairs)' },
+  { route: '2', direction: 'Top-Down', humanities: 'Sabrina (M108)', language: 'Spanish',
+    itinerary: '8:30 Leave cafeteria to start tour\n8:34 8th Grade Math (M308)\n8:36 Learning Center\n8:40 6th Grade Science (M310)\n8:44 Main Science Lab (M307) - talk about robotics\n8:47 Art (M306)\n8:51 Spanish (M209)\n8:55 7th Grade Humanities - Sabrina (M108)\n8:57 Sports Bulletin Board (next to front desk, talk about sports)\n8:59 Library\n9:03 Co-Lab\n9:06 Bring visitors to class - Bring the clock and tour route with you to class.\n9:25 Bring visitor down to cafeteria (wait with them for Maren and parents to get back downstairs)' },
+  { route: '3', direction: 'Bottom-Up', humanities: 'Sabrina (M108)', language: 'Mandarin',
+    itinerary: '8:30 Leave cafeteria to start tour\n8:32 Sports Bulletin Board (next to front desk, talk about sports)\n8:36 Co-Lab\n8:38 Library\n8:42 7th Grade Humanities - Sabrina (M108)\n8:46 Mandarin (M208) - talk about world languages\n8:50 Main Science Lab (M307) - talk about robotics also\n8:53 Art (M306)\n8:57 8th Grade Math (M308)\n9:01 6th Grade Science (M310)\n9:03 Learning Center\n9:06 Bring visitors to class - Bring the clock and tour route with you to class.\n9:25 Bring visitor down to cafeteria (wait with them for Maren and parents to get back downstairs)' },
+  { route: '4', direction: 'Top-Down', humanities: 'Elizabeth (M107)', language: 'Spanish',
+    itinerary: '8:30 Leave cafeteria to start tour\n8:34 6th Grade Science (M310)\n8:38 8th Grade Math (M308)\n8:40 Learning Center\n8:43 Art (M306)\n8:47 Main Science Lab (M307) - talk about robotics also\n8:51 Spanish (M209)\n8:55 7th Grade Humanities - Elizabeth (M107)\n8:59 Co-Lab\n9:01 Sports Bulletin Board (next to front desk, talk about sports)\n9:03 Library\n9:06 Bring visitors to class - Bring the clock and tour route with you to class.\n9:25 Bring visitor down to cafeteria (wait with them for Maren and parents to get back downstairs)' },
+  { route: '5', direction: 'Bottom-Up', humanities: 'Elizabeth (M107)', language: 'Spanish',
+    itinerary: '8:30 Leave cafeteria to start tour\n8:34 Co-Lab\n8:36 Library\n8:38 Sports Bulletin Board (next to front desk, talk about sports)\n8:42 7th Grade Humanities - Elizabeth (M107)\n8:46 Spanish (M209)\n8:49 Art (M306)\n8:53 Main Science Lab (M307) - talk about robotics also\n8:57 6th Grade Science (M310)\n8:59 Learning Center\n9:03 8th Grade Math (M308)\n9:06 Bring visitors to class - Bring the clock and tour route with you to class.\n9:25 Bring visitor down to cafeteria (wait with them for Maren and parents to get back downstairs)' },
+  { route: '6', direction: 'Top-Down', humanities: 'Sabrina (M108)', language: 'Mandarin',
+    itinerary: '8:30 Leave cafeteria to start tour\n8:32 Learning Center\n8:36 8th Grade Math (M308)\n8:40 6th Grade Science (M310)\n8:44 Main Science Lab (M307) - talk about robotics also\n8:47 Art (M306)\n8:51 Mandarin (M208) - talk about world languages\n8:55 7th Grade Humanities - Sabrina (M108)\n8:57 Library\n8:59 Sports Bulletin Board (next to front desk, talk about sports)\n9:03 Co-Lab\n9:06 Bring visitors to class - Bring the clock and tour route with you to class.\n9:25 Bring visitor down to cafeteria (wait with them for Maren and parents to get back downstairs)' },
+  { route: '7', direction: 'Bottom-Up', humanities: 'Sabrina (M108)', language: 'Spanish',
+    itinerary: '8:30 Leave cafeteria to start tour\n8:32 Library\n8:36 Co-Lab\n8:38 Sports Bulletin Board (next to front desk, talk about sports)\n8:42 7th Grade Humanities - Sabrina (M108)\n8:46 Spanish (M209)\n8:50 Main Science Lab (M307) - talk about robotics also\n8:53 Art (M306)\n8:55 Learning Center\n8:59 6th Grade Science (M310)\n9:03 8th Grade Math (M308)\n9:06 Bring visitors to class - Bring the clock and tour route with you to class.\n9:25 Bring visitor down to cafeteria (wait with them for Maren and parents to get back downstairs)' }
+];
+
+/* ---------- The bell schedule: 5 days, 8 pods, 403 blocks ---------- */
+
+const SCHEDULE_DAYS_ = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+const BELL_SCHEDULE_ = {
+  'Monday': {
+    'MMS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'MS Meeting'], ['9:30', '10:15', 'French - M207 Mandarin - M208 Spanish - M209'], ['10:15', '11:00', 'Hum MN M212'], ['11:00', '11:30', 'Lunch JL, SA'], ['11:30', '12:00', 'Recess MB, CB'], ['12:00', '12:45', 'PE LH TSAC'], ['12:45', '13:30', 'Science SA M310'], ['13:30', '14:15', 'Math A MD M311 (split A)'], ['13:30', '14:15', 'Hum B MN M212 (split B)'], ['14:15', '15:00', 'Hum A MN M212 (split A)'], ['14:15', '15:00', 'Math B MD M311 (split B)'], ['15:00', '15:10', 'IWP']],
+    'DJM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'MS Meeting'], ['9:30', '10:15', 'Math A CB M311'], ['10:15', '11:00', 'Music A CN M103'], ['11:00', '11:30', 'Lunch JL, SA'], ['11:30', '12:00', 'Recess MB, CB'], ['12:00', '13:30', 'Hum DR M211'], ['13:30', '14:15', 'French - M207 Mandarin - M208 Spanish - M209'], ['14:15', '15:00', 'PE A LH TSAC'], ['15:00', '15:10', 'IWP']],
+    'AOS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'MS Meeting'], ['9:30', '10:15', 'PE B LH TSAC'], ['10:15', '11:00', 'Math B CB M311'], ['11:00', '11:30', 'Lunch JL, SA'], ['11:30', '12:00', 'Recess MB, CB'], ['12:00', '13:30', 'Hum AG M209'], ['13:30', '14:15', 'French - M207 Mandarin - M208 Spanish - M209'], ['14:15', '15:00', 'Music B CN M103'], ['15:00', '15:10', 'IWP']],
+    'CCM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'MS Meeting'], ['9:30', '11:00', 'Science C OC M310'], ['11:00', '11:30', 'Lunch JL, SA'], ['11:30', '12:00', 'Recess MB, CB'], ['12:00', '13:30', 'Hum MS M212'], ['13:30', '14:15', 'French - M207 Mandarin - M208 Spanish - M209'], ['14:15', '15:00', 'Math C CB M310'], ['15:00', '15:10', 'IWP']],
+    'EEL': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'MS Meeting'], ['9:30', '11:00', 'Hum ES M107'], ['11:00', '11:30', 'Recess AG, DR'], ['11:30', '12:00', 'Lunch SF, SdB'], ['12:00', '12:45', '7/8 Majors Dance - PAPAS Drama - M107+M108 Instrumental - Auditorium Portfolio A - Art Room Portfolio B - L104 Vocal - M103'], ['12:45', '13:30', 'PE A LH TSAC'], ['13:30', '14:15', 'Math A CK M308'], ['14:15', '15:00', 'French - M207 Mandarin - M208 Spanish - M209'], ['15:00', '15:10', 'IWP']],
+    'MSB': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'MS Meeting'], ['9:30', '11:00', 'Hum SdB M108'], ['11:00', '11:30', 'Recess AG, DR'], ['11:30', '12:00', 'Lunch SF, SdB'], ['12:00', '12:45', '7/8 Majors Dance - PAPAS Drama - M107+M108 Instrumental - Auditorium Portfolio A - Art Room Portfolio B - L104 Vocal - M103'], ['12:45', '13:30', 'Math B CK M308'], ['13:30', '14:15', 'PE B LH TSAC'], ['14:15', '15:00', 'French - M207 Mandarin - M208 Spanish - M209'], ['15:00', '15:10', 'IWP']],
+    'CJM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'MS Meeting'], ['9:30', '10:15', 'Math A CK M308'], ['10:15', '11:00', 'PE A BR TSAC'], ['11:00', '11:30', 'Recess AG, DR'], ['11:30', '12:00', 'Lunch SF, SdB'], ['12:00', '12:45', '7/8 Majors Dance - PAPAS Drama - M107+M108 Instrumental - Auditorium Portfolio A - Art Room Portfolio B - L104 Vocal - M103'], ['12:45', '13:30', 'Hum As SMR+SC M107+M108'], ['13:30', '15:00', 'Science A LL/EZ M307'], ['15:00', '15:10', 'IWP']],
+    'RSS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'MS Meeting'], ['9:30', '11:00', 'Science B LL/EZ M307'], ['11:00', '11:30', 'Recess AG, DR'], ['11:30', '12:00', 'Lunch SF, SdB'], ['12:00', '12:45', '7/8 Majors Dance - PAPAS Drama - M107+M108 Instrumental - Auditorium Portfolio A - Art Room Portfolio B - L104 Vocal - M103'], ['12:45', '13:30', 'PE B BR Charlton'], ['13:30', '14:15', 'Hum Bs SMR+SC M107+M108'], ['14:15', '15:00', 'Math B CK M308'], ['15:00', '15:10', 'IWP']]
+  },
+  'Tuesday': {
+    'MMS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Math MD M311'], ['9:30', '10:15', 'Choices LA M211'], ['10:15', '11:00', '5/6 Electives Dance - Thompson Drama - M212 Modern Band - Auditorium Animation - L104 Vocal Ensemble - M103'], ['11:00', '11:30', 'Lunch MS, SH'], ['11:30', '12:00', 'Recess CN, AG'], ['12:00', '12:45', 'PE LH TSAC'], ['12:45', '13:30', 'Music CN M103'], ['13:30', '14:45', 'Hum MN M212'], ['14:45', '15:10', 'IWP']],
+    'DJM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Choices A LA M211'], ['9:30', '10:15', 'Math A CB M311'], ['10:15', '11:00', '5/6 Electives Dance - Thompson Drama - M212 Modern Band - Auditorium Animation - L104 Vocal Ensemble - M103'], ['11:00', '11:30', 'Lunch MS, SH'], ['11:30', '12:00', 'Recess CN, AG'], ['12:00', '13:15', 'Hum DR M211'], ['13:15', '14:45', 'Science A OC M310'], ['14:45', '15:10', 'IWP']],
+    'AOS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '10:15', 'Science B OC M310'], ['10:15', '11:00', '5/6 Electives Dance - Thompson Drama - M212 Modern Band - Auditorium Animation - L104 Vocal Ensemble - M103'], ['11:00', '11:30', 'Lunch MS, SH'], ['11:30', '12:00', 'Recess CN, AG'], ['12:00', '13:15', 'Hum AG M209'], ['13:15', '14:00', 'Choices B LA M211'], ['14:00', '14:45', 'Math B CB M311'], ['14:45', '15:10', 'IWP']],
+    'CCM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Music C CN M103'], ['9:30', '10:15', 'Art C M306'], ['10:15', '11:00', '5/6 Electives Dance - Thompson Drama - M212 Modern Band - Auditorium Animation - L104 Vocal Ensemble - M103'], ['11:00', '11:30', 'Lunch MS, SH'], ['11:30', '12:00', 'Recess CN, AG'], ['12:00', '13:15', 'Hum MS M212'], ['13:15', '14:00', 'Math C CB M311'], ['14:00', '14:45', 'PE C LH TSAC'], ['14:45', '15:10', 'IWP']],
+    'EEL': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Hum As ES+SdB M107 M108'], ['9:30', '10:15', 'Math A CK M308'], ['10:15', '11:00', 'French - M207 Mandarin - M208 Spanish - M209'], ['11:00', '11:30', 'Recess SdB, ES'], ['11:30', '12:00', 'Lunch JD, BC'], ['12:00', '12:45', '7/8 Electives The Movement Lab - PAPAS Storytelling - M108 Mix it Up - M107 Ceramics - Art Room Photography - L104 Music Production - M103'], ['12:45', '13:15', 'Hum ES M107'], ['13:15', '14:45', 'Science A LL/EZ M307'], ['14:45', '15:10', 'IWP']],
+    'MSB': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '10:15', 'Science B LL/EZ M307'], ['10:15', '11:00', 'French - M207 Mandarin - M208 Spanish - M209'], ['11:00', '11:30', 'Recess SdB, ES'], ['11:30', '12:00', 'Lunch JD, BC'], ['12:00', '12:45', '7/8 Electives The Movement Lab - PAPAS Storytelling - M108 Mix it Up - M107 Ceramics - Art Room Photography - L104 Music Production - M103'], ['12:45', '13:15', 'Hum SdB M108'], ['13:15', '14:00', 'Hum Bs ES+SdB M107 M108'], ['14:00', '14:45', 'Math B CK M308'], ['14:45', '15:10', 'IWP']],
+    'CJM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Math A CK M308'], ['9:30', '11:00', 'Hum SMR M107'], ['11:00', '11:30', 'Recess SdB, ES'], ['11:30', '12:00', 'Lunch JD, BC'], ['12:00', '12:45', '7/8 Electives The Movement Lab - PAPAS Storytelling - M108 Mix it Up - M107 Ceramics - Art Room Photography - L104 Music Production - M103'], ['12:45', '13:30', 'PE A BR TSAC'], ['13:30', '14:15', 'French - M207 Mandarin - M208 Spanish - M209'], ['14:15', '15:00', 'CAP'], ['15:00', '15:10', 'IWP']],
+    'RSS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'PE B BR TSAC'], ['9:30', '11:00', 'Hum SC M108'], ['11:00', '11:30', 'Recess SdB, ES'], ['11:30', '12:00', 'Lunch JD, BC'], ['12:00', '12:45', '7/8 Electives The Movement Lab - PAPAS Storytelling - M108 Mix it Up - M107 Ceramics - Art Room Photography - L104 Music Production - M103'], ['12:45', '13:30', 'Math B CK M308'], ['13:30', '14:15', 'French - M207 Mandarin - M208 Spanish - M209'], ['14:15', '15:00', 'CAP'], ['15:00', '15:10', 'IWP']]
+  },
+  'Wednesday': {
+    'MMS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'French - M207 Mandarin - M208 Spanish - M209'], ['9:30', '10:15', 'Hum MN M212'], ['10:15', '11:00', '5/6 Electives Dance - PAPAS Drama - M212 Modern Band - Auditorium Animation - L104 Vocal Ensemble - M103'], ['11:00', '11:30', 'Lunch MS, SA'], ['11:30', '12:00', 'Recess OC, MB'], ['12:00', '12:45', 'Math MD M311'], ['12:45', '13:30', 'Hum A MN M212 (split A)'], ['12:45', '13:30', 'Science SA M310 (split B)'], ['13:30', '14:15', 'Science SA M310 (split A)'], ['13:30', '14:15', 'Hum B MN M212 (split B)'], ['14:15', '15:00', 'Affinity Groups/Olympic Teams'], ['15:00', '15:10', 'IWP']],
+    'DJM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Math A CB M311'], ['9:30', '10:15', 'PE A LH TSAC'], ['10:15', '11:00', '5/6 Electives Dance - PAPAS Drama - M212 Modern Band - Auditorium Animation - L104 Vocal Ensemble - M103'], ['11:00', '11:30', 'Lunch MS, SA'], ['11:30', '12:00', 'Recess OC, MB'], ['12:00', '12:45', 'Hum DR M211'], ['12:45', '13:30', 'B Art A M306'], ['13:30', '14:15', 'French - M207 Mandarin - M208 Spanish - M209'], ['14:15', '15:00', 'Affinity Groups/Olympic Teams'], ['15:00', '15:10', 'IWP']],
+    'AOS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Art B M306'], ['9:30', '10:15', 'Math B CB M311'], ['10:15', '11:00', '5/6 Electives Dance - PAPAS Drama - M212 Modern Band - Auditorium Animation - L104 Vocal Ensemble - M103'], ['11:00', '11:30', 'Lunch MS, SA'], ['11:30', '12:00', 'Recess OC, MB'], ['12:00', '12:45', 'Hum AG M209'], ['12:45', '13:30', 'PE B LH TSAC'], ['13:30', '14:15', 'French - M207 Mandarin - M208 Spanish - M209'], ['14:15', '15:00', 'Affinity Groups/Olympic Teams'], ['15:00', '15:10', 'IWP']],
+    'CCM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '10:15', 'Science C OC M310'], ['10:15', '11:00', '5/6 Electives Dance - PAPAS Drama - M212 Modern Band - Auditorium Animation - L104 Vocal Ensemble - M103'], ['11:00', '11:30', 'Lunch MS, SA'], ['11:30', '12:00', 'Recess OC, MB'], ['12:00', '12:45', 'Hum MS M212'], ['12:45', '13:30', 'Math C CB M311'], ['13:30', '14:15', 'French - M207 Mandarin - M208 Spanish - M209'], ['14:15', '15:00', 'Affinity Groups/Olympic Teams'], ['15:00', '15:10', 'IWP']],
+    'EEL': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '10:15', 'Science A LL/EZ M307'], ['10:15', '11:00', 'French - M207 Mandarin - M208 Spanish - M209'], ['11:00', '11:30', 'Recess SMR, DR'], ['11:30', '12:00', 'Lunch MN, SC'], ['12:00', '12:45', '7/8 Majors Dance - PAPAS Drama - M107+M108 Instrumental - Auditorium Portfolio A - Art Room Portfolio B - L104 Vocal - M103'], ['12:45', '13:30', 'Math A CK M308'], ['13:30', '14:15', 'Hum As ES+SdB M107 M108'], ['14:15', '15:00', 'Affinity Groups/Olympic Teams'], ['15:00', '15:10', 'IWP']],
+    'MSB': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Hum Bs ES+SdB M107 M108'], ['9:30', '10:15', 'Math B CK M308'], ['10:15', '11:00', 'French - M207 Mandarin - M208 Spanish - M209'], ['11:00', '11:30', 'Recess SMR, DR'], ['11:30', '12:00', 'Lunch MN, SC'], ['12:00', '12:45', '7/8 Majors Dance - PAPAS Drama - M107+M108 Instrumental - Auditorium Portfolio A - Art Room Portfolio B - L104 Vocal - M103'], ['12:45', '14:15', 'Science B LL/EZ M307'], ['14:15', '15:00', 'Affinity Groups/Olympic Teams'], ['15:00', '15:10', 'IWP']],
+    'CJM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Math A CK M308'], ['9:30', '11:00', 'Hum SMR M107'], ['11:00', '11:30', 'Recess SMR, DR'], ['11:30', '12:00', 'Lunch MN, SC'], ['12:00', '12:45', '7/8 Majors Dance - PAPAS Drama - M107+M108 Instrumental - Auditorium Portfolio A - Art Room Portfolio B - L104 Vocal - M103'], ['12:45', '13:30', 'French - M207 Mandarin - M208 Spanish - M209'], ['13:30', '14:15', 'PE A BR TSAC'], ['14:15', '15:00', 'Affinity Groups/Olympic Teams'], ['15:00', '15:10', 'IWP']],
+    'RSS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'PE B BR TSAC'], ['9:30', '11:00', 'Hum SC M108'], ['11:00', '11:30', 'Recess SMR, DR'], ['11:30', '12:00', 'Lunch MN, SC'], ['12:00', '12:45', '7/8 Majors Dance - PAPAS Drama - M107+M108 Instrumental - Auditorium Portfolio A - Art Room Portfolio B - L104 Vocal - M103'], ['12:45', '13:30', 'French - M207 Mandarin - M208 Spanish - M209'], ['13:30', '14:15', 'Math B CK M308'], ['14:15', '15:00', 'Affinity Groups/Olympic Teams'], ['15:00', '15:10', 'IWP']]
+  },
+  'Thursday': {
+    'MMS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Science SA M310'], ['9:30', '10:15', 'French - M207 Mandarin - M208 Spanish - M209'], ['10:15', '11:00', 'Music CN M103'], ['11:00', '11:30', 'Lunch MD, ES'], ['11:30', '12:00', 'Recess SMR, SF'], ['12:00', '12:45', 'Math MD M311'], ['12:45', '13:30', 'Art M306'], ['13:30', '14:45', 'Hum MN M212'], ['14:45', '15:10', 'IWP']],
+    'DJM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Music A CN M103'], ['9:30', '11:00', 'Science A OC M310'], ['11:00', '11:30', 'Lunch MD, ES'], ['11:30', '12:00', 'Recess SMR, SF'], ['12:00', '13:15', 'Hum DR M211'], ['13:15', '14:00', 'Math A CB M311'], ['14:00', '14:45', 'PE A LH TSAC'], ['14:45', '15:10', 'IWP']],
+    'AOS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Art B M306'], ['9:30', '10:15', 'Math B CB M311'], ['10:15', '11:00', 'PE B LH TSAC'], ['11:00', '11:30', 'Lunch MD, ES'], ['11:30', '12:00', 'Recess SMR, SF'], ['12:00', '13:15', 'Hum AG M209'], ['13:15', '14:45', 'Science B OC M310'], ['14:45', '15:10', 'IWP']],
+    'CCM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Math C CB M311'], ['9:30', '10:15', 'Music C CN M103'], ['10:15', '11:00', 'Art C M306'], ['11:00', '11:30', 'Lunch MD, ES'], ['11:30', '12:00', 'Recess SMR, SF'], ['12:00', '13:15', 'Hum MS M212'], ['13:15', '14:00', 'PE C LH TSAC'], ['14:00', '14:45', 'Choices C LA M211'], ['14:45', '15:10', 'IWP']],
+    'EEL': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'PE A LH TSAC'], ['9:30', '10:15', 'Math A CK M308'], ['10:15', '11:00', 'Choices A LA M107'], ['11:00', '11:30', 'Recess MKP, SC'], ['11:30', '12:00', 'Lunch BC, MN'], ['12:00', '12:45', '7/8 Electives The Movement Lab - PAPAS Storytelling - M108 Mix it Up - M107 Ceramics - Art Room Photography - L104 Music Production - M103'], ['12:45', '14:00', 'Hum ES M107'], ['14:00', '14:45', 'French - M207 Mandarin - M208 Spanish - M209'], ['14:45', '15:10', 'IWP']],
+    'MSB': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Choices B LA M107'], ['9:30', '10:15', 'PE B LH TSAC'], ['10:15', '11:00', 'Math B CK M308'], ['11:00', '11:30', 'Recess MKP, SC'], ['11:30', '12:00', 'Lunch BC, MN'], ['12:00', '12:45', '7/8 Electives The Movement Lab - PAPAS Storytelling - M108 Mix it Up - M107 Ceramics - Art Room Photography - L104 Music Production - M103'], ['12:45', '14:00', 'Hum SdB M108'], ['14:00', '14:45', 'French - M207 Mandarin - M208 Spanish - M209'], ['14:45', '15:10', 'IWP']],
+    'CJM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '10:15', 'Science A LL/EZ M307'], ['10:15', '11:00', 'French - M207 Mandarin - M208 Spanish - M209'], ['11:00', '11:30', 'Recess MKP, SC'], ['11:30', '12:00', 'Lunch BC, MN'], ['12:00', '12:45', '7/8 Electives The Movement Lab - PAPAS Storytelling - M108 Mix it Up - M107 Ceramics - Art Room Photography - L104 Music Production - M103'], ['12:45', '13:30', 'Choices A LA M308'], ['13:30', '14:15', 'Math A CK M308'], ['14:15', '15:00', 'Hum SMR M107'], ['15:00', '15:10', 'IWP']],
+    'RSS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Math B CK M308'], ['9:30', '10:15', 'Choices B LA M107'], ['10:15', '11:00', 'French - M207 Mandarin - M208 Spanish - M209'], ['11:00', '11:30', 'Recess MKP, SC'], ['11:30', '12:00', 'Lunch BC, MN'], ['12:00', '12:45', '7/8 Electives The Movement Lab - PAPAS Storytelling - M108 Mix it Up - M107 Ceramics - Art Room Photography - L104 Music Production - M103'], ['12:45', '14:15', 'Science B LL/EZ M307'], ['14:15', '15:00', 'Hum SC M108'], ['15:00', '15:10', 'IWP']]
+  },
+  'Friday': {
+    'MMS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '10:15', 'Science SA M310'], ['10:15', '11:00', 'Hum MN M212'], ['11:00', '11:30', 'Lunch JL, MD'], ['11:30', '12:00', 'Recess CK, LL'], ['12:00', '12:45', 'Math MD M311'], ['12:45', '13:30', 'PE LH TSAC'], ['13:30', '14:15', 'Art M306'], ['14:15', '15:00', 'Activity Period'], ['15:00', '15:10', 'IWP']],
+    'DJM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '10:15', 'Hum DR M211'], ['10:15', '11:00', 'Math A CB M311'], ['11:00', '11:30', 'Lunch JL, MD'], ['11:30', '12:00', 'Recess CK, LL'], ['12:00', '12:45', 'French - M207 Mandarin - M208 Spanish - M209'], ['12:45', '13:30', 'Art A M306'], ['13:30', '14:15', 'Science A OC M310'], ['14:15', '15:00', 'Activity Period'], ['15:00', '15:10', 'IWP']],
+    'AOS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '10:15', 'Hum AG M209'], ['10:15', '11:00', 'Science B OC M310'], ['11:00', '11:30', 'Lunch JL, MD'], ['11:30', '12:00', 'Recess CK, LL'], ['12:00', '12:45', 'French - M207 Mandarin - M208 Spanish - M209'], ['12:45', '13:30', 'Math B CB M311'], ['13:30', '14:15', 'Music B CN M103'], ['14:15', '15:00', 'Activity Period'], ['15:00', '15:10', 'IWP']],
+    'CCM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '10:15', 'Hum MS M212'], ['10:15', '11:00', 'PE C LH TSAC'], ['11:00', '11:30', 'Lunch JL, MD'], ['11:30', '12:00', 'Recess CK, LL'], ['12:00', '12:45', 'French - M207 Mandarin - M208 Spanish - M209'], ['12:45', '13:30', 'Science C OC M310'], ['13:30', '14:15', 'Math C CB M311'], ['14:15', '15:00', 'Activity Period'], ['15:00', '15:10', 'IWP']],
+    'EEL': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'Science A LL/EZ M307'], ['9:30', '10:15', 'PE A LH TSAC'], ['10:15', '11:00', 'Math A CK M308'], ['11:00', '11:30', 'Recess RC, CB'], ['11:30', '12:00', 'Lunch MKP, SH'], ['12:00', '12:45', '7/8 Majors Dance - PAPAS Drama - M107+M108 Instrumental - Auditorium Portfolio A - Art Room Portfolio B - L104 Vocal - M103'], ['12:45', '14:15', 'Hum ES M107'], ['14:15', '15:00', 'Activity Period'], ['15:00', '15:10', 'IWP']],
+    'MSB': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'PE B LH TSAC'], ['9:30', '10:15', 'Math B CK M308'], ['10:15', '11:00', 'Science B LL/EZ M307'], ['11:00', '11:30', 'Recess RC, CB'], ['11:30', '12:00', 'Lunch MKP, SH'], ['12:00', '12:45', '7/8 Majors Dance - PAPAS Drama - M107+M108 Instrumental - Auditorium Portfolio A - Art Room Portfolio B - L104 Vocal - M103'], ['12:45', '14:15', 'Hum SdB M108'], ['14:15', '15:00', 'Activity Period'], ['15:00', '15:10', 'IWP']],
+    'CJM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '10:15', 'Hum SMR M107'], ['10:15', '11:00', 'French - M207 Mandarin - M208 Spanish - M209'], ['11:00', '11:30', 'Recess RC, CB'], ['11:30', '12:00', 'Lunch MKP, SH'], ['12:00', '12:45', '7/8 Majors Dance - PAPAS Drama - M107+M108 Instrumental - Auditorium Portfolio A - Art Room Portfolio B - L104 Vocal - M103'], ['12:45', '13:30', 'Math A CK M308'], ['13:30', '14:15', 'Science A LL/EZ M307'], ['14:15', '15:00', 'Activity Period'], ['15:00', '15:10', 'IWP']],
+    'RSS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '10:15', 'Hum SC M108'], ['10:15', '11:00', 'French - M207 Mandarin - M208 Spanish - M209'], ['11:00', '11:30', 'Recess RC, CB'], ['11:30', '12:00', 'Lunch MKP, SH'], ['12:00', '12:45', '7/8 Majors Dance - PAPAS Drama - M107+M108 Instrumental - Auditorium Portfolio A - Art Room Portfolio B - L104 Vocal - M103'], ['12:45', '13:30', 'Science B LL/EZ M307'], ['13:30', '14:15', 'Math B CK M308'], ['14:15', '15:00', 'Activity Period'], ['15:00', '15:10', 'IWP']]
+  }
+};
+
