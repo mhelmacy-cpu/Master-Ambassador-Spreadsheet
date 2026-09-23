@@ -94,22 +94,86 @@ function sheet_(name) {
   return made;
 }
 
-/** Every data row of a sheet, as an array of arrays. */
+/**
+ * Where each column actually sits, read off the sheet's own header row
+ * rather than assumed from the list above. A column inserted, moved or
+ * renamed then shifts nothing: the values still come from the right
+ * place. Falls back to the expected order only when row 1 is empty.
+ */
+const HEADER_CACHE_ = {};
+
+/* Other names the same column goes by, so a sheet that says "Homeroom Pod"
+ * or "Email" still lines up. */
+const HEADER_ALIASES_ = {
+  'Homeroom': ['Homeroom Pod', 'Pod', 'HR', 'Homeroom/Advisory'],
+  'Student Email': ['Email', 'Student email address', 'LREI Email'],
+  'Split': ['Split Group', 'A/B', 'Section'],
+  'Advisor': ['Adviser', 'Advisory', 'Teacher'],
+  'Prospective Student(s)': ['Prospective Student', 'Visiting Student', 'Visitor'],
+  'Tour Date': ['Date'],
+  'Name': ['Student Name', 'Full Name']
+};
+
+function headerIndex_(name) {
+  if (HEADER_CACHE_[name]) return HEADER_CACHE_[name];
+  const s = sheet_(name);
+  const width = Math.max(s.getLastColumn(), HEADERS[name].length);
+  const row = s.getRange(1, 1, 1, width).getValues()[0];
+  const map = {};
+  row.forEach(function (cell, i) {
+    const key = trim_(cell);
+    if (key && map[key] === undefined) map[key] = i;
+  });
+  // Nothing in row 1: assume the order this script creates.
+  if (!Object.keys(map).length) {
+    HEADERS[name].forEach(function (h, i) { map[h] = i; });
+  }
+  // Fill any gap from a column that goes by another name.
+  Object.keys(HEADER_ALIASES_).forEach(function (want) {
+    if (map[want] !== undefined) return;
+    HEADER_ALIASES_[want].forEach(function (alt) {
+      if (map[want] === undefined && map[alt] !== undefined) map[want] = map[alt];
+    });
+  });
+  HEADER_CACHE_[name] = map;
+  return map;
+}
+
+/** Every data row of a sheet, at its real width. */
 function rows_(name) {
   const s = sheet_(name);
   const last = s.getLastRow();
   if (last < 2) return [];
-  return s.getRange(2, 1, last - 1, HEADERS[name].length).getValues();
+  const width = Math.max(s.getLastColumn(), HEADERS[name].length);
+  return s.getRange(2, 1, last - 1, width).getValues();
 }
 
 function col_(name, header) {
-  const i = HEADERS[name].indexOf(header);
-  if (i === -1) throw new Error('No column "' + header + '" on ' + name + '.');
-  return i;
+  const map = headerIndex_(name);
+  if (map[header] === undefined) {
+    throw new Error('The ' + name + ' sheet has no column headed "' + header + '". ' +
+      'Check the spelling in row 1 - it has to match exactly.');
+  }
+  return map[header];
+}
+
+/** An empty row the same width as the sheet really is. */
+function blankRow_(name) {
+  const s = sheet_(name);
+  const width = Math.max(s.getLastColumn(), HEADERS[name].length);
+  const row = [];
+  for (let i = 0; i < width; i++) row.push('');
+  return row;
 }
 
 function norm_(v) { return String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' '); }
 function trim_(v) { return String(v == null ? '' : v).trim(); }
+
+/** "6B", "6 B", "b" -> "B". The office writes the grade in front of it. */
+function splitLetter_(v) {
+  const m = /([A-Ca-c])\s*$/.exec(trim_(v));
+  return m ? m[1].toUpperCase() : '';
+}
 
 function fullName_(first, last) { return (trim_(first) + ' ' + trim_(last)).trim(); }
 
@@ -236,13 +300,13 @@ function setupAmbassadors_() {
   if (s.getLastRow() < 2) {
     const rows = AMBASSADOR_NAMES_.map(function (n) {
       const p = splitName_(n);
-      const row = h.map(function () { return ''; });
+      const row = blankRow_(SHEETS.AMBASSADORS);
       row[col_(SHEETS.AMBASSADORS, 'First Name')] = p.first;
       row[col_(SHEETS.AMBASSADORS, 'Last Name')] = p.last;
       row[col_(SHEETS.AMBASSADORS, 'Active')] = 'Yes';
       return row;
     });
-    s.getRange(2, 1, rows.length, h.length).setValues(rows);
+    s.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
   }
   const last = Math.max(s.getLastRow(), 2);
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Homeroom') + 1, PODS);
@@ -541,7 +605,7 @@ function bellSchedule_() {
   const sheet = ss_().getSheetByName(SHEETS.BELL);
   if (sheet && sheet.getLastRow() > 1) {
     rows_(SHEETS.BELL).forEach(function (r) {
-      add(trim_(r[0]), trim_(r[1]), trim_(r[2]).toUpperCase(), r[3], r[4], trim_(r[5]));
+      add(trim_(r[0]), trim_(r[1]), splitLetter_(r[2]), r[3], r[4], trim_(r[5]));
     });
     return out;
   }
@@ -570,7 +634,7 @@ function classesMissed_(pod, split, grade, dateVal, startMin, endMin) {
 
   const myGrade = grade || POD_GRADE_[pod] || '';
   const columns = GRADE_PODS_[myGrade] || (pod ? [pod] : []);
-  const mySplit = trim_(split).toUpperCase();
+  const mySplit = splitLetter_(split);
   const byInitials = teachersByInitials_();
   const found = [];
 
@@ -581,7 +645,7 @@ function classesMissed_(pod, split, grade, dateVal, startMin, endMin) {
       if (s == null || e == null || !(s < endMin && startMin < e)) return;
       if (NON_CLASS_RE_.test(b.what)) return;
 
-      const letter = trim_(b.split).toUpperCase() || splitLetterOf_(b.what);
+      const letter = splitLetter_(b.split) || splitLetterOf_(b.what);
       if (letter) {
         // A split-group block. Only this student's own letter counts.
         if (!mySplit) {
@@ -638,7 +702,7 @@ function ambassadors_() {
     return {
       name: fullName_(r[col_(N, 'First Name')], r[col_(N, 'Last Name')]),
       pod: trim_(r[col_(N, 'Homeroom')]).toUpperCase(),
-      split: trim_(r[col_(N, 'Split')]).toUpperCase(),
+      split: splitLetter_(r[col_(N, 'Split')]),
       grade: trim_(r[col_(N, 'Grade')]).replace(/[^0-9]/g, ''),
       advisor: trim_(r[col_(N, 'Advisor')]),
       borough: trim_(r[col_(N, 'Borough')]).toUpperCase(),
@@ -903,7 +967,7 @@ function commitTour(dateStr) {
   const out = [];
   plan.pairs.forEach(function (p) {
     p.guides.forEach(function (g) {
-      const row = HEADERS[N].map(function () { return ''; });
+      const row = blankRow_(N);
       row[col_(N, 'Tour Date')] = dateVal;
       row[col_(N, 'Ambassador')] = g;
       row[col_(N, 'Job')] = JOBS.GUIDE;
@@ -914,7 +978,7 @@ function commitTour(dateStr) {
   });
   plan.greeters.forEach(function (c) {
     c.chosen.forEach(function (n) {
-      const row = HEADERS[N].map(function () { return ''; });
+      const row = blankRow_(N);
       row[col_(N, 'Tour Date')] = dateVal;
       row[col_(N, 'Ambassador')] = n;
       row[col_(N, 'Job')] = c.job;
@@ -922,7 +986,7 @@ function commitTour(dateStr) {
     });
   });
   if (out.length) {
-    tracker.getRange(tracker.getLastRow() + 1, 1, out.length, HEADERS[N].length).setValues(out);
+    tracker.getRange(tracker.getLastRow() + 1, 1, out.length, out[0].length).setValues(out);
     tracker.getRange(2, col_(N, 'Tour Date') + 1, tracker.getLastRow() - 1, 1)
       .setNumberFormat('yyyy-mm-dd');
   }
@@ -1096,13 +1160,18 @@ function sendTeacherEmails(dateStr) {
 
     /* advisor */
     if (who.advisor) {
-      const t = teacherByName[norm_(who.advisor)];
-      if (t && t.email) {
-        if (!byAdvisor[t.email]) byAdvisor[t.email] = { name: t.name, rows: [] };
-        byAdvisor[t.email].rows.push({ student: name, job: jobText });
-      } else {
-        needsYou.push(name + "'s advisor (" + who.advisor + ') has no email on the Teachers sheet.');
-      }
+      // An advisory shared by two people is written "Eliza/Lila". Both hear.
+      who.advisor.split(/[\/,&]| and /).forEach(function (part) {
+        const one = trim_(part);
+        if (!one) return;
+        const t = teacherByName[norm_(one)];
+        if (t && t.email) {
+          if (!byAdvisor[t.email]) byAdvisor[t.email] = { name: t.name, rows: [] };
+          byAdvisor[t.email].rows.push({ student: name, job: jobText });
+        } else {
+          needsYou.push(name + "'s advisor (" + one + ') has no email on the Teachers sheet.');
+        }
+      });
     } else {
       needsYou.push(name + ' has no Advisor filled in.');
     }
