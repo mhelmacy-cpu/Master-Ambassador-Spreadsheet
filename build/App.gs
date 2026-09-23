@@ -726,7 +726,8 @@ function awayWindow_(jobNames) {
  * Rows already there are never touched: a No she has set stays set.
  */
 /**
- * Pairs who are never given the same job on the same tour.
+ * Pairs who are never put together: not in one guide pair, not on one
+ * greeting crew.
  *
  * First names are enough, because that is how she thinks of them and
  * how she typed the list. A name is matched against the Ambassadors
@@ -757,10 +758,11 @@ function setupKeepApart_() {
   const rows = KEEP_APART_SEED_.map(function (p) { return [p[0], p[1], '']; });
   s.getRange(2, 1, rows.length, 3).setValues(rows);
   note_(s, SHEETS.APART, 'Ambassador',
-    'Two ambassadors who are never given the same job on the same tour: never both ' +
-    'tour guides, never both lobby greeters, never both table greeters. First names ' +
-    'are enough unless two ambassadors share one, in which case write the full name. ' +
-    'Panelists are not affected, since you pick those by hand.');
+    'Two ambassadors who are never put together: never the same pair of tour guides, ' +
+    'never the same greeting crew. They can both work on the same tour, as long as ' +
+    'they are not side by side - two of them may guide, with different families. ' +
+    'First names are enough unless two ambassadors share one, in which case write ' +
+    'the full name. Panelists are not affected, since you pick those by hand.');
   s.autoResizeColumns(1, 3);
 }
 
@@ -827,8 +829,13 @@ function keptApart_(a, b) {
 }
 
 /**
- * True if giving this person this job would put them alongside somebody
- * they are kept apart from. Panelists are never checked.
+ * True if giving this person this job would put them on a crew with
+ * somebody they are kept apart from.
+ *
+ * Crews work as a group, so this looks at everyone already given that
+ * job. Guides are handled separately, pair by pair: two of them may
+ * both guide, as long as they are not guiding the same family.
+ * Panelists are never checked.
  */
 function apartClash_(name, job, used) {
   if (job === JOBS.PANELIST) return false;
@@ -1656,8 +1663,9 @@ function planTour(dateStr, keepExisting) {
           if (used[a.name] || !canDo(a, JOBS.GUIDE)) return false;
           if (!a.grade || !a.gender) return false;
           if (v.grade && grades.indexOf(a.grade) === -1) return false;
-          // Never bends, whatever it costs the rest of the matching.
-          if (apartClash_(a.name, JOBS.GUIDE, used)) return false;
+          // Kept apart means not in the same pair. Two of them may both
+          // guide, as long as they are walking different families.
+          if (chosen.some(function (x) { return keptApart_(a.name, x.name); })) return false;
           return true;
         });
       };
@@ -1801,7 +1809,10 @@ function planTour(dateStr, keepExisting) {
         !chosen.some(function (a) { return norm_(a.gender) === norm_(v.gender); }),
       short: Math.max(0, perVisitor - chosen.length),
       anyGrade: !v.grade,
-      why: missing.length ? guideMissReason_(v, missing, pool, used, canDo, all.length) : ''
+      why: missing.length
+        ? guideMissReason_(v, missing, pool, used, canDo, all.length,
+            chosen.map(function (a) { return a.name; }))
+        : ''
     };
   });
 
@@ -2051,7 +2062,8 @@ function traitMix_(names, pool, field) {
 function genderMix_(names, pool) { return traitMix_(names, pool, 'gender'); }
 
 /** Which grade could not be filled, and why, in plain words. */
-function guideMissReason_(v, missing, pool, used, canDo, total) {
+function guideMissReason_(v, missing, pool, used, canDo, total, withWhom) {
+  withWhom = withWhom || [];
   if (!total) return 'the Ambassadors sheet is empty';
   if (!pool.length) return 'no ambassador is marked Active - put Yes in the Active column';
   const parts = missing.map(function (slot) {
@@ -2062,11 +2074,11 @@ function guideMissReason_(v, missing, pool, used, canDo, total) {
     if (!inGrade.length) return 'no ' + label + ' ambassador on the sheet at all';
     const free = inGrade.filter(function (a) { return !used[a.name] && canDo(a, JOBS.GUIDE); });
     if (!free.length) return 'every ' + label + ' ambassador is already assigned';
-    const allClash = free.every(function (a) {
-      return apartClash_(a.name, JOBS.GUIDE, used);
+    const allClash = withWhom.length && free.every(function (a) {
+      return withWhom.some(function (n) { return keptApart_(a.name, n); });
     });
     if (allClash) {
-      return 'every ' + label + ' ambassador left is kept apart from one already guiding';
+      return 'every ' + label + ' ambassador left is kept apart from ' + withWhom.join(' and ');
     }
 
     const noDetails = free.filter(function (a) { return !a.grade || !a.gender; }).length;

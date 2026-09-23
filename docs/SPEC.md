@@ -52,9 +52,13 @@ not typed.
 
 ### Keep Apart
 
-Pairs of ambassadors who are never given the same job on the same tour:
-never both tour guides, never both lobby greeters, never both table
-greeters. They may both work, at different jobs.
+Pairs of ambassadors who are never put together: never the same pair of
+tour guides, never the same greeting crew. They can both work the same
+tour, and both guide, as long as they are with different families.
+
+Rows can be added at any point in the season. The sheet is read afresh
+at every staffing run, so a pair added on a Tuesday holds that Wednesday
+with no setup run in between.
 
 First names are enough, and a double first name is matched on either
 part, so "Afia" finds Afia-Kusiwaa Twumasi. A name matching nobody, or
