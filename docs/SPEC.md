@@ -203,6 +203,26 @@ click shows everything that will really arrive:
     [TEST - Students, Tuesday 12:00 PM] Your Tour Job - Tomorrow
     [TEST - Students, Wednesday 7:45 AM] Your Tour Job - Today
 
+A test sends **one copy per kind**, not one per person - one of each job
+for the students, and one advisor, one class teacher and one host
+teacher - twice over for the two days. Who would have been skipped for
+want of an address is still worked out for everybody and still reported,
+so the test says what a real send would do without filling her inbox
+with the same message thirty times.
+
+### The roster
+
+Every send, test or real, and the automatic teacher send on Tuesday and
+Wednesday morning, also builds a Google Doc and mails her the link:
+
+    Student                Role                        Class teacher       Advisor
+    Afia-Kusiwaa Twumasi   Lobby Greeter               Lila, Eliza         Eliza
+    Aurelia Walker         Tour Guide for Sam Visitor  Jeremiah            Marco
+
+One line per ambassador on duty, so the office has in one place what the
+emails only say one person at a time. The 5th grade buddies are not on
+it, the same as the emails.
+
 The redirect works inside `mailOptions_`, which every message is built
 by, so a send cannot get past it - and it is cleared in a `finally`, so
 a test run that fails part way cannot leave the next real send pointing

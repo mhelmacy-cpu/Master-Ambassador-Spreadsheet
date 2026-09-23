@@ -2261,6 +2261,116 @@ function buildLockerSlips(dateStr) {
 }
 
 /* =========================================================
+ * The roster
+ *
+ * One line per ambassador on duty: their name, what they are doing,
+ * whose class they walk out of and who their advisor is. It goes out
+ * with the emails, so the office has on paper what the emails only say
+ * one person at a time.
+ * ========================================================= */
+
+function tourRoster_(dateVal) {
+  const amb = {};
+  ambassadors_().forEach(function (a) { amb[norm_(a.name)] = a; });
+  const fallbackFrom = toMinutes_(setting_('Tour Start Time', '8:30'));
+  const fallbackTo = toMinutes_(setting_('Tour End Time', '9:25'));
+
+  const grouped = {};
+  assignmentsOn_(dateVal).forEach(function (a) {
+    // The 5th grade buddies are told in person, so they are not on here.
+    if (a.job === JOBS.BUDDY) return;
+    (grouped[a.name] = grouped[a.name] || []).push(a);
+  });
+
+  return Object.keys(grouped).sort().map(function (name) {
+    const jobs = grouped[name];
+    const who = amb[norm_(name)];
+    const role = jobs.map(function (j) {
+      return j.job + (j.visitor ? ' for ' + j.visitor : '') +
+        (j.route ? ' (route ' + j.route + ')' : '');
+    }).join('; ');
+
+    let teacher = '';
+    if (who && (who.pod || who.split)) {
+      const win = awayMinutes_(jobs.map(function (j) { return j.job; })) ||
+        { from: fallbackFrom, to: fallbackTo };
+      const seen = {};
+      const names = [];
+      classesMissed_(who.pod, who.split, who.grade, dateVal, win.from, win.to)
+        .forEach(function (b) {
+          if (b.needsYou) { names.push(b.what + ' (needs you)'); return; }
+          b.teachers.forEach(function (t) {
+            if (seen[norm_(t.name)]) return;
+            seen[norm_(t.name)] = true;
+            names.push(t.name);
+          });
+          b.unresolved.forEach(function (i) { names.push(i + ' (no email on file)'); });
+        });
+      teacher = names.join(', ');
+    }
+
+    return {
+      name: name,
+      role: role,
+      teacher: teacher,
+      advisor: who ? who.advisor : ''
+    };
+  });
+}
+
+function buildTourRoster(dateStr) {
+  const dateVal = dateStr instanceof Date ? dateStr : toDate_(dateStr);
+  if (!dateVal) throw new Error('Pick a tour date first.');
+  const rows = tourRoster_(dateVal);
+  if (!rows.length) throw new Error('Nothing is staffed for ' + longDate_(dateVal) + ' yet.');
+
+  const title = 'Tour Roster - ' + longDate_(dateVal);
+  const doc = DocumentApp.create(title);
+  const body = doc.getBody();
+  body.clear();
+  body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  body.appendParagraph(rows.length + ' ambassadors on duty.');
+
+  const table = [['Student', 'Role', 'Class teacher', 'Advisor']];
+  rows.forEach(function (r) {
+    table.push([r.name, r.role, r.teacher, r.advisor]);
+  });
+  body.appendTable(table);
+
+  doc.saveAndClose();
+  return { url: doc.getUrl(), name: title, rows: rows.length };
+}
+
+/**
+ * The roster, mailed to whoever is running this.
+ *
+ * It goes with every send - the manual button, test or real, and the
+ * automatic teacher send on Tuesday and Wednesday morning - so there is
+ * always a copy of who was doing what that day.
+ */
+function mailTourRoster_(dateVal) {
+  let r = null;
+  try {
+    r = buildTourRoster(dateVal);
+  } catch (err) {
+    return null;
+  }
+  const to = previewAddress_();
+  if (!to) return r;
+  const html = '<div style="' + MAIL_STYLE_ + '">' +
+    '<p>Who is on duty ' + escapeHtml_(longDate_(dateVal)) + ', with the teacher whose ' +
+    'class they leave and their advisor:</p>' +
+    '<p><a href="' + r.url + '">' + escapeHtml_(r.name) + '</a></p></div>';
+  MailApp.sendEmail({
+    to: to,
+    subject: r.name,
+    htmlBody: html,
+    name: setting_('Sender Display Name', 'LREI Middle School Tours')
+  });
+  return r;
+}
+
+/* =========================================================
  * Emails
  *
  * Teachers and advisors hear twice: Tuesday 8:30am and Wednesday 7:45am.
@@ -2324,6 +2434,23 @@ function assignmentsOn_(dateVal) {
  */
 let PREVIEW_TO_ = '';
 let TEST_LABEL_ = '';
+
+/**
+ * While testing, one copy per kind rather than one per person.
+ *
+ * She is reading these to check the wording, and thirty of the same
+ * message buries the one thing that differs. Everything else about the
+ * run is unchanged - who would be skipped for want of an address is
+ * still worked out for all of them, and still reported.
+ */
+let SAMPLE_SEEN_ = null;
+
+function sampleAllows_(kind) {
+  if (!SAMPLE_SEEN_) return true;
+  if (SAMPLE_SEEN_[kind]) return false;
+  SAMPLE_SEEN_[kind] = true;
+  return true;
+}
 
 /** Where test copies go: the Settings address if there is one, else whoever is running this. */
 function previewAddress_() {
@@ -2424,6 +2551,7 @@ function sendStudentEmails(dateStr) {
       '<p>Thank you for doing this.<br>' +
       escapeHtml_(setting_('Sender Display Name', 'LREI Middle School Tours')) + '</p></div>';
 
+    if (!sampleAllows_('student:' + jobs.map(function (j) { return j.job; }).sort().join('+'))) return;
     MailApp.sendEmail(mailOptions_(who.email, 'Your Tour Job - ' + when.subject, html));
     sent++;
   });
@@ -2566,6 +2694,7 @@ function sendTeacherEmails(dateStr) {
       '<table style="' + TABLE_STYLE_ + '"><tr><th style="' + TH_ + '">Advisee</th>' +
       '<th style="' + TH_ + '">Job</th></tr>' + body + '</table>' +
       '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p></div>';
+    if (!sampleAllows_('advisor')) return;
     MailApp.sendEmail(mailOptions_(email, 'Advisee on Tour Duty - ' + when.subject, html));
     advisorsSent++;
   });
@@ -2593,6 +2722,7 @@ function sendTeacherEmails(dateStr) {
           'before the end of the period, so please expect a visitor as well.</p>'
         : '') +
       '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p></div>';
+    if (!sampleAllows_('class teacher')) return;
     MailApp.sendEmail(mailOptions_(email, 'Student Out of Your Class - ' + when.subject, html));
     teachersSent++;
   });
@@ -2620,6 +2750,7 @@ function sendTeacherEmails(dateStr) {
       '<th style="' + TH_ + '">Sitting with</th><th style="' + TH_ + '">Room</th></tr>' +
       body + '</table>' +
       '<p>Nothing is needed from you beyond a seat.<br>' + escapeHtml_(senderName) + '</p></div>';
+    if (!sampleAllows_('host teacher')) return;
     MailApp.sendEmail(mailOptions_(email,
       'Student Visitor in Your Class - ' + when.subject, html));
     hostsSent++;
@@ -2634,7 +2765,13 @@ function sendTeacherEmails(dateStr) {
 /* ---------- what the triggers call ---------- */
 
 function sendStudentEmailsForNextTour() { return sendStudentEmails(null); }
-function sendTeacherEmailsForNextTour() { return sendTeacherEmails(null); }
+function sendTeacherEmailsForNextTour() {
+  const r = sendTeacherEmails(null);
+  const on = nextTourDate_();
+  // Once a send day, with the round that knows about teachers and advisors.
+  if (on) r.roster = mailTourRoster_(on);
+  return r;
+}
 
 /* =========================================================
  * Automatic sends
@@ -2877,7 +3014,7 @@ function showEmailDialog() {
     'function done(r){var h="<div class=\'free\'>";' +
     'if(r.testTo){h+="<b>Test only.</b> Everything below went to "+esc(r.testTo)+' +
     '" and nowhere else"+(r.testDays&&r.testDays.length>1?", once for each send: "+' +
-    'esc(r.testDays.join(" and ")):"")+".<br>";}' +
+    'esc(r.testDays.join(" and ")):"")+". One of each kind, not one per person.<br>";}' +
     'if(r.note){h+=esc(r.note);}else{' +
     'if(r.sent!=null){h+="<b>"+r.sent+"</b> student email(s) sent for "+esc(r.date)+".";}' +
     'else{h+="<b>"+r.advisorsSent+"</b> advisor email(s), <b>"+r.teachersSent+' +
@@ -2886,6 +3023,9 @@ function showEmailDialog() {
     'h+="</div>";' +
     'if(r.skipped&&r.skipped.length){h+="<div class=\'warn\'><b>No Student Email on file, so not sent:</b><br>"+' +
     'esc(r.skipped.join(", "))+"</div>";}' +
+    'if(r.roster){h+="<div class=\'free\'><b>Who is on duty</b><br><a href=\'"+r.roster.url+' +
+    '"\' target=\'_blank\'>"+esc(r.roster.name)+"</a> - "+r.roster.rows+' +
+    '" ambassador(s), with their teacher and advisor. A copy is in your inbox.</div>";}' +
     'if(r.needsYou&&r.needsYou.length){h+="<div class=\'warn\'><b>Needs you - nobody was emailed for these</b><ul>"+' +
     'r.needsYou.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>";}' +
     'document.getElementById("out").innerHTML=h;}' +
@@ -2984,7 +3124,12 @@ function api_sendEmails(which, dateStr, test) {
   const run = function () {
     return students ? sendStudentEmails(dateStr) : sendTeacherEmails(dateStr);
   };
-  if (!test) return run();
+  if (!test) {
+    const r = run();
+    const on = dateStr ? toDate_(dateStr) : nextTourDate_();
+    if (on) r.roster = mailTourRoster_(on);
+    return r;
+  }
 
   const to = previewAddress_();
   if (!to) throw new Error('Could not work out your email address to send the test to.');
@@ -2998,6 +3143,7 @@ function api_sendEmails(which, dateStr, test) {
   days.forEach(function (day) {
     PRETEND_TODAY_ = day.when;
     TEST_LABEL_ = day.label;
+    SAMPLE_SEEN_ = {};                 // one of each per day, not one per person
     try {
       const r = asTest_(to, run);
       if (!out) {
@@ -3010,9 +3156,12 @@ function api_sendEmails(which, dateStr, test) {
     } finally {
       PRETEND_TODAY_ = null;
       TEST_LABEL_ = '';
+      SAMPLE_SEEN_ = null;
     }
   });
   out.testTo = to;
   out.testDays = days.map(function (d) { return d.label; }).filter(Boolean);
+  out.sampled = true;
+  if (dateVal) out.roster = mailTourRoster_(dateVal);
   return out;
 }
