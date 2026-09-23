@@ -75,10 +75,10 @@ const DEFAULT_SETTINGS = [
   ['Lobby Greeters Needed', '3'],
   ['Table Greeters Needed', '2'],
   ['Tour Guides Per Visiting Student', '2'],
-  ['Guide Grades for Rising 5', '6, 6'],
-  ['Guide Grades for Rising 6', '5, 6'],
-  ['Guide Grades for Rising 7', '6, 7'],
-  ['Guide Grades for Rising 8', '7, 8'],
+  ['Guide Grades for Rising 5', '6 and 6'],
+  ['Guide Grades for Rising 6', '5 and 6'],
+  ['Guide Grades for Rising 7', '6 and 7'],
+  ['Guide Grades for Rising 8', '7 and 8'],
   ['Visitor Races Needing a Student of Color Guide', 'African American, Black'],
   ['Max Families Per Route', '1']
 ];
@@ -545,6 +545,9 @@ function setupRoutes_() {
 function setupSettings_() {
   const s = sheet_(SHEETS.SETTINGS);
   if (s.getLastRow() > 1) return;
+  // Plain text, or Sheets reads "6 and 6" style values as dates and the
+  // grades come back as a day and a year.
+  s.getRange(2, 2, Math.max(DEFAULT_SETTINGS.length, 200), 1).setNumberFormat('@');
   s.getRange(2, 1, DEFAULT_SETTINGS.length, 2).setValues(DEFAULT_SETTINGS);
   note_(s, SHEETS.SETTINGS, 'Value',
     'Visitor Races Needing a Student of Color Guide: a visitor whose Race ' +
@@ -864,19 +867,45 @@ function activeJobs_() {
  * in order. Two guides and one grade listed means both come from it.
  */
 function guideGradesFor_(applyingForGrade, howMany) {
-  const g = trim_(applyingForGrade).replace(/[^0-9]/g, '');
+  const g = gradeNumber_(applyingForGrade);
   const want = howMany || 2;
   const out = [];
   if (!g) return out;
-  const raw = setting_('Guide Grades for Rising ' + g, '');
-  const list = String(raw).split(/[,\/ ]+/)
-    .map(function (x) { return trim_(x).replace(/[^0-9]/g, ''); })
-    .filter(Boolean);
+  const list = gradeList_(settingRaw_('Guide Grades for Rising ' + g));
   for (let i = 0; i < want; i++) {
     if (list.length) out.push(list[Math.min(i, list.length - 1)]);
     else out.push(i === 0 ? String(Number(g) - 1) : g);   // their grade, then the next
   }
   return out;
+}
+
+/** "6th", 6, " 7 " -> "6". A date is not a grade, so it gives nothing. */
+function gradeNumber_(value) {
+  if (value instanceof Date) return '';
+  const digits = trim_(value).replace(/[^0-9]/g, '');
+  return digits.length <= 2 ? digits : '';
+}
+
+/**
+ * "6 and 7" -> ['6', '7'].
+ *
+ * A Date here means Sheets has reinterpreted the cell - "6, 7" reads to
+ * it as the 7th of June - so the value is refused rather than mined for
+ * digits, which is how a grade once came out as 2026.
+ */
+function gradeList_(raw) {
+  if (raw instanceof Date) return [];
+  return trim_(raw).split(/[^0-9]+/)
+    .filter(function (x) { return x !== '' && x.length <= 2; });
+}
+
+/** A setting's value as it really is, Date and all. */
+function settingRaw_(key) {
+  const data = rows_(SHEETS.SETTINGS);
+  for (let i = 0; i < data.length; i++) {
+    if (trim_(data[i][0]) === key) return data[i][1];
+  }
+  return '';
 }
 
 /** Visitors on a given tour date. */
@@ -1263,6 +1292,16 @@ function setupWarnings_(all, visitors) {
     return trim_(r[0]) && !trim_(r[2]);
   }).length;
   if (noTeacherEmail) w.push(noTeacherEmail + ' teacher(s) have no email address on the Teachers sheet.');
+
+  ['5', '6', '7', '8'].forEach(function (g) {
+    const raw = settingRaw_('Guide Grades for Rising ' + g);
+    if (raw instanceof Date) {
+      w.push('Settings: "Guide Grades for Rising ' + g + '" has been turned into a date by ' +
+        'Google Sheets. Format column B of Settings as Plain text (Format > Number > ' +
+        'Plain text), then retype it as "6 and 7". Until then that grade falls back to ' +
+        'the grade below and the grade itself.');
+    }
+  });
 
   const needed = {};
   visitors.forEach(function (v) {
