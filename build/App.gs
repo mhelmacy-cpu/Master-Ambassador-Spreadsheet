@@ -79,6 +79,7 @@ const DEFAULT_SETTINGS = [
   ['Guide Grades for Rising 6', '5, 6'],
   ['Guide Grades for Rising 7', '6, 7'],
   ['Guide Grades for Rising 8', '7, 8'],
+  ['Visitor Races Needing a Student of Color Guide', 'African American, Black'],
   ['Max Families Per Route', '1']
 ];
 
@@ -541,6 +542,11 @@ function setupSettings_() {
   if (s.getLastRow() > 1) return;
   s.getRange(2, 1, DEFAULT_SETTINGS.length, 2).setValues(DEFAULT_SETTINGS);
   note_(s, SHEETS.SETTINGS, 'Value',
+    'Visitor Races Needing a Student of Color Guide: a visitor whose Race ' +
+    'is on this list always gets at least one student of color among their ' +
+    'guides. Two is fine. Everyone else carries no race constraint at all - ' +
+    'two white-presenting guides for a white visitor is fine, and the other ' +
+    'races are left open.\n\n' +
     'Reply-To Email: leave blank and replies come back to whoever sends. ' +
     'Set it to an admissions address to collect replies there instead.\n\n' +
     'Guide Grades for Rising N: which ambassador grades may guide a visitor ' +
@@ -935,26 +941,38 @@ function planTour(dateStr) {
 
   const pairs = visitors.map(function (v) {
     const wantGrades = guideGradesFor_(v.grade, perVisitor);
+    const needsSoC = needsSoCGuide_(v.race);
     // Each guide comes from its own grade, so the places are filled one
     // at a time rather than taken off a single ranked list.
     const chosen = [];
     const missing = [];
-    wantGrades.forEach(function (wantGrade) {
-      const candidates = pool.filter(function (a) {
+    wantGrades.forEach(function (wantGrade, slot) {
+      let candidates = pool.filter(function (a) {
         if (used[a.name] || !canDo(a, JOBS.GUIDE)) return false;
         if (!a.grade || !a.gender) return false;
         if (v.grade && a.grade !== wantGrade) return false;
         if (v.gender && norm_(a.gender) !== norm_(v.gender)) return false;
         return true;
       });
-      // A pair that already has a student of color takes someone else next
-      // where there is a choice - a preference here, not a rule, because
-      // the grade and gender requirements have already narrowed this a lot.
-      // Then same borough, then whoever has done least.
+      // Where the visitor's race calls for it, at least one guide has to be
+      // a student of color. It is preferred on every place and required on
+      // the last one, so the pair cannot finish without it. Two students of
+      // color is fine. Every other visitor carries no race constraint.
+      const haveSoC = chosen.some(function (x) { return isStudentOfColor_(x.presenting); });
+      const stillOwed = needsSoC && !haveSoC;
+      const lastPlace = slot === wantGrades.length - 1;
+      if (stillOwed && lastPlace) {
+        const only = candidates.filter(function (a) { return isStudentOfColor_(a.presenting); });
+        if (only.length) candidates = only;
+      }
+      // Owed one and places left: take a student of color where there is a
+      // choice. Then same borough, then whoever has done least.
       candidates.sort(function (a, b) {
-        const da = chosen.filter(function (x) { return sameTrait_(x.presenting, a.presenting); }).length;
-        const db = chosen.filter(function (x) { return sameTrait_(x.presenting, b.presenting); }).length;
-        if (da !== db) return da - db;
+        if (stillOwed) {
+          const sa = isStudentOfColor_(a.presenting) ? 0 : 1;
+          const sb = isStudentOfColor_(b.presenting) ? 0 : 1;
+          if (sa !== sb) return sa - sb;
+        }
         const ba = (v.borough && a.borough === v.borough) ? 0 : 1;
         const bb = (v.borough && b.borough === v.borough) ? 0 : 1;
         if (ba !== bb) return ba - bb;
@@ -984,7 +1002,11 @@ function planTour(dateStr) {
       }),
       guideNames: chosen.map(function (a) { return a.name; }),
       wantGrades: wantGrades,
+      needsSoC: needsSoC,
+      guideMix: traitMix_(chosen.map(function (a) { return a.name; }), pool, 'presenting'),
       route: route,
+      socShortfall: needsSoC && chosen.length > 0 &&
+        !chosen.some(function (a) { return isStudentOfColor_(a.presenting); }),
       short: Math.max(0, perVisitor - chosen.length),
       why: missing.length
         ? guideMissReason_(v, missing, pool, used, canDo, all.length)
@@ -1068,6 +1090,31 @@ function planTour(dateStr) {
     assignedCount: everyone.length,
     warnings: setupWarnings_(all, visitors)
   };
+}
+
+/**
+ * Whether at least one of this visitor's guides must be a student of
+ * colour, so they meet somebody who reflects them.
+ *
+ * Set on the Settings sheet, as a list of the races it applies to. A
+ * visitor whose race is not on that list carries no constraint at all -
+ * two white-presenting guides for a white visitor is fine, and the other
+ * races are left open.
+ */
+function needsSoCGuide_(visitorRace) {
+  const race = norm_(visitorRace);
+  if (!race) return false;
+  return String(setting_('Visitor Races Needing a Student of Color Guide', ''))
+    .split(',')
+    .map(function (x) { return norm_(x); })
+    .filter(Boolean)
+    .some(function (x) { return race === x || race.indexOf(x) !== -1 || x.indexOf(race) !== -1; });
+}
+
+/** "Student of color", as the Ambassadors sheet writes it. */
+function isStudentOfColor_(presenting) {
+  const v = norm_(presenting);
+  return v !== '' && v !== 'white presenting' && v.indexOf('white') === -1;
 }
 
 /** Two blank traits do not count as a match, or blanks would all clump. */
@@ -1620,8 +1667,11 @@ function showStaffDialog() {
     '<th>Guides</th><th>Route</th></tr>";' +
     'p.pairs.forEach(function(x){h+="<tr><td>"+esc(x.visitor.name)+' +
     '(x.visitor.grade?" <span class=\'muted\'>grade "+esc(x.visitor.grade)+"</span>":"")+' +
+    '(x.visitor.race?" <span class=\'muted\'>"+esc(x.visitor.race)+(x.needsSoC?" - needs a student of color":"")+"</span>":"")+' +
     '(x.visitor.school?" <span class=\'muted\'><br>("+esc(x.visitor.school)+")</span>":"")+"</td><td>"+' +
     '(x.guides.length?esc(x.guides.join(", ")):"<b>none found</b>")+' +
+    '(x.guideMix?"<br><span class=\'muted\'>"+esc(x.guideMix)+"</span>":"")+' +
+    '(x.socShortfall?"<br><b>no student of color was free for this pair</b>":"")+' +
     '(x.short?" <span class=\'muted\'>short "+x.short+(x.why?" - "+esc(x.why):"")+"</span>":"")+' +
     '"</td><td>"+esc(x.route||"-")+"</td></tr>";});' +
     'h+="</table>";' +
