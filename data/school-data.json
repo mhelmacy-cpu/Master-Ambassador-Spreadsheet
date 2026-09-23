@@ -1374,20 +1374,6 @@
    "notes": ""
   },
   {
-   "name": "Charlie Pinsky",
-   "gradeWhenListed": "5th",
-   "borough": "M",
-   "parent1": {
-    "name": "David Pinsky",
-    "email": "david.z.pinsky@gmail.com"
-   },
-   "parent2": {
-    "name": "Amanda Schreiber",
-    "email": "amanda.j.schreiber@gmail.com"
-   },
-   "notes": ""
-  },
-  {
    "name": "Jordan Gary",
    "gradeWhenListed": "5th",
    "borough": "M",
@@ -1468,48 +1454,6 @@
    "parent2": {
     "name": "Sam Orlofsky",
     "email": "samorlofsky1@gmail.com"
-   },
-   "notes": ""
-  },
-  {
-   "name": "Toby Imberman",
-   "gradeWhenListed": "5th",
-   "borough": "M",
-   "parent1": {
-    "name": "Matthew Imberman",
-    "email": "mimberman@gmail.com"
-   },
-   "parent2": {
-    "name": "Sari Imberman",
-    "email": "sari.imberman@gmail.com"
-   },
-   "notes": ""
-  },
-  {
-   "name": "Sachin Gopal",
-   "gradeWhenListed": "5th",
-   "borough": "M",
-   "parent1": {
-    "name": "Arvind Gopal",
-    "email": "arvgop@gmail.com"
-   },
-   "parent2": {
-    "name": "Karen Sumberg",
-    "email": "ksumberg@gmail.com"
-   },
-   "notes": ""
-  },
-  {
-   "name": "Julian Lopez",
-   "gradeWhenListed": "5th",
-   "borough": "M",
-   "parent1": {
-    "name": "Mike Lopez",
-    "email": "mlopez762@gmail.com"
-   },
-   "parent2": {
-    "name": "Natalie Sanz '00",
-    "email": "Natalie@sanzmanagement.com"
    },
    "notes": ""
   },
@@ -1668,48 +1612,6 @@
    "notes": ""
   },
   {
-   "name": "Blake Glenn",
-   "gradeWhenListed": "6th",
-   "borough": "B",
-   "parent1": {
-    "name": "Paula Davis",
-    "email": "Pauladavis018@gmail.com"
-   },
-   "parent2": {
-    "name": "William Glenn",
-    "email": "wglenn31186@Gmail.com"
-   },
-   "notes": ""
-  },
-  {
-   "name": "Miro Tavakoli",
-   "gradeWhenListed": "6th",
-   "borough": "M",
-   "parent1": {
-    "name": "Sefaat Kavak",
-    "email": "sefaat@gmail.com"
-   },
-   "parent2": {
-    "name": "Sorosh Tavakoli",
-    "email": "sorosh.tavakoli@gmail.com"
-   },
-   "notes": ""
-  },
-  {
-   "name": "Solomon Pearce",
-   "gradeWhenListed": "6th",
-   "borough": "M",
-   "parent1": {
-    "name": "Jonathan Pearce",
-    "email": "jrpearce@deloitte.com"
-   },
-   "parent2": {
-    "name": "Desiree van Rensburg",
-    "email": "desiree@thevrps.com"
-   },
-   "notes": ""
-  },
-  {
    "name": "Aksel Ozturk",
    "gradeWhenListed": "7th",
    "borough": "J",
@@ -1808,20 +1710,6 @@
    "notes": ""
   },
   {
-   "name": "Jackson Atienza",
-   "gradeWhenListed": "7th",
-   "borough": "Q",
-   "parent1": {
-    "name": "Michelle Atienza",
-    "email": "matienza@lrei.org"
-   },
-   "parent2": {
-    "name": "Rethier Atienza",
-    "email": "rethier.atienza@gmail.com"
-   },
-   "notes": ""
-  },
-  {
    "name": "Cecilia Melzer",
    "gradeWhenListed": "7th",
    "borough": "M",
@@ -1832,20 +1720,6 @@
    "parent2": {
     "name": "Thiago Melzer",
     "email": "tmelzer@gmail.com"
-   },
-   "notes": ""
-  },
-  {
-   "name": "Kay Chisling",
-   "gradeWhenListed": "7th",
-   "borough": "M",
-   "parent1": {
-    "name": "Brian Chisling",
-    "email": "bchisling1@gmail.com"
-   },
-   "parent2": {
-    "name": "Pamela Chisling",
-    "email": "pamela.chisling@gmail.com"
    },
    "notes": ""
   }
