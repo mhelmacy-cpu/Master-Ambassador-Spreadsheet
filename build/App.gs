@@ -1609,10 +1609,12 @@ function guideHandback_(page, dateVal) {
   const names = page.guides.map(function (g) { return g.replace(/\s*\(.*$/, ''); });
   if (!names.length) return '';
   const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
-  if (names.length === 1) {
-    return names[0] + ', take ' + page.visitor.name + ' to class with you, and bring ' +
-      'them down to the cafeteria at ' + endsAt + '.';
-  }
+  const wait = setting_('Wait For', 'Maren');
+  const takeThem = function (who) {
+    return who + ': take ' + page.visitor.name + ' to class with you. At ' + endsAt +
+      ' bring them down to the cafeteria and wait with them until ' + wait + ' is back.';
+  };
+  if (names.length === 1) return takeThem(names[0]);
 
   const startMin = toMinutes_(setting_('Class Visit Handoff Time', '9:06'));
   const endMin = toMinutes_(setting_('Tour End Time', '9:25'));
@@ -1629,12 +1631,9 @@ function guideHandback_(page, dateVal) {
   const second = classOf(names[1]);
 
   if (first && second && norm_(first) === norm_(second)) {
-    return names.join(' and ') + ', take ' + page.visitor.name + ' to class with you, ' +
-      'and bring them down to the cafeteria at ' + endsAt + '.';
+    return takeThem(names.join(' and '));
   }
-  return names[0] + ', take ' + page.visitor.name + ' to class with you, and bring them ' +
-    'down to the cafeteria at ' + endsAt + '.  ' +
-    names[1] + ', go back to class. You are finished.';
+  return takeThem(names[0]) + '  ' + names[1] + ': go back to class. You are finished.';
 }
 
 /** "Take Nora to SPANISH with Alexander Rogoff. ..." */
@@ -1651,9 +1650,10 @@ function handoffForGuides_(page) {
 function handoffForBuddy_(page) {
   const who = page.buddyName || (page.buddy && page.buddy.name) || '';
   const wait = setting_('Wait For', 'Maren');
-  return who + '. Introduce yourself and welcome your buddy to your class by ' +
-    'telling them what you are working on. Take your buddy back to the cafeteria ' +
-    'and wait with them till ' + wait + ' gets back.';
+  const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
+  return who + ': introduce yourself and tell ' + page.visitor.name +
+    ' what you are working on. At ' + endsAt + ' take them down to the cafeteria ' +
+    'and wait with them until ' + wait + ' gets back.';
 }
 
 function buildRouteSheets(dateStr) {
@@ -1695,7 +1695,7 @@ function buildRouteSheets(dateStr) {
     // The walk itself, minus the two closing lines when there is a handoff.
     const closing = /Bring visitors to class|Bring visitor down to cafeteria/;
     page.lines.forEach(function (line) {
-      if (page.buddy && closing.test(line)) return;
+      if (closing.test(line)) return;
       body.appendParagraph(line);
     });
 
