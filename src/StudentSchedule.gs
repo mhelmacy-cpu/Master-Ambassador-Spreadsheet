@@ -81,7 +81,7 @@ function isSplitBlock_(text) {
   const t = String(text || '');
   // A half-pod block still carrying its group marker has not been
   // narrowed to this student, so both halves are still on the table.
-  if (/\(split group \d\)/.test(t)) return true;
+  if (/\(split [A-C]\)/.test(t)) return true;
   if (t.indexOf('Majors') !== -1 || t.indexOf('Electives') !== -1) return true;
   if (t.indexOf('unclear from PDF') !== -1) return true;
   const distinctSubjects = SUBJECT_WORDS_.filter(s => new RegExp('\\b' + s + '\\b').test(t));

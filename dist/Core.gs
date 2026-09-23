@@ -65,11 +65,12 @@ const GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Other'];
 const LANGUAGE_OPTIONS = ['French', 'Mandarin', 'Spanish'];
 const LANGUAGE_ROOMS_ = { French: 'M207', Mandarin: 'M208', Spanish: 'M209' };
 
-// A few pods split in half for some periods, with the two halves swapping
-// subjects. The schedule names both halves but never which one a given
-// student is in, so this column supplies it. Blank is fine - the tool then
-// reports both options instead of guessing.
-const SPLIT_OPTIONS = ['1', '2'];
+// Every pod divides into halves (or thirds in 6th grade) for the periods
+// that split, and the office writes them as 5A/5B, 6A/6B/6C and so on.
+// This column holds just the letter. The schedule names both halves but
+// never which one a given student is in, so this is what supplies it.
+// Blank is fine - the tool then reports every option instead of guessing.
+const SPLIT_OPTIONS = ['A', 'B', 'C'];
 
 const TOUR_JOBS = { PANELIST: 'Panelist', LOBBY_GREETER: 'Lobby Greeter', TABLE_GREETER: 'Table Greeter', TOUR_GUIDE: 'Tour Guide' };
 

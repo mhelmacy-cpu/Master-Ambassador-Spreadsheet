@@ -857,10 +857,10 @@ function getTouringStudentDirectory_(tourId) {
  * ========================================================== */
 
 /**
- * Matches Ambassadors sheet rows against HOMEROOM_DATA_ by exact
- * (normalized) full name, and fills in Grade / Homeroom Pod / Advisor
- * from the official roster. Re-runnable each year with an
- * updated HOMEROOM_DATA_.
+ * Matches Ambassadors sheet rows against MS_ROSTER_ by exact
+ * (normalized) full name, and fills in Grade / Homeroom Pod / Advisor /
+ * Split / Language, plus Student Email where that cell is still empty.
+ * Re-runnable each year with an updated MS_ROSTER_.
  *
  * A student who isn't found and was last known to be in 8th grade is
  * assumed to have graduated out of Middle School and is marked Inactive
@@ -878,12 +878,16 @@ function syncAmbassadorHomerooms() {
   const gradeCol = colNum_(headers, 'Grade') - 1;
   const podCol = colNum_(headers, 'Homeroom Pod') - 1;
   const teacherCol = colNum_(headers, 'Advisor') - 1;
+  const splitCol = colNum_(headers, 'Split') - 1;
+  const languageCol = colNum_(headers, 'Language') - 1;
+  const emailCol = colNum_(headers, 'Student Email') - 1;
   const activeCol = colNum_(headers, 'Active') - 1;
   const notesCol = colNum_(headers, 'Notes') - 1;
 
   const lookup = buildHomeroomLookup_();
   let matched = 0;
   const unmatched = [];
+  const fifthGradeLanguage = [];
   const flaggedGraduated = [];
 
   rows.forEach((r, i) => {
@@ -895,6 +899,13 @@ function syncAmbassadorHomerooms() {
       sheet.getRange(sheetRow, gradeCol + 1).setValue(hit.grade);
       sheet.getRange(sheetRow, podCol + 1).setValue(hit.pod);
       sheet.getRange(sheetRow, teacherCol + 1).setValue(hit.advisor);
+      sheet.getRange(sheetRow, splitCol + 1).setValue(hit.split || '');
+      sheet.getRange(sheetRow, languageCol + 1).setValue(hit.language || '');
+      // Don't overwrite an address someone has corrected by hand.
+      if (!String(r[emailCol] || '').trim() && hit.email) {
+        sheet.getRange(sheetRow, emailCol + 1).setValue(hit.email);
+      }
+      if (hit.grade === '5' && hit.language) fifthGradeLanguage.push(name);
       matched++;
       return;
     }
@@ -918,13 +929,22 @@ function syncAmbassadorHomerooms() {
     }
   });
 
-  return { matched: matched, unmatched: unmatched, flaggedGraduated: flaggedGraduated };
+  return { matched: matched, unmatched: unmatched, flaggedGraduated: flaggedGraduated,
+    fifthGradeLanguage: fifthGradeLanguage };
 }
 
 function syncAmbassadorHomeroomsFromMenu_() {
   const result = syncAmbassadorHomerooms();
-  let msg = 'Matched ' + result.matched + ' ambassador(s) to the 2026-27 homeroom roster ' +
-    '(Grade, Homeroom Pod, and Teacher updated).';
+  let msg = 'Matched ' + result.matched + ' ambassador(s) to the 2026-27 roster. ' +
+    'Grade, Homeroom Pod, Advisor, Split and Language are filled in, and a blank ' +
+    'Student Email is filled in too (an address already there is left alone).';
+  if (result.fifthGradeLanguage.length > 0) {
+    msg += '\n\nFifth grade rotates through the three languages rather than picking one. ' +
+      'The language set for ' + result.fifthGradeLanguage.join(', ') + ' is the rotation ' +
+      'running to ' + FIFTH_GRADE_LANGUAGE_ROTATION_ENDS_ + '. After that date, correct it ' +
+      'on the Ambassadors sheet when the office sets the next rotation - otherwise the ' +
+      'wrong language teacher gets the email.';
+  }
   if (result.flaggedGraduated.length > 0) {
     msg += '\n\nMarked Inactive (not in this year\'s MS roster - likely graduated): ' +
       result.flaggedGraduated.join(', ');
@@ -1134,7 +1154,7 @@ function isSplitBlock_(text) {
   const t = String(text || '');
   // A half-pod block still carrying its group marker has not been
   // narrowed to this student, so both halves are still on the table.
-  if (/\(split group \d\)/.test(t)) return true;
+  if (/\(split [A-C]\)/.test(t)) return true;
   if (t.indexOf('Majors') !== -1 || t.indexOf('Electives') !== -1) return true;
   if (t.indexOf('unclear from PDF') !== -1) return true;
   const distinctSubjects = SUBJECT_WORDS_.filter(s => new RegExp('\\b' + s + '\\b').test(t));
@@ -1325,17 +1345,14 @@ const SEEDED_TEACHER_INITIALS_ = {
   'Sharyn': 'M207',
   'Janet': 'M208',
   'Mary Katherine': 'M209',
-  'Jeremiah Demster': 'M306'
+  'Jeremiah': 'M306'
 };
 
 /** Teachers who run classes but do not hold an advisory, so aren't on the roster. */
 const EXTRA_TEACHERS_ = [
   { name: 'Layla Alter', initials: 'LA', note: 'Choices.' },
   { name: 'Brian', initials: 'BR', note: 'PE.' },
-  { name: 'Lila', initials: 'LL', note: "Subbing for Eliza (EZ) through the first half of the year; the schedule lists them together, so both are emailed." },
-  { name: 'Jeremiah Demster', initials: 'M306',
-    note: 'Art. The schedule prints every Art block as "Art A M306" with no initials at all, ' +
-          'so the room is what identifies the teacher - keep M306 in the Initials column.' }
+  { name: 'Lila', initials: 'LL', note: "Subbing for Eliza (EZ) through the first half of the year; the schedule lists them together, so both are emailed." }
 ];
 
 const ROOM_CODE_ = /^(M\d{3}|L\d{3}|TSAC|PAPAS|Charlton|Thompson|Auditorium)$/;
@@ -1403,9 +1420,9 @@ function getTeacherByInitials_() {
   return map;
 }
 
-const SPLIT_GROUP_RE_ = /\s*\(split group (\d)\)\s*$/;
+const SPLIT_GROUP_RE_ = /\s*\(split ([A-C])\)\s*$/;
 
-/** '1' / '2' for a half-pod block, '' for an ordinary one. */
+/** 'A' / 'B' for a half-pod block, '' for an ordinary one. */
 function splitGroupOf_(text) {
   const m = SPLIT_GROUP_RE_.exec(String(text || ''));
   return m ? m[1] : '';
@@ -1422,7 +1439,7 @@ function splitGroupOf_(text) {
 function pickParallelSection_(text, split) {
   const inits = extractInitials_(text);
   const rooms = extractRooms_(text);
-  const idx = Number(split) - 1;
+  const idx = 'ABC'.indexOf(String(split).toUpperCase());
   if (inits.length < 2 || inits.length !== rooms.length) return null;
   if (inits[0] === rooms[0]) return null;
   if (!(idx >= 0 && idx < inits.length)) return null;
@@ -1482,7 +1499,7 @@ function findMissedClass_(pod, dateVal, startMin, endMin, prefs) {
     const group = splitGroupOf_(text);
     let narrowed = false;
     if (group && split) {
-      if (group !== split) return;
+      if (group.toUpperCase() !== split.toUpperCase()) return;
       text = text.replace(SPLIT_GROUP_RE_, '');
       narrowed = true;
     }
@@ -1493,8 +1510,8 @@ function findMissedClass_(pod, dateVal, startMin, endMin, prefs) {
     }
     // Paired sections running at the same time in two rooms
     // ("Hum Bs ES+SdB M107 M108"): several teachers, one room each. The
-    // schedule lists them in a fixed order, so Split 1 is the first
-    // teacher named and Split 2 the second. Blank Split leaves it
+    // schedule lists them in a fixed order, so Split A is the first
+    // teacher named and Split B the second. Blank Split leaves it
     // ambiguous rather than picking one.
     if (!group && split) {
       const picked = pickParallelSection_(text, split);

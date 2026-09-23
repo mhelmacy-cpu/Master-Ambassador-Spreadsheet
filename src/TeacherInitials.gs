@@ -41,17 +41,14 @@ const SEEDED_TEACHER_INITIALS_ = {
   'Sharyn': 'M207',
   'Janet': 'M208',
   'Mary Katherine': 'M209',
-  'Jeremiah Demster': 'M306'
+  'Jeremiah': 'M306'
 };
 
 /** Teachers who run classes but do not hold an advisory, so aren't on the roster. */
 const EXTRA_TEACHERS_ = [
   { name: 'Layla Alter', initials: 'LA', note: 'Choices.' },
   { name: 'Brian', initials: 'BR', note: 'PE.' },
-  { name: 'Lila', initials: 'LL', note: "Subbing for Eliza (EZ) through the first half of the year; the schedule lists them together, so both are emailed." },
-  { name: 'Jeremiah Demster', initials: 'M306',
-    note: 'Art. The schedule prints every Art block as "Art A M306" with no initials at all, ' +
-          'so the room is what identifies the teacher - keep M306 in the Initials column.' }
+  { name: 'Lila', initials: 'LL', note: "Subbing for Eliza (EZ) through the first half of the year; the schedule lists them together, so both are emailed." }
 ];
 
 const ROOM_CODE_ = /^(M\d{3}|L\d{3}|TSAC|PAPAS|Charlton|Thompson|Auditorium)$/;
@@ -119,9 +116,9 @@ function getTeacherByInitials_() {
   return map;
 }
 
-const SPLIT_GROUP_RE_ = /\s*\(split group (\d)\)\s*$/;
+const SPLIT_GROUP_RE_ = /\s*\(split ([A-C])\)\s*$/;
 
-/** '1' / '2' for a half-pod block, '' for an ordinary one. */
+/** 'A' / 'B' for a half-pod block, '' for an ordinary one. */
 function splitGroupOf_(text) {
   const m = SPLIT_GROUP_RE_.exec(String(text || ''));
   return m ? m[1] : '';
@@ -138,7 +135,7 @@ function splitGroupOf_(text) {
 function pickParallelSection_(text, split) {
   const inits = extractInitials_(text);
   const rooms = extractRooms_(text);
-  const idx = Number(split) - 1;
+  const idx = 'ABC'.indexOf(String(split).toUpperCase());
   if (inits.length < 2 || inits.length !== rooms.length) return null;
   if (inits[0] === rooms[0]) return null;
   if (!(idx >= 0 && idx < inits.length)) return null;
@@ -198,7 +195,7 @@ function findMissedClass_(pod, dateVal, startMin, endMin, prefs) {
     const group = splitGroupOf_(text);
     let narrowed = false;
     if (group && split) {
-      if (group !== split) return;
+      if (group.toUpperCase() !== split.toUpperCase()) return;
       text = text.replace(SPLIT_GROUP_RE_, '');
       narrowed = true;
     }
@@ -209,8 +206,8 @@ function findMissedClass_(pod, dateVal, startMin, endMin, prefs) {
     }
     // Paired sections running at the same time in two rooms
     // ("Hum Bs ES+SdB M107 M108"): several teachers, one room each. The
-    // schedule lists them in a fixed order, so Split 1 is the first
-    // teacher named and Split 2 the second. Blank Split leaves it
+    // schedule lists them in a fixed order, so Split A is the first
+    // teacher named and Split B the second. Blank Split leaves it
     // ambiguous rather than picking one.
     if (!group && split) {
       const picked = pickParallelSection_(text, split);

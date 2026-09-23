@@ -108,75 +108,218 @@ function buildAmbassadorSeedRows_() {
  * ========================================================== */
 
 /**
- * 2026-27 Middle School Homeroom/Advisories, transcribed from the
- * school's official roster PDF. Used to auto-fill each ambassador's
- * Grade, Homeroom Pod, and Teacher (=Advisor) by exact name match.
+ * The 2026-27 Middle School roster, from the office's own
+ * MS-Alpha_by_Grade workbook: one record per student, 143 in all.
  *
- * Row counts were cross-checked against the "Total:" figures printed on
- * each homeroom page of the source PDF (CJM 21, RSS 19, EEL 18, MSB 17,
- * AOS 17, CCM 16, DJM 16, MMS 19 = 143 total Middle School students).
+ * Every field here is something the tool would otherwise have to guess:
+ *
+ *   pod       the homeroom column the bell schedule is keyed on
+ *   advisor   who hears "your advisee is out for a tour"
+ *   split     A, B or C - which half (or third) of the pod the student
+ *             is in for the periods that split. The bell schedule names
+ *             both halves but never who is in which, so this is the
+ *             answer to that.
+ *   language  French, Mandarin or Spanish. The schedule prints the
+ *             language period as all three at once, so this is what
+ *             turns it into one class and one teacher.
+ *
+ * Two honest gaps, both left blank rather than guessed:
+ *
+ * 1. Fifth grade does not have a fixed language - MMS rotates through
+ *    all three. The rotation below is the first one only (Sept 8 to
+ *    Oct 2), which is as far as the workbook was filled in. After Oct 2
+ *    these are stale: update them on the Ambassadors sheet when the
+ *    office sets the next rotation, or re-run Sync Homerooms once this
+ *    file is updated.
+ * 2. Three eighth graders take no language at all, so theirs is blank
+ *    on purpose.
  */
 
-const HOMEROOM_DATA_ = [
-  { grade: '8', pod: 'CJM', advisors: {
-    'Chris': ['Banks Bauer', 'Damien Sandelowsky Weinryt', 'Elias Cuaron', 'Irie Bocchino', 'Lorne Mitchell', 'Sanai Parikh', 'Sophia Pena'],
-    'Janet': ['Delphine Lefleur', 'Jackson Atienza', 'Leonie Sabag', 'Naoki Umehara', 'Ori Cunningham', 'Rhys Quarfordt', 'Zaida Richardson'],
-    'Momii': ['Cyrus Dancy', 'Ethan Bruno', 'Felix Lopez', 'Humphrey Squadron', 'Kay Chisling', 'Logan Vouvalides', 'Paloma White']
-  }},
-  { grade: '8', pod: 'RSS', advisors: {
-    'Rohan': ['Aksel Ozturk', 'Cecilia Melzer', 'Christopher Dike', 'Joseph Corwin', 'Margo Moss', 'Wylie Schwarz', 'Zay Casey'],
-    'Susannah': ['Jessa Shankman', 'Kayla Gary', 'Nicholas Johnson', 'Ricky Rodriguez', 'Soraya Ghavidel'],
-    'Suzanne': ['Emersyn Barile', 'Frank Durst', 'Harriet (Hattie) Owens', 'Leleanna Supan', 'Marcel McAlpin', 'Pascale Destin', 'Steevens Jean']
-  }},
-  { grade: '7', pod: 'EEL', advisors: {
-    'Eliza': ['Afia-Kusiwaa Twumasi', 'Anthony Rosen', 'Eva Ladd-Greene', 'Oscar Morales', 'Solomon Pearce', 'Teo Linville Kendall'],
-    'Elizabeth': ['Brixton Chaffee', 'Leo Askill-Ryan', 'Logan Lai', 'Lulu De Guzman-Schaffer', 'Pierce Shea', 'Seren Kaiser'],
-    'Luis': ['Blake Glenn', 'Caper Helliker', 'Charlotte Schwartz', 'Isabella Westlake', 'Julien Kelly-Green', 'Michelle Denson']
-  }},
-  { grade: '7', pod: 'MSB', advisors: {
-    'Mary Katherine': ['Alia Vinet', 'Alma Bradley', 'Diego Ocotl', 'Emilio Hernandez', 'Gabriel Maczka', 'Kazuma Matsumoto'],
-    'Brendan': ['Ama Bediako Whyte', 'Arlo Berg', 'August (Gus) Gordon', 'Emma Cobert', 'Luca Amoia', 'Mika Bocchino'],
-    'Sabrina': ['Alejandrina (Ale) Chapman', 'Daschel McMahon', 'Larkin Bagley', 'Malcolm Vincent-Gravenhise', 'Reagan Rhau']
-  }},
-  { grade: '6', pod: 'AOS', advisors: {
-    'Amanda': ['Clemente Perez', 'Edward Dickerson', 'Ethan Akuffo Djan', 'Piper Bess', 'Sebastian Block'],
-    'Oliver': ['Benjamin Rogoff', 'Camille Bedeau', 'Eleanor Owens', 'Laura Sandoval', 'Ocea Currie', 'Toby Imberman'],
-    'Sharyn': ['Cara "Cici" Cohen', 'Liam Silverstein', 'Malcolm Mensch', 'Milo Dowling Anderson', 'Sachin Gopal', 'Tessa Fung']
-  }},
-  { grade: '6', pod: 'CCM', advisors: {
-    'Carrie': ['Jane Moss', 'Julian Lopez', 'Marlow Meshberg', 'Sadie Imperioli'],
-    'Chantilly': ['Avery Griffiths', 'Axel Peters', 'Cassidy Handler', 'George McNulty', 'Gus McKay', 'Skylar Bruno'],
-    'Marco': ['August Jones', 'Aurelia Walker', 'Elias "Eli" Fernandez', 'Frances Cooper', 'Hugh Nottingham', 'Jordan Gary']
-  }},
-  { grade: '6', pod: 'DJM', advisors: {
-    'Dan': ['Ashur Valdez', 'Curtis Rosenberg', 'Harper Yun-Dea', 'Jacob Sagner-Washington', 'Oscar Gutmann', 'Saviour Boxill'],
-    'Jeremiah': ['Charli Cooper', 'Errol Grant', 'Jackson Terranova', 'Lev David', 'Penelope Lansdale'],
-    'Mala': ['Alice Chen', 'George Orlofsky', 'Leo Nachum', 'Mateo Moran', 'Sadie Toussant']
-  }},
-  { grade: '5', pod: 'MMS', advisors: {
-    'Mo': ['Aeon Anjargolian', 'Alexander Rogoff', 'Archimedes Gutmann', 'Isabella Dike', 'Olivia Lee', 'Rhea Kaiser', 'Roger Sierant'],
-    'Molly': ['Ellis Ahmed', 'Ezra Fisher', 'Matteo Keklikian', 'McKenna Rodzevicius', 'Perla Dunn', 'Tobik Maczka'],
-    'Sherezada': ['Aiden Tedder', 'Edie Gerson', 'Joakim Leon-McCool', 'Liv Feldman', 'Luka Cuparic', 'Miles Titus']
-  }}
+const MS_ROSTER_ = [
+  { name: 'Banks Bauer', email: '31BanksB@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'B', language: 'French' },
+  { name: 'Damien Sandelowsky Weinryt', email: '31DamienS@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'B', language: 'French' },
+  { name: 'Elias Cuaron', email: '31EliasC@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'A', language: 'French' },
+  { name: 'Irie Bocchino', email: '31IrieB@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'A', language: 'Spanish' },
+  { name: 'Lorne Mitchell', email: '31LorneM@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'B', language: 'Mandarin' },
+  { name: 'Sanai Parikh', email: '31SanaiP@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'A', language: 'French' },
+  { name: 'Sophia Pena', email: '31SophiaP@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'A', language: 'Mandarin' },
+  { name: 'Delphine Lefleur', email: '31DelphineL@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'B', language: 'Mandarin' },
+  { name: 'Jackson Atienza', email: '31JacksonA@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'A', language: 'Mandarin' },
+  { name: 'Leonie Sabag', email: '31LeonieS@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'B', language: 'Mandarin' },
+  { name: 'Naoki Umehara', email: '31NaokiU@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'A', language: 'Mandarin' },
+  { name: 'Ori Cunningham', email: '31OriC@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'A', language: 'Mandarin' },
+  { name: 'Rhys Quarfordt', email: '31RhysQ@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'A', language: 'Mandarin' },
+  { name: 'Zaida Richardson', email: '31ZaidaR@lrei.org', grade: '8', pod: 'CJM', advisor: 'Janet', split: 'B', language: 'Mandarin' },
+  { name: 'Cyrus Dancy', email: '31CyrusD@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'B', language: 'Mandarin' },
+  { name: 'Ethan Bruno', email: '31EthanB@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'B', language: '' },
+  { name: 'Felix Lopez', email: '31FelixL@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'B', language: 'Spanish' },
+  { name: 'Humphrey Squadron', email: '31HumphreyS@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'A', language: 'Spanish' },
+  { name: 'Kay Chisling', email: '31KayC@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'B', language: 'French' },
+  { name: 'Logan Vouvalides', email: '31LoganV@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'A', language: 'French' },
+  { name: 'Paloma White', email: '31PalomaW@lrei.org', grade: '8', pod: 'CJM', advisor: 'Momii', split: 'A', language: 'Mandarin' },
+  { name: 'Aksel Ozturk', email: '31AkselO@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'B', language: 'Spanish' },
+  { name: 'Cecilia Melzer', email: '31CeciliaM@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'B', language: 'French' },
+  { name: 'Christopher Dike', email: '31ChristopherD@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'A', language: 'Spanish' },
+  { name: 'Joseph Corwin', email: '31JosephC@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'B', language: 'Mandarin' },
+  { name: 'Margo Moss', email: '31MargoM@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'B', language: 'Mandarin' },
+  { name: 'Wylie Schwarz', email: '31WylieS@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'B', language: 'Spanish' },
+  { name: 'Zay Casey', email: '31ZayC@lrei.org', grade: '8', pod: 'RSS', advisor: 'Rohan', split: 'A', language: 'French' },
+  { name: 'Jessa Shankman', email: '31JessaS@lrei.org', grade: '8', pod: 'RSS', advisor: 'Susannah', split: 'A', language: 'Spanish' },
+  { name: 'Kayla Gary', email: '31KaylaG@lrei.org', grade: '8', pod: 'RSS', advisor: 'Susannah', split: 'B', language: '' },
+  { name: 'Nicholas Johnson', email: '31NicholasJ@lrei.org', grade: '8', pod: 'RSS', advisor: 'Susannah', split: 'A', language: 'Spanish' },
+  { name: 'Ricky Rodriguez', email: '31RickyR@lrei.org', grade: '8', pod: 'RSS', advisor: 'Susannah', split: 'A', language: 'Spanish' },
+  { name: 'Soraya Ghavidel', email: '31SorayaG@lrei.org', grade: '8', pod: 'RSS', advisor: 'Susannah', split: 'B', language: '' },
+  { name: 'Emersyn Barile', email: '31EmersynB@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'B', language: 'Mandarin' },
+  { name: 'Frank Durst', email: '31FrankD@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'B', language: 'Mandarin' },
+  { name: 'Harriet (Hattie) Owens', email: '31Harriet (Hattie)O@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'A', language: 'French' },
+  { name: 'Leleanna Supan', email: '31LeleannaS@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'A', language: 'French' },
+  { name: 'Marcel McAlpin', email: '31MarcelM@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'B', language: 'Mandarin' },
+  { name: 'Pascale Destin', email: '31PascaleD@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'A', language: 'French' },
+  { name: 'Steevens Jean', email: '31SteevensJ@lrei.org', grade: '8', pod: 'RSS', advisor: 'Suzanne', split: 'A', language: 'Spanish' },
+  { name: 'Afia-Kusiwaa Twumasi', email: '32Afia-KusiwaaT@lrei.org', grade: '7', pod: 'EEL', advisor: 'Eliza', split: 'A', language: 'French' },
+  { name: 'Anthony Rosen', email: '32AnthonyR@lrei.org', grade: '7', pod: 'EEL', advisor: 'Eliza', split: 'B', language: 'Mandarin' },
+  { name: 'Eva Ladd-Greene', email: '32EvaL@lrei.org', grade: '7', pod: 'EEL', advisor: 'Eliza', split: 'A', language: 'Spanish' },
+  { name: 'Oscar Morales', email: '32OscarM@lrei.org', grade: '7', pod: 'EEL', advisor: 'Eliza', split: 'B', language: 'Spanish' },
+  { name: 'Solomon Pearce', email: '32SolomonP@lrei.org', grade: '7', pod: 'EEL', advisor: 'Eliza', split: 'A', language: 'French' },
+  { name: 'Teo Linville Kendall', email: '32TeoL@lrei.org', grade: '7', pod: 'EEL', advisor: 'Eliza', split: 'A', language: 'Spanish' },
+  { name: 'Brixton Chaffee', email: '32BrixtonC@lrei.org', grade: '7', pod: 'EEL', advisor: 'Elizabeth', split: 'A', language: 'Mandarin' },
+  { name: 'Leo Askill-Ryan', email: '32LeoA@lrei.org', grade: '7', pod: 'EEL', advisor: 'Elizabeth', split: 'A', language: 'Spanish' },
+  { name: 'Logan Lai', email: '32LoganL@lrei.org', grade: '7', pod: 'EEL', advisor: 'Elizabeth', split: 'A', language: 'Mandarin' },
+  { name: 'Lulu De Guzman-Schaffer', email: '32LuluD@lrei.org', grade: '7', pod: 'EEL', advisor: 'Elizabeth', split: 'B', language: 'Mandarin' },
+  { name: 'Pierce Shea', email: '32PierceS@lrei.org', grade: '7', pod: 'EEL', advisor: 'Elizabeth', split: 'B', language: 'Spanish' },
+  { name: 'Seren Kaiser', email: '32SerenK@lrei.org', grade: '7', pod: 'EEL', advisor: 'Elizabeth', split: 'B', language: 'Spanish' },
+  { name: 'Blake Glenn', email: '32BlakeG@lrei.org', grade: '7', pod: 'EEL', advisor: 'Luis', split: 'B', language: 'Spanish' },
+  { name: 'Caper Helliker', email: '32CaperH@lrei.org', grade: '7', pod: 'EEL', advisor: 'Luis', split: 'A', language: 'French' },
+  { name: 'Charlotte Schwartz', email: '32CharlotteS@lrei.org', grade: '7', pod: 'EEL', advisor: 'Luis', split: 'A', language: 'French' },
+  { name: 'Isabella Westlake', email: '32IsabellaW@lrei.org', grade: '7', pod: 'EEL', advisor: 'Luis', split: 'B', language: 'Spanish' },
+  { name: 'Julien Kelly-Green', email: '32JulienK@lrei.org', grade: '7', pod: 'EEL', advisor: 'Luis', split: 'B', language: 'Spanish' },
+  { name: 'Michelle Denson', email: '32MichelleD@lrei.org', grade: '7', pod: 'EEL', advisor: 'Luis', split: 'B', language: 'French' },
+  { name: 'Ama Bediako Whyte', email: '32AmaB@lrei.org', grade: '7', pod: 'MSB', advisor: 'Brendan', split: 'B', language: 'Mandarin' },
+  { name: 'Arlo Berg', email: '32ArloB@lrei.org', grade: '7', pod: 'MSB', advisor: 'Brendan', split: 'A', language: 'Mandarin' },
+  { name: 'August (Gus) Gordon', email: '32August (Gus)G@lrei.org', grade: '7', pod: 'MSB', advisor: 'Brendan', split: 'A', language: 'Spanish' },
+  { name: 'Emma Cobert', email: '32EmmaC@lrei.org', grade: '7', pod: 'MSB', advisor: 'Brendan', split: 'B', language: 'French' },
+  { name: 'Luca Amoia', email: '32LucaA@lrei.org', grade: '7', pod: 'MSB', advisor: 'Brendan', split: 'B', language: 'Mandarin' },
+  { name: 'Mika Bocchino', email: '32MikaB@lrei.org', grade: '7', pod: 'MSB', advisor: 'Brendan', split: 'A', language: 'French' },
+  { name: 'Alia Vinet', email: '32AliaV@lrei.org', grade: '7', pod: 'MSB', advisor: 'Mary Katherine', split: 'B', language: 'French' },
+  { name: 'Alma Bradley', email: '32AlmaB@lrei.org', grade: '7', pod: 'MSB', advisor: 'Mary Katherine', split: 'A', language: 'French' },
+  { name: 'Diego Ocotl', email: '32DiegoO@lrei.org', grade: '7', pod: 'MSB', advisor: 'Mary Katherine', split: 'B', language: 'Mandarin' },
+  { name: 'Emilio Hernandez', email: '32EmilioH@lrei.org', grade: '7', pod: 'MSB', advisor: 'Mary Katherine', split: 'A', language: 'Spanish' },
+  { name: 'Gabriel Maczka', email: '32GabrielM@lrei.org', grade: '7', pod: 'MSB', advisor: 'Mary Katherine', split: 'A', language: 'French' },
+  { name: 'Kazuma Matsumoto', email: '32KazumaM@lrei.org', grade: '7', pod: 'MSB', advisor: 'Mary Katherine', split: 'B', language: 'Mandarin' },
+  { name: 'Alejandrina (Ale) Chapman', email: '32Alejandrina (Ale)C@lrei.org', grade: '7', pod: 'MSB', advisor: 'Sabrina', split: 'A', language: 'Mandarin' },
+  { name: 'Daschel McMahon', email: '32DaschelM@lrei.org', grade: '7', pod: 'MSB', advisor: 'Sabrina', split: 'B', language: 'French' },
+  { name: 'Larkin Bagley', email: '32LarkinB@lrei.org', grade: '7', pod: 'MSB', advisor: 'Sabrina', split: 'B', language: 'Spanish' },
+  { name: 'Malcolm Vincent-Gravenhise', email: '32MalcolmV@lrei.org', grade: '7', pod: 'MSB', advisor: 'Sabrina', split: 'A', language: 'Mandarin' },
+  { name: 'Reagan Rhau', email: '32ReaganR@lrei.org', grade: '7', pod: 'MSB', advisor: 'Sabrina', split: 'B', language: 'Mandarin' },
+  { name: 'Ashur Valdez', email: '33AshurV@lrei.org', grade: '6', pod: 'DJM', advisor: 'Dan', split: 'C', language: 'French' },
+  { name: 'Curtis Rosenberg', email: '33CurtisR@lrei.org', grade: '6', pod: 'DJM', advisor: 'Dan', split: 'B', language: 'Spanish' },
+  { name: 'Harper Yun-Dea', email: '33HarperY@lrei.org', grade: '6', pod: 'DJM', advisor: 'Dan', split: 'B', language: 'Mandarin' },
+  { name: 'Jacob Sagner-Washington', email: '33JacobS@lrei.org', grade: '6', pod: 'DJM', advisor: 'Dan', split: 'B', language: 'Spanish' },
+  { name: 'Oscar Gutmann', email: '33OscarG@lrei.org', grade: '6', pod: 'DJM', advisor: 'Dan', split: 'C', language: 'French' },
+  { name: 'Saviour Boxill', email: '33SaviourB@lrei.org', grade: '6', pod: 'DJM', advisor: 'Dan', split: 'B', language: 'Spanish' },
+  { name: 'Charli Cooper', email: '33CharliC@lrei.org', grade: '6', pod: 'DJM', advisor: 'Jeremiah', split: 'C', language: 'Spanish' },
+  { name: 'Errol Grant', email: '33ErrolG@lrei.org', grade: '6', pod: 'DJM', advisor: 'Jeremiah', split: 'A', language: 'Spanish' },
+  { name: 'Jackson Terranova', email: '33JacksonT@lrei.org', grade: '6', pod: 'DJM', advisor: 'Jeremiah', split: 'C', language: 'Mandarin' },
+  { name: 'Lev David', email: '33LevD@lrei.org', grade: '6', pod: 'DJM', advisor: 'Jeremiah', split: 'A', language: 'Spanish' },
+  { name: 'Penelope Lansdale', email: '33PenelopeL@lrei.org', grade: '6', pod: 'DJM', advisor: 'Jeremiah', split: 'C', language: 'French' },
+  { name: 'Alice Chen', email: '33AliceC@lrei.org', grade: '6', pod: 'DJM', advisor: 'Mala', split: 'B', language: 'Mandarin' },
+  { name: 'George Orlofsky', email: '33GeorgeO@lrei.org', grade: '6', pod: 'DJM', advisor: 'Mala', split: 'C', language: 'French' },
+  { name: 'Leo Nachum', email: '33LeoN@lrei.org', grade: '6', pod: 'DJM', advisor: 'Mala', split: 'A', language: 'Mandarin' },
+  { name: 'Mateo Moran', email: '33MateoM@lrei.org', grade: '6', pod: 'DJM', advisor: 'Mala', split: 'A', language: 'Spanish' },
+  { name: 'Sadie Toussant', email: '33SadieT@lrei.org', grade: '6', pod: 'DJM', advisor: 'Mala', split: 'A', language: 'Mandarin' },
+  { name: 'Clemente Perez', email: '33ClementeP@lrei.org', grade: '6', pod: 'AOS', advisor: 'Amanda', split: 'B', language: 'Mandarin' },
+  { name: 'Edward Dickerson', email: '33EdwardD@lrei.org', grade: '6', pod: 'AOS', advisor: 'Amanda', split: 'A', language: 'Mandarin' },
+  { name: 'Ethan Akuffo Djan', email: '33EthanA@lrei.org', grade: '6', pod: 'AOS', advisor: 'Amanda', split: 'A', language: 'Mandarin' },
+  { name: 'Piper Bess', email: '33PiperB@lrei.org', grade: '6', pod: 'AOS', advisor: 'Amanda', split: 'B', language: 'French' },
+  { name: 'Sebastian Block', email: '33SebastianB@lrei.org', grade: '6', pod: 'AOS', advisor: 'Amanda', split: 'B', language: 'French' },
+  { name: 'Benjamin Rogoff', email: '33BenjaminR@lrei.org', grade: '6', pod: 'AOS', advisor: 'Oliver', split: 'C', language: 'Mandarin' },
+  { name: 'Camille Bedeau', email: '33CamilleB@lrei.org', grade: '6', pod: 'AOS', advisor: 'Oliver', split: 'C', language: 'Mandarin' },
+  { name: 'Eleanor Owens', email: '33EleanorO@lrei.org', grade: '6', pod: 'AOS', advisor: 'Oliver', split: 'C', language: 'French' },
+  { name: 'Laura Sandoval', email: '33LauraS@lrei.org', grade: '6', pod: 'AOS', advisor: 'Oliver', split: 'C', language: 'French' },
+  { name: 'Ocea Currie', email: '33OceaC@lrei.org', grade: '6', pod: 'AOS', advisor: 'Oliver', split: 'B', language: 'Spanish' },
+  { name: 'Toby Imberman', email: '33TobyI@lrei.org', grade: '6', pod: 'AOS', advisor: 'Oliver', split: 'B', language: 'Spanish' },
+  { name: 'Cara "Cici" Cohen', email: '33Cara "Cici"C@lrei.org', grade: '6', pod: 'AOS', advisor: 'Sharyn', split: 'B', language: 'Spanish' },
+  { name: 'Liam Silverstein', email: '33LiamS@lrei.org', grade: '6', pod: 'AOS', advisor: 'Sharyn', split: 'C', language: 'French' },
+  { name: 'Malcolm Mensch', email: '33MalcolmM@lrei.org', grade: '6', pod: 'AOS', advisor: 'Sharyn', split: 'A', language: 'Spanish' },
+  { name: 'Milo Dowling Anderson', email: '33MiloD@lrei.org', grade: '6', pod: 'AOS', advisor: 'Sharyn', split: 'B', language: 'Mandarin' },
+  { name: 'Sachin Gopal', email: '33SachinG@lrei.org', grade: '6', pod: 'AOS', advisor: 'Sharyn', split: 'C', language: 'Spanish' },
+  { name: 'Tessa Fung', email: '33TessaF@lrei.org', grade: '6', pod: 'AOS', advisor: 'Sharyn', split: 'A', language: 'Mandarin' },
+  { name: 'Jane Moss', email: '33JaneM@lrei.org', grade: '6', pod: 'CCM', advisor: 'Carrie', split: 'A', language: 'Spanish' },
+  { name: 'Julian Lopez', email: '33JulianL@lrei.org', grade: '6', pod: 'CCM', advisor: 'Carrie', split: 'B', language: 'Spanish' },
+  { name: 'Marlow Meshberg', email: '33MarlowM@lrei.org', grade: '6', pod: 'CCM', advisor: 'Carrie', split: 'C', language: 'French' },
+  { name: 'Sadie Imperioli', email: '33SadieI@lrei.org', grade: '6', pod: 'CCM', advisor: 'Carrie', split: 'A', language: 'Spanish' },
+  { name: 'Avery Griffiths', email: '33AveryG@lrei.org', grade: '6', pod: 'CCM', advisor: 'Chantilly', split: 'A', language: 'Mandarin' },
+  { name: 'Axel Peters', email: '33AxelP@lrei.org', grade: '6', pod: 'CCM', advisor: 'Chantilly', split: 'C', language: 'Mandarin' },
+  { name: 'Cassidy Handler', email: '33CassidyH@lrei.org', grade: '6', pod: 'CCM', advisor: 'Chantilly', split: 'B', language: 'Spanish' },
+  { name: 'George McNulty', email: '33GeorgeM@lrei.org', grade: '6', pod: 'CCM', advisor: 'Chantilly', split: 'C', language: 'Spanish' },
+  { name: 'Gus McKay', email: '33GusM@lrei.org', grade: '6', pod: 'CCM', advisor: 'Chantilly', split: 'A', language: 'Mandarin' },
+  { name: 'Skylar Bruno', email: '33SkylarB@lrei.org', grade: '6', pod: 'CCM', advisor: 'Chantilly', split: 'C', language: 'Mandarin' },
+  { name: 'August Jones', email: '33AugustJ@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'B', language: 'Spanish' },
+  { name: 'Aurelia Walker', email: '33AureliaW@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'B', language: 'Mandarin' },
+  { name: 'Elias "Eli" Fernandez', email: '33Elias "Eli"F@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'A', language: 'French' },
+  { name: 'Frances Cooper', email: '33FrancesC@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'A', language: 'Mandarin' },
+  { name: 'Hugh Nottingham', email: '33HughN@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'B', language: 'Mandarin' },
+  { name: 'Jordan Gary', email: '33JordanG@lrei.org', grade: '6', pod: 'CCM', advisor: 'Marco', split: 'A', language: 'Mandarin' },
+  { name: 'Aeon Anjargolian', email: '34AeonA@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: 'French' },
+  { name: 'Alexander Rogoff', email: '34AlexanderR@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: 'Spanish' },
+  { name: 'Archimedes Gutmann', email: '34ArchimedesG@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: 'French' },
+  { name: 'Isabella Dike', email: '34IsabellaD@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: 'Mandarin' },
+  { name: 'Olivia Lee', email: '34OliviaL@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'A', language: 'Spanish' },
+  { name: 'Rhea Kaiser', email: '34RheaK@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'B', language: 'Mandarin' },
+  { name: 'Roger Sierant', email: '34RogerS@lrei.org', grade: '5', pod: 'MMS', advisor: 'Mo', split: 'B', language: 'Spanish' },
+  { name: 'Ellis Ahmed', email: '34EllisA@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'A', language: 'Spanish' },
+  { name: 'Ezra Fisher', email: '34EzraF@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B', language: 'French' },
+  { name: 'Matteo Keklikian', email: '34MatteoK@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B', language: 'Spanish' },
+  { name: 'McKenna Rodzevicius', email: '34McKennaR@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'A', language: 'French' },
+  { name: 'Perla Dunn', email: '34PerlaD@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B', language: 'French' },
+  { name: 'Tobik Maczka', email: '34TobikM@lrei.org', grade: '5', pod: 'MMS', advisor: 'Molly', split: 'B', language: 'French' },
+  { name: 'Aiden Tedder', email: '34AidenT@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'A', language: 'Mandarin' },
+  { name: 'Edie Gerson', email: '34EdieG@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B', language: 'Mandarin' },
+  { name: 'Joakim Leon-McCool', email: '34JoakimL@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B', language: 'Spanish' },
+  { name: 'Liv Feldman', email: '34LivF@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B', language: 'Spanish' },
+  { name: 'Luka Cuparic', email: '34LukaC@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'B', language: 'Mandarin' },
+  { name: 'Miles Titus', email: '34MilesT@lrei.org', grade: '5', pod: 'MMS', advisor: 'Sherezada', split: 'A', language: 'Mandarin' }
 ];
+
+/** The date the seeded fifth-grade language rotation stops being true. */
+const FIFTH_GRADE_LANGUAGE_ROTATION_ENDS_ = '2026-10-02';
 
 function getAllAdvisorNames_() {
   const names = {};
-  HOMEROOM_DATA_.forEach(section => Object.keys(section.advisors).forEach(a => { names[a] = true; }));
+  MS_ROSTER_.forEach(s => { if (s.advisor) names[s.advisor] = true; });
   return Object.keys(names).sort();
 }
 
 function buildHomeroomLookup_() {
   const map = {};
-  HOMEROOM_DATA_.forEach(section => {
-    Object.keys(section.advisors).forEach(advisor => {
-      section.advisors[advisor].forEach(name => {
-        map[normalizeName_(name)] = { grade: section.grade, pod: section.pod, advisor: advisor };
-      });
-    });
+  MS_ROSTER_.forEach(s => {
+    map[normalizeName_(s.name)] = {
+      grade: s.grade, pod: s.pod, advisor: s.advisor,
+      split: s.split, language: s.language, email: s.email
+    };
   });
   return map;
 }
+
+/**
+ * The old grade/pod/advisor shape, rebuilt from the roster so the two
+ * can never drift apart.
+ */
+const HOMEROOM_DATA_ = (function () {
+  const sections = [];
+  const index = {};
+  MS_ROSTER_.forEach(s => {
+    const key = s.grade + '|' + s.pod;
+    if (!index[key]) {
+      index[key] = { grade: s.grade, pod: s.pod, advisors: {} };
+      sections.push(index[key]);
+    }
+    const advisors = index[key].advisors;
+    if (!advisors[s.advisor]) advisors[s.advisor] = [];
+    advisors[s.advisor].push(s.name);
+  });
+  return sections;
+})();
 
 /* ==========================================================
  * TourRoutesSeedData
@@ -337,7 +480,7 @@ const TOUR_ROUTE_NUMBERS = TOUR_ROUTE_SEED_.map(r => r.route);
  * are parallel groups the schedule names without saying which student
  * is in which - the language choice (French M207 / Mandarin M208 /
  * Spanish M209), Majors and Electives, and the MMS blocks marked
- * '(split group 1)' / '(split group 2)'. Fill in an ambassador's
+ * '(split A)' / '(split B)'. Fill in an ambassador's
  * Language and Split on the Ambassadors sheet and the tool resolves
  * those to one class; leave them blank and it reports the options
  * instead of guessing.
@@ -348,7 +491,7 @@ const TOUR_ROUTE_NUMBERS = TOUR_ROUTE_SEED_.map(r => r.route);
 
 const BELL_SCHEDULE_ = {
   'Monday': {
-    'MMS': [['8:15','8:45','Morning Homeroom'], ['8:45','9:30','MS Meeting'], ['9:30','10:15','French - M207 Mandarin - M208 Spanish - M209'], ['10:15','11:00','Hum MN M212'], ['11:00','11:30','Lunch JL, SA'], ['11:30','12:00','Recess MB, CB'], ['12:00','12:45','PE LH TSAC'], ['12:45','13:30','Science SA M310'], ['13:30','14:15','Math A MD M311 (split group 1)'], ['13:30','14:15','Hum B MN M212 (split group 2)'], ['14:15','15:00','Hum A MN M212 (split group 1)'], ['14:15','15:00','Math B MD M311 (split group 2)'], ['15:00','15:10','IWP']],
+    'MMS': [['8:15','8:45','Morning Homeroom'], ['8:45','9:30','MS Meeting'], ['9:30','10:15','French - M207 Mandarin - M208 Spanish - M209'], ['10:15','11:00','Hum MN M212'], ['11:00','11:30','Lunch JL, SA'], ['11:30','12:00','Recess MB, CB'], ['12:00','12:45','PE LH TSAC'], ['12:45','13:30','Science SA M310'], ['13:30','14:15','Math A MD M311 (split A)'], ['13:30','14:15','Hum B MN M212 (split B)'], ['14:15','15:00','Hum A MN M212 (split A)'], ['14:15','15:00','Math B MD M311 (split B)'], ['15:00','15:10','IWP']],
     'DJM': [['8:15','8:45','Morning Homeroom'], ['8:45','9:30','MS Meeting'], ['9:30','10:15','Math A CB M311'], ['10:15','11:00','Music A CN M103'], ['11:00','11:30','Lunch JL, SA'], ['11:30','12:00','Recess MB, CB'], ['12:00','13:30','Hum DR M211'], ['13:30','14:15','French - M207 Mandarin - M208 Spanish - M209'], ['14:15','15:00','PE A LH TSAC'], ['15:00','15:10','IWP']],
     'AOS': [['8:15','8:45','Morning Homeroom'], ['8:45','9:30','MS Meeting'], ['9:30','10:15','PE B LH TSAC'], ['10:15','11:00','Math B CB M311'], ['11:00','11:30','Lunch JL, SA'], ['11:30','12:00','Recess MB, CB'], ['12:00','13:30','Hum AG M209'], ['13:30','14:15','French - M207 Mandarin - M208 Spanish - M209'], ['14:15','15:00','Music B CN M103'], ['15:00','15:10','IWP']],
     'CCM': [['8:15','8:45','Morning Homeroom'], ['8:45','9:30','MS Meeting'], ['9:30','11:00','Science C OC M310'], ['11:00','11:30','Lunch JL, SA'], ['11:30','12:00','Recess MB, CB'], ['12:00','13:30','Hum MS M212'], ['13:30','14:15','French - M207 Mandarin - M208 Spanish - M209'], ['14:15','15:00','Math C CB M310'], ['15:00','15:10','IWP']],
@@ -368,7 +511,7 @@ const BELL_SCHEDULE_ = {
     'RSS': [['8:15','8:45','Morning Homeroom'], ['8:45','9:30','PE B BR TSAC'], ['9:30','11:00','Hum SC M108'], ['11:00','11:30','Recess SdB, ES'], ['11:30','12:00','Lunch JD, BC'], ['12:00','12:45','7/8 Electives The Movement Lab - PAPAS Storytelling - M108 Mix it Up - M107 Ceramics - Art Room Photography - L104 Music Production - M103'], ['12:45','13:30','Math B CK M308'], ['13:30','14:15','French - M207 Mandarin - M208 Spanish - M209'], ['14:15','15:00','CAP'], ['15:00','15:10','IWP']]
   },
   'Wednesday': {
-    'MMS': [['8:15','8:45','Morning Homeroom'], ['8:45','9:30','French - M207 Mandarin - M208 Spanish - M209'], ['9:30','10:15','Hum MN M212'], ['10:15','11:00','5/6 Electives Dance - PAPAS Drama - M212 Modern Band - Auditorium Animation - L104 Vocal Ensemble - M103'], ['11:00','11:30','Lunch MS, SA'], ['11:30','12:00','Recess OC, MB'], ['12:00','12:45','Math MD M311'], ['12:45','13:30','Hum A MN M212 (split group 1)'], ['12:45','13:30','Science SA M310 (split group 2)'], ['13:30','14:15','Science SA M310 (split group 1)'], ['13:30','14:15','Hum B MN M212 (split group 2)'], ['14:15','15:00','Affinity Groups/Olympic Teams'], ['15:00','15:10','IWP']],
+    'MMS': [['8:15','8:45','Morning Homeroom'], ['8:45','9:30','French - M207 Mandarin - M208 Spanish - M209'], ['9:30','10:15','Hum MN M212'], ['10:15','11:00','5/6 Electives Dance - PAPAS Drama - M212 Modern Band - Auditorium Animation - L104 Vocal Ensemble - M103'], ['11:00','11:30','Lunch MS, SA'], ['11:30','12:00','Recess OC, MB'], ['12:00','12:45','Math MD M311'], ['12:45','13:30','Hum A MN M212 (split A)'], ['12:45','13:30','Science SA M310 (split B)'], ['13:30','14:15','Science SA M310 (split A)'], ['13:30','14:15','Hum B MN M212 (split B)'], ['14:15','15:00','Affinity Groups/Olympic Teams'], ['15:00','15:10','IWP']],
     'DJM': [['8:15','8:45','Morning Homeroom'], ['8:45','9:30','Math A CB M311'], ['9:30','10:15','PE A LH TSAC'], ['10:15','11:00','5/6 Electives Dance - PAPAS Drama - M212 Modern Band - Auditorium Animation - L104 Vocal Ensemble - M103'], ['11:00','11:30','Lunch MS, SA'], ['11:30','12:00','Recess OC, MB'], ['12:00','12:45','Hum DR M211'], ['12:45','13:30','B Art A M306'], ['13:30','14:15','French - M207 Mandarin - M208 Spanish - M209'], ['14:15','15:00','Affinity Groups/Olympic Teams'], ['15:00','15:10','IWP']],
     'AOS': [['8:15','8:45','Morning Homeroom'], ['8:45','9:30','Art B M306'], ['9:30','10:15','Math B CB M311'], ['10:15','11:00','5/6 Electives Dance - PAPAS Drama - M212 Modern Band - Auditorium Animation - L104 Vocal Ensemble - M103'], ['11:00','11:30','Lunch MS, SA'], ['11:30','12:00','Recess OC, MB'], ['12:00','12:45','Hum AG M209'], ['12:45','13:30','PE B LH TSAC'], ['13:30','14:15','French - M207 Mandarin - M208 Spanish - M209'], ['14:15','15:00','Affinity Groups/Olympic Teams'], ['15:00','15:10','IWP']],
     'CCM': [['8:15','8:45','Morning Homeroom'], ['8:45','10:15','Science C OC M310'], ['10:15','11:00','5/6 Electives Dance - PAPAS Drama - M212 Modern Band - Auditorium Animation - L104 Vocal Ensemble - M103'], ['11:00','11:30','Lunch MS, SA'], ['11:30','12:00','Recess OC, MB'], ['12:00','12:45','Hum MS M212'], ['12:45','13:30','Math C CB M311'], ['13:30','14:15','French - M207 Mandarin - M208 Spanish - M209'], ['14:15','15:00','Affinity Groups/Olympic Teams'], ['15:00','15:10','IWP']],
