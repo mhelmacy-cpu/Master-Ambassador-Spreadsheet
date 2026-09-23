@@ -263,6 +263,11 @@ function alert_(msg) { SpreadsheetApp.getUi().alert(msg); }
  * ========================================================= */
 
 function setupSpreadsheet() {
+  // Only a workbook with nothing in it yet gets its tabs arranged and its
+  // columns sized. Run this again later and it fills gaps without
+  // touching a single thing already there.
+  const before = ss_().getSheetByName(SHEETS.AMBASSADORS);
+  const firstRun = !before || before.getLastRow() < 2;
   Object.keys(SHEETS).forEach(function (k) { sheet_(SHEETS[k]); });
 
   setupAmbassadors_();
@@ -275,15 +280,19 @@ function setupSpreadsheet() {
   setupRoutes_();
   setupSettings_();
 
-  const order = [SHEETS.PROSPECTIVE, SHEETS.TRACKER, SHEETS.AMBASSADORS, SHEETS.ELIGIBILITY,
-    SHEETS.JOBS, SHEETS.TEACHERS, SHEETS.ROUTES, SHEETS.BELL, SHEETS.SETTINGS];
-  order.forEach(function (name, i) {
-    const s = ss_().getSheetByName(name);
-    if (s) ss_().setActiveSheet(s).moveActiveSheet(i + 1);
-  });
-  ss_().setActiveSheet(ss_().getSheetByName(SHEETS.PROSPECTIVE));
+  if (firstRun) {
+    const order = [SHEETS.PROSPECTIVE, SHEETS.TRACKER, SHEETS.AMBASSADORS, SHEETS.ELIGIBILITY,
+      SHEETS.JOBS, SHEETS.TEACHERS, SHEETS.ROUTES, SHEETS.BELL, SHEETS.SETTINGS];
+    order.forEach(function (name, i) {
+      const s = ss_().getSheetByName(name);
+      if (s) ss_().setActiveSheet(s).moveActiveSheet(i + 1);
+    });
+    ss_().setActiveSheet(ss_().getSheetByName(SHEETS.PROSPECTIVE));
+  }
 
-  alert_('Setup complete.\n\n' +
+  alert_((firstRun ? 'Setup complete.' :
+    'Setup checked over. Everything already there was left exactly as it was - ' +
+    'no columns resized, no formatting changed.') + '\n\n' +
     'Three things to fill in before anything can send:\n\n' +
     '1. Ambassadors - the 31 names are there. Add Homeroom, Split, Grade, ' +
     'Advisor, Borough, Gender and Student Email.\n' +
@@ -297,7 +306,8 @@ function setupSpreadsheet() {
 function setupAmbassadors_() {
   const s = sheet_(SHEETS.AMBASSADORS);
   const h = HEADERS[SHEETS.AMBASSADORS];
-  if (s.getLastRow() < 2) {
+  const fresh = s.getLastRow() < 2;
+  if (fresh) {
     const rows = AMBASSADOR_NAMES_.map(function (n) {
       const p = splitName_(n);
       const row = blankRow_(SHEETS.AMBASSADORS);
@@ -308,6 +318,7 @@ function setupAmbassadors_() {
     });
     s.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
   }
+  if (!fresh) return;   // an existing sheet keeps its own formatting
   const last = Math.max(s.getLastRow(), 2);
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Homeroom') + 1, PODS);
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Split') + 1, SPLITS);
@@ -338,6 +349,7 @@ function setupAmbassadors_() {
 function setupProspective_() {
   const s = sheet_(SHEETS.PROSPECTIVE);
   const h = HEADERS[SHEETS.PROSPECTIVE];
+  if (s.getLastRow() > 1) return;
   const last = Math.max(s.getLastRow(), 2);
   dropdown_(s, last, col_(SHEETS.PROSPECTIVE, 'Grade') + 1, GRADES, true);
   dropdown_(s, last, col_(SHEETS.PROSPECTIVE, 'Gender') + 1, GENDERS, true);
@@ -352,6 +364,7 @@ function setupProspective_() {
 
 function setupTracker_() {
   const s = sheet_(SHEETS.TRACKER);
+  if (s.getLastRow() > 1) return;
   const last = Math.max(s.getLastRow(), 2);
   s.getRange(2, col_(SHEETS.TRACKER, 'Tour Date') + 1, Math.max(last - 1, 200), 1)
     .setNumberFormat('yyyy-mm-dd');
@@ -365,7 +378,8 @@ function setupTracker_() {
 
 function setupJobs_() {
   const s = sheet_(SHEETS.JOBS);
-  if (s.getLastRow() < 2) {
+  const fresh = s.getLastRow() < 2;
+  if (fresh) {
     s.getRange(2, 1, 4, 3).setValues([
       [JOBS.PANELIST, 'Speaks on the student panel. Chosen by hand, not by the staffing command.', 'Yes'],
       [JOBS.LOBBY, 'Greets visiting families as they arrive in the lobby.', 'Yes'],
@@ -373,6 +387,7 @@ function setupJobs_() {
       [JOBS.GUIDE, 'Walks a prospective student round the building on a set route.', 'Yes']
     ]);
   }
+  if (!fresh) return;
   dropdown_(s, Math.max(s.getLastRow(), 2), 3, YES_NO);
   s.autoResizeColumns(1, 3);
 }
@@ -380,6 +395,7 @@ function setupJobs_() {
 function setupEligibility_() {
   const s = sheet_(SHEETS.ELIGIBILITY);
   const h = HEADERS[SHEETS.ELIGIBILITY];
+  const fresh = s.getLastRow() < 2;
   const names = rows_(SHEETS.AMBASSADORS)
     .map(function (r) { return fullName_(r[0], r[1]); })
     .filter(function (n) { return n !== ''; });
@@ -392,6 +408,7 @@ function setupEligibility_() {
       return [n, 'Yes', 'Yes', 'Yes', 'Yes'];
     }));
   }
+  if (!fresh) return;
   const last = Math.max(s.getLastRow(), 2);
   for (let c = 2; c <= h.length; c++) dropdown_(s, last, c, YES_NO);
   note_(s, SHEETS.ELIGIBILITY, 'Ambassador',
@@ -403,7 +420,8 @@ function setupEligibility_() {
 function setupTeachers_() {
   const s = sheet_(SHEETS.TEACHERS);
   const h = HEADERS[SHEETS.TEACHERS];
-  if (s.getLastRow() < 2) {
+  const fresh = s.getLastRow() < 2;
+  if (fresh) {
     const seen = {};
     const rows = [];
     Object.keys(TEACHER_INITIALS_).forEach(function (name) {
@@ -426,6 +444,7 @@ function setupTeachers_() {
     });
     s.getRange(2, 1, rows.length, h.length).setValues(rows);
   }
+  if (!fresh) return;
   note_(s, SHEETS.TEACHERS, 'Initials',
     'How this teacher appears on the Bell Schedule (CB, LH, SdB). The World ' +
     'Language teachers and Art are keyed by room instead - those blocks print ' +
@@ -439,7 +458,8 @@ function setupTeachers_() {
 
 function setupBellSchedule_() {
   const s = sheet_(SHEETS.BELL);
-  if (s.getLastRow() < 2) {
+  const fresh = s.getLastRow() < 2;
+  if (fresh) {
     const rows = [];
     SCHEDULE_DAYS_.forEach(function (day) {
       PODS.forEach(function (pod) {
@@ -450,6 +470,7 @@ function setupBellSchedule_() {
     });
     s.getRange(2, 1, rows.length, HEADERS[SHEETS.BELL].length).setValues(rows);
   }
+  if (!fresh) return;
   note_(s, SHEETS.BELL, 'Split',
     'Filled in where the block belongs to a split group rather than the whole ' +
     'homeroom - that is what the section letter in "Math A" or "Science C" means. ' +
@@ -463,7 +484,8 @@ function setupBellSchedule_() {
 
 function setupRoutes_() {
   const s = sheet_(SHEETS.ROUTES);
-  if (s.getLastRow() < 2) {
+  if (s.getLastRow() > 1) return;
+  {
     const rows = TOUR_ROUTES_.map(function (r) {
       return [r.route, r.direction, r.humanities, r.language, r.itinerary];
     });
@@ -477,9 +499,8 @@ function setupRoutes_() {
 
 function setupSettings_() {
   const s = sheet_(SHEETS.SETTINGS);
-  if (s.getLastRow() < 2) {
-    s.getRange(2, 1, DEFAULT_SETTINGS.length, 2).setValues(DEFAULT_SETTINGS);
-  }
+  if (s.getLastRow() > 1) return;
+  s.getRange(2, 1, DEFAULT_SETTINGS.length, 2).setValues(DEFAULT_SETTINGS);
   note_(s, SHEETS.SETTINGS, 'Value',
     'Reply-To Email: leave blank and replies come back to whoever sends. ' +
     'Set it to an admissions address to collect replies there instead.');
@@ -488,7 +509,7 @@ function setupSettings_() {
 
 function dropdown_(sheet, lastRow, col, values, allowOther) {
   const rule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(values, true).setAllowInvalid(!!allowOther).build();
+    .requireValueInList(values, true).setAllowInvalid(true).build();
   sheet.getRange(2, col, Math.max(lastRow - 1, 200), 1).setDataValidation(rule);
 }
 
