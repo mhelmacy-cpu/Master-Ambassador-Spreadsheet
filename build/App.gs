@@ -591,7 +591,7 @@ function timeCell_(v) {
 }
 
 /** The whole time somebody is away, across every job they are doing. */
-function awayWindow_(jobNames) {
+function awayMinutes_(jobNames) {
   const hours = jobHours_();
   let from = null;
   let to = null;
@@ -603,8 +603,13 @@ function awayWindow_(jobNames) {
     if (a != null && (from === null || a < from)) from = a;
     if (b != null && (to === null || b > to)) to = b;
   });
-  if (from === null || to === null) return '';
-  return timeLabel_(from) + ' - ' + timeLabel_(to);
+  if (from === null || to === null) return null;
+  return { from: from, to: to };
+}
+
+function awayWindow_(jobNames) {
+  const w = awayMinutes_(jobNames);
+  return w ? timeLabel_(w.from) + ' - ' + timeLabel_(w.to) : '';
 }
 
 function setupEligibility_() {
@@ -2514,7 +2519,12 @@ function sendTeacherEmails(dateStr) {
       needsYou.push(name + ' has no Homeroom or Split, so their class cannot be worked out.');
       return;
     }
-    const blocks = classesMissed_(who.pod, who.split, who.grade, dateVal, startMin, endMin);
+    // Which class they miss depends on how long their own job keeps them
+    // out. A panelist is back at 9:05 and should not be reported absent
+    // from a period that starts after that.
+    const win = awayMinutes_(jobs.map(function (j) { return j.job; })) ||
+      { from: startMin, to: endMin };
+    const blocks = classesMissed_(who.pod, who.split, who.grade, dateVal, win.from, win.to);
     if (!blocks.length) { return; }
     blocks.forEach(function (b) {
       if (b.needsYou) {

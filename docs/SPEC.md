@@ -83,9 +83,11 @@ period they are missing. A greeter is back before the bell.
     Tour Guide      8:25 AM - 9:05 AM
     Class Buddy     9:05 AM - 9:25 AM
 
-The teacher email prints this window, and the student email uses the end
-of it for "back in class by". Both follow the sheet, so changing a time
-there changes what goes out.
+The teacher email prints this window, the student email uses the end of
+it for "back in class by", and it is also what decides which class the
+email goes to - a panelist back at 9:05 is not reported absent from a
+period starting after that. All of it follows the sheet, so changing a
+time there changes what goes out.
 
 ## Reading the schedule
 
@@ -147,6 +149,10 @@ Two audiences, on separate schedules.
 
     Tuesday    8:30 AM
     Wednesday  7:45 AM
+
+Every ambassador on the Tour Tracker is treated the same, whatever the
+job - a panelist gets their own email, their advisor hears, and so does
+the teacher whose class they walk out of.
 
 Three rounds go out together each time:
 
