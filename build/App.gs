@@ -53,7 +53,8 @@ const CLASS_VISIT_WITH_GUIDE = 'With tour guide';
 HEADERS[SHEETS.JOBS] = ['Job Name', 'Description', 'Active', 'Out of Class From', 'Out of Class To'];
 HEADERS[SHEETS.ELIGIBILITY] = ['Ambassador', 'Panelist', 'Lobby Greeter', 'Table Greeter', 'Tour Guide'];
 HEADERS[SHEETS.TEACHERS] = ['Teacher Name', 'Initials', 'Teacher Email', 'Room / Notes'];
-HEADERS[SHEETS.BELL] = ['Day', 'Homeroom', 'Split', 'Start', 'End', 'What / Teacher / Room'];
+HEADERS[SHEETS.BELL] = ['Day', 'Grade', 'Homeroom', 'Split', 'Start', 'End',
+  'What / Teacher / Room'];
 HEADERS[SHEETS.ROUTES] = ['Route', 'Direction', 'Humanities Teacher', 'Language', 'Itinerary'];
 HEADERS[SHEETS.BUDDIES] = ['Student', 'Gender', 'Language', 'Teacher', 'Room', 'Can Host a Visitor'];
 HEADERS[SHEETS.SETTINGS] = ['Setting', 'Value'];
@@ -464,6 +465,9 @@ function setupSpreadsheet() {
   });
   if (ensureColumn_(SHEETS.TRACKER, 'Showed Up', YES_NO)) {
     added.push('Showed Up on Tour Tracker');
+  }
+  if (ensureBellGrade_()) {
+    added.push('Grade on Bell Schedule');
   }
   if (tidyAmbassadorColumns_()) {
     added.push('contact details moved to the right of the Ambassadors sheet');
@@ -1003,7 +1007,8 @@ function setupBellSchedule_() {
     SCHEDULE_DAYS_.forEach(function (day) {
       PODS.forEach(function (pod) {
         (BELL_SCHEDULE_[day][pod] || []).forEach(function (e) {
-          rows.push([day, pod, splitLetterOf_(e[2]), e[0], e[1], e[2]]);
+          rows.push([day, POD_GRADE_[pod] || '', pod, splitLetterOf_(e[2]),
+            e[0], e[1], e[2]]);
         });
       });
     });
@@ -1017,8 +1022,11 @@ function setupBellSchedule_() {
   note_(s, SHEETS.BELL, 'What / Teacher / Room',
     'Read off the 2026-27 schedule. Correct anything here and the lookups ' +
     'follow this sheet, not the code.');
+  note_(s, SHEETS.BELL, 'Grade',
+    'Which grade that homeroom belongs to, filled in from the homeroom so the ' +
+    'two can never disagree.');
   s.setColumnWidth(col_(SHEETS.BELL, 'What / Teacher / Room') + 1, 420);
-  s.autoResizeColumns(1, 5);
+  s.autoResizeColumns(1, 6);
 }
 
 function setupRoutes_() {
@@ -1125,6 +1133,22 @@ function refreshCounts_() {
   });
   s.getRange(2, first + 1, block.length, width).setValues(block);
   return block.length;
+}
+
+/** The Grade column on a Bell Schedule made before it existed. */
+function ensureBellGrade_() {
+  const N = SHEETS.BELL;
+  if (!ensureColumn_(N, 'Grade')) return false;
+  const s = sheet_(N);
+  const at = col_(N, 'Grade');
+  const data = rows_(N);
+  if (data.length) {
+    s.getRange(2, at + 1, data.length, 1).setValues(data.map(function (r) {
+      return [POD_GRADE_[trim_(r[col_(N, 'Homeroom')])] || ''];
+    }));
+  }
+  clearReadCache_();
+  return true;
 }
 
 function ensureJobHourColumns_() {
@@ -1287,8 +1311,13 @@ function bellSchedule_() {
     };
     const sheet = ss_().getSheetByName(SHEETS.BELL);
     if (sheet && sheet.getLastRow() > 1) {
-      rows_(SHEETS.BELL).forEach(function (r) {
-        add(trim_(r[0]), trim_(r[1]), splitLetter_(r[2]), r[3], r[4], trim_(r[5]));
+      // By header name, so a column added to the left of these moves
+      // nothing that reads them.
+      const N = SHEETS.BELL;
+      rows_(N).forEach(function (r) {
+        add(trim_(r[col_(N, 'Day')]), trim_(r[col_(N, 'Homeroom')]),
+          splitLetter_(r[col_(N, 'Split')]), r[col_(N, 'Start')], r[col_(N, 'End')],
+          trim_(r[col_(N, 'What / Teacher / Room')]));
       });
       return out;
     }
