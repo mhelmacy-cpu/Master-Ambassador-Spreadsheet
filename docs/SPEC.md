@@ -20,6 +20,17 @@ is entered by the office.
   8:30-9:25 tour window all week is MMS (5th grade) on Wednesday, and
   there are no 5th grade ambassadors.
 
+Everything about tours is on the left; contact details (student email,
+both parents' names and emails) sit to the right of it. First-Time Setup
+moves them there once, carrying their formatting, and does nothing on
+later runs.
+
+Three columns are written by the script, not typed:
+
+    Signed Up   jobs she has given them, the number to look at before a tour
+    Confirmed   jobs she has ticked off afterwards, the one that counts
+    Jobs Done   those confirmed jobs broken out, "2 Tour Guide, 1 Lobby Greeter"
+
 ### Prospective Students
 
 Only the tour date and the name are needed. Every other column is a rule
@@ -167,6 +178,19 @@ working gets a second job. Untick it to start that date over.
 
 Panelists are never touched either way: the command does not assign
 them, so it does not delete them.
+
+## Confirming a tour afterwards
+
+"Confirm a Tour Afterwards..." lists everyone staffed for a date, all
+ticked. She unticks whoever did not work and saves. A tour that never
+happened has its own box, which marks everyone at once.
+
+Anyone left unticked is written as No rather than blank, so "not yet
+confirmed" and "did not turn up" stay different things. Re-opening the
+date brings her own answers back rather than a fresh list.
+
+A no-show is not charged against the child: fairness counts every job
+except one marked No, so a child pulled on the day goes first next time.
 
 ## Printouts
 

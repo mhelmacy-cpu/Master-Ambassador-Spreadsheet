@@ -34,12 +34,21 @@ const SHEETS = {
 
 const HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
-  'Borough', 'Gender', 'Race (Presenting)', 'Student Email', 'Parent 1 Name', 'Parent 1 Email',
-  'Parent 2 Name', 'Parent 2 Email', 'Light', 'Strength', 'Active'];
+  'Borough', 'Gender', 'Race (Presenting)', 'Light', 'Strength', 'Active',
+  'Signed Up', 'Confirmed', 'Jobs Done',
+  'Student Email', 'Parent 1 Name', 'Parent 1 Email', 'Parent 2 Name', 'Parent 2 Email'];
+
+/** Everything about reaching a family rather than about a tour. Kept to the right. */
+const CONTACT_COLUMNS_ = ['Student Email', 'Parent 1 Name', 'Parent 1 Email',
+  'Parent 2 Name', 'Parent 2 Email'];
+
+/** Written by the script after a tour is staffed or confirmed. */
+const COUNT_COLUMNS_ = ['Signed Up', 'Confirmed', 'Jobs Done'];
 HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'School', 'Grade', 'Gender', 'Race', 'Borough',
   'Full Pay', 'Well Connected', 'Class Visit', 'Route', 'Tour Guides', 'Class Buddy', 'Notes'];
 HEADERS[SHEETS.APART] = ['Ambassador', 'And', 'Notes'];
-HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route', 'Notes'];
+HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route',
+  'Showed Up', 'Notes'];
 const CLASS_VISIT_WITH_GUIDE = 'With tour guide';
 HEADERS[SHEETS.JOBS] = ['Job Name', 'Description', 'Active', 'Out of Class From', 'Out of Class To'];
 HEADERS[SHEETS.ELIGIBILITY] = ['Ambassador', 'Panelist', 'Lobby Greeter', 'Table Greeter', 'Tour Guide'];
@@ -450,6 +459,16 @@ function setupSpreadsheet() {
   if (ensureColumn_(SHEETS.PROSPECTIVE, 'Well Connected', YES_NO)) {
     added.push('Well Connected on Prospective Students');
   }
+  COUNT_COLUMNS_.forEach(function (h) {
+    if (ensureColumn_(SHEETS.AMBASSADORS, h)) added.push(h + ' on Ambassadors');
+  });
+  if (ensureColumn_(SHEETS.TRACKER, 'Showed Up', YES_NO)) {
+    added.push('Showed Up on Tour Tracker');
+  }
+  if (tidyAmbassadorColumns_()) {
+    added.push('contact details moved to the right of the Ambassadors sheet');
+  }
+  refreshCounts_();
   clearReadCache_();               // columns just changed under it
 
   setupAmbassadors_();
@@ -994,6 +1013,66 @@ function setupSettings_() {
  * they existed, filled in for the jobs we know about. Anything she has
  * added herself is left blank for her to fill.
  */
+/**
+ * Contact details to the right of everything about tours.
+ *
+ * moveColumns carries the values, the formatting and the validation
+ * with them, so nothing is retyped and nothing is lost. It runs only
+ * when a column is not already where it belongs, so running setup
+ * again does nothing.
+ */
+function tidyAmbassadorColumns_() {
+  const N = SHEETS.AMBASSADORS;
+  const s = sheet_(N);
+  let moved = 0;
+  CONTACT_COLUMNS_.forEach(function (header) {
+    const width = s.getLastColumn();
+    const at = optionalCol_(N, header);
+    if (at === -1) return;
+    if (at + 1 === width) return;            // already the rightmost
+    s.moveColumns(s.getRange(1, at + 1, 1, 1), width + 1);
+    delete HEADER_CACHE_[N];
+    moved++;
+  });
+  if (moved) clearReadCache_();
+  return moved;
+}
+
+/**
+ * The three count columns, written from the Tour Tracker.
+ *
+ * Signed Up is everything she has given them, which is the number to
+ * look at before a tour. Confirmed is what she has since ticked off,
+ * which is the one that counts afterwards. Jobs Done breaks the
+ * confirmed ones out by job.
+ */
+function refreshCounts_() {
+  const N = SHEETS.AMBASSADORS;
+  const s = sheet_(N);
+  const data = rows_(N);
+  if (!data.length) return 0;
+  const cols = COUNT_COLUMNS_.map(function (h) { return optionalCol_(N, h); });
+  if (cols.some(function (c) { return c === -1; })) return 0;
+
+  delete READ_CACHE_.jobHistory;
+  const hist = jobHistory_();
+  const first = Math.min.apply(null, cols);
+  const last = Math.max.apply(null, cols);
+  const width = last - first + 1;
+  const block = data.map(function (r) {
+    const name = fullName_(r[col_(N, 'First Name')], r[col_(N, 'Last Name')]);
+    const h = hist[norm_(name)] || { signedUp: 0, confirmed: 0, byJobDone: {} };
+    const row = [];
+    for (let i = 0; i < width; i++) row.push(r[first + i]);
+    row[cols[0] - first] = h.signedUp;
+    row[cols[1] - first] = h.confirmed;
+    row[cols[2] - first] = jobBreakdown_(h.byJobDone);
+    return row;
+  });
+  s.getRange(2, first + 1, block.length, width).setValues(block);
+  return block.length;
+}
+
 function ensureJobHourColumns_() {
   const N = SHEETS.JOBS;
   const a = ensureColumn_(N, 'Out of Class From');
@@ -1270,6 +1349,15 @@ function ambassadors_() {
 }
 
 /** name -> {Job: count}, plus a total, read off the Tour Tracker. */
+/**
+ * What each ambassador has done, from the Tour Tracker.
+ *
+ *   signed up   given the job, whether or not the day has happened
+ *   confirmed   she has since ticked them as having turned up
+ *   total       what fairness counts: everything except a no-show,
+ *               so a child she pulled on the day is still first in
+ *               line next time rather than being charged for it
+ */
 function jobHistory_() {
   return cached_('jobHistory', function () {
     const N = SHEETS.TRACKER;
@@ -1278,12 +1366,30 @@ function jobHistory_() {
       const who = norm_(r[col_(N, 'Ambassador')]);
       const job = trim_(r[col_(N, 'Job')]);
       if (!who || !job) return;
-      if (!hist[who]) hist[who] = { total: 0, byJob: {} };
-      hist[who].total += 1;
-      hist[who].byJob[job] = (hist[who].byJob[job] || 0) + 1;
+      const showed = norm_(cell_(r, N, 'Showed Up'));
+      if (!hist[who]) {
+        hist[who] = { total: 0, signedUp: 0, confirmed: 0, byJob: {}, byJobDone: {} };
+      }
+      const h = hist[who];
+      h.signedUp += 1;
+      h.byJob[job] = (h.byJob[job] || 0) + 1;
+      if (showed === 'no') return;
+      h.total += 1;
+      if (showed === 'yes') {
+        h.confirmed += 1;
+        h.byJobDone[job] = (h.byJobDone[job] || 0) + 1;
+      }
     });
     return hist;
   });
+}
+
+/** "2 Tour Guide, 1 Lobby Greeter", commonest first. */
+function jobBreakdown_(byJob) {
+  return Object.keys(byJob || {}).sort(function (a, b) {
+    if (byJob[a] !== byJob[b]) return byJob[b] - byJob[a];
+    return a < b ? -1 : 1;
+  }).map(function (j) { return byJob[j] + ' ' + j; }).join(', ');
 }
 
 /** name -> {Job: true}, read off the Eligibility sheet. Missing row = eligible. */
@@ -2314,6 +2420,7 @@ function commitTour(dateStr, keepExisting, panelists) {
   }
 
   const panel = savePanel_(dateVal, panelists, plan);
+  refreshCounts_();
 
   const P = SHEETS.PROSPECTIVE;
   const psheet = sheet_(P);
@@ -2722,6 +2829,92 @@ function buildLockerSlips(dateStr) {
 
   doc.saveAndClose();
   return { url: doc.getUrl(), name: title, slips: slips.length };
+}
+
+/* =========================================================
+ * Confirming a tour, afterwards
+ *
+ * Being given a job and turning up are not the same thing. She pulls
+ * children on the day, tours get cancelled, and the count that matters
+ * at the end of the year is the one she has ticked off herself.
+ *
+ * So the Tour Tracker carries a Showed Up column, and the Ambassadors
+ * sheet carries both numbers: Signed Up, which is what to look at
+ * before a tour, and Confirmed, which is what counts after it.
+ * ========================================================= */
+
+function confirmList_(dateVal) {
+  const N = SHEETS.TRACKER;
+  const out = [];
+  rows_(N).forEach(function (r, i) {
+    if (!sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal)) return;
+    const name = trim_(r[col_(N, 'Ambassador')]);
+    if (!name) return;
+    out.push({
+      row: i + 2,
+      name: name,
+      job: trim_(r[col_(N, 'Job')]),
+      visitor: trim_(r[col_(N, 'Prospective Student(s)')]),
+      showed: trim_(cell_(r, N, 'Showed Up'))
+    });
+  });
+  out.sort(function (a, b) {
+    if (a.job !== b.job) return a.job < b.job ? -1 : 1;
+    return a.name < b.name ? -1 : 1;
+  });
+  return out;
+}
+
+function api_loadConfirm(dateStr) {
+  clearReadCache_();
+  const dateVal = toDate_(dateStr);
+  if (!dateVal) throw new Error('Pick a tour date first.');
+  const rows = confirmList_(dateVal);
+  if (!rows.length) {
+    throw new Error('Nothing was staffed for ' + longDate_(dateVal) + '.');
+  }
+  return {
+    date: dateKey_(dateVal),
+    dateLabel: longDate_(dateVal),
+    rows: rows,
+    // Nothing ticked off yet means this is the first time through, and
+    // everybody starts ticked. After that her own answers come back.
+    fresh: !rows.some(function (r) { return r.showed; })
+  };
+}
+
+/**
+ * Writes the answers back, in one pass over the column.
+ *
+ * Anyone she did not tick is a No rather than a blank, so "not yet
+ * confirmed" and "did not turn up" stay different things.
+ */
+function api_saveConfirm(dateStr, showedRows, happened) {
+  clearReadCache_();
+  const dateVal = toDate_(dateStr);
+  if (!dateVal) throw new Error('Pick a tour date first.');
+  const N = SHEETS.TRACKER;
+  const s = sheet_(N);
+  const at = optionalCol_(N, 'Showed Up');
+  if (at === -1) {
+    throw new Error('The Tour Tracker has no "Showed Up" column. Run First-Time Setup once.');
+  }
+  const yes = {};
+  (showedRows || []).forEach(function (r) { yes[Number(r)] = true; });
+
+  const data = rows_(N);
+  const column = data.map(function (r) { return [r[at]]; });
+  let showed = 0;
+  let missed = 0;
+  confirmList_(dateVal).forEach(function (r) {
+    const ok = happened !== false && yes[r.row] === true;
+    column[r.row - 2] = [ok ? 'Yes' : 'No'];
+    if (ok) showed++; else missed++;
+  });
+  s.getRange(2, at + 1, column.length, 1).setValues(column);
+  clearReadCache_();
+  refreshCounts_();
+  return { showed: showed, missed: missed, date: longDate_(dateVal), happened: happened !== false };
 }
 
 /* =========================================================
@@ -3302,6 +3495,7 @@ function onOpen() {
     .addItem('Staff This Wednesday Tour...', 'showStaffDialog')
     .addItem('Print Tour Routes...', 'showRouteSheetDialog')
     .addItem('Print Locker Slips...', 'showLockerSlipDialog')
+    .addItem('Confirm a Tour Afterwards...', 'showConfirmDialog')
     .addItem('Send Emails Now...', 'showEmailDialog')
     .addSeparator()
     .addSubMenu(SpreadsheetApp.getUi().createMenu('Automation')
@@ -3544,6 +3738,56 @@ function showRouteSheetDialog() {
     '.api_buildRouteSheets(document.getElementById("d").value);}' +
     '<\/script>';
   dialog_(html, 'Print Tour Routes', 600, 460);
+}
+
+function showConfirmDialog() {
+  const next = nextTourDate_();
+  const html =
+    '<style>' + DIALOG_CSS_ + '</style>' +
+    '<h2>Confirm a tour afterwards</h2>' +
+    '<p class="sub">Tick whoever turned up and did their job. Anyone left unticked is ' +
+    'recorded as not having worked, so their count stays where it was.</p>' +
+    '<label for="d">Tour date</label>' +
+    '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
+    '<div style="margin-top:12px;"><button id="load" onclick="load()">Load that tour</button></div>' +
+    '<div id="out"></div>' +
+    '<script>' +
+    'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
+    'function load(){document.getElementById("load").disabled=true;' +
+    'document.getElementById("out").innerHTML="<p class=\'muted\'>Loading...</p>";' +
+    'google.script.run.withSuccessHandler(show).withFailureHandler(fail)' +
+    '.api_loadConfirm(document.getElementById("d").value);}' +
+    'function fail(e){document.getElementById("load").disabled=false;' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    'function show(p){document.getElementById("load").disabled=false;window.__rows=p.rows;' +
+    'var h="<div class=\'out\'><h3>"+esc(p.dateLabel)+"</h3><div class=\'panel\'>";' +
+    'p.rows.forEach(function(r,i){' +
+    'var on=p.fresh?true:r.showed!=="No";' +
+    'h+="<label><input type=\'checkbox\' class=\'did\' value=\'"+i+"\'"+(on?" checked":"")+"> "+' +
+    'esc(r.name)+" <span class=\'muted\'>"+esc(r.job)+(r.visitor?" - "+esc(r.visitor):"")+' +
+    '"</span></label>";});' +
+    'h+="</div></div>";' +
+    'h+="<label class=\'opt\'><input type=\'checkbox\' id=\'cancelled\'>' +
+    '<span><b>The tour did not happen.</b> Everyone is recorded as not having worked, ' +
+    'whatever is ticked above.</span></label>";' +
+    'h+="<div style=\'margin-top:12px;\'><button onclick=\'save()\'>Save</button>' +
+    '<button class=\'ghost\' onclick=\'all(true)\'>Tick all</button>' +
+    '<button class=\'ghost\' onclick=\'all(false)\'>Untick all</button></div>";' +
+    'document.getElementById("out").innerHTML=h;}' +
+    'function all(on){var b=document.querySelectorAll("input.did");' +
+    'for(var i=0;i<b.length;i++){b[i].checked=on;}}' +
+    'function save(){var out=[],b=document.querySelectorAll("input.did");' +
+    'for(var i=0;i<b.length;i++){if(b[i].checked){out.push(window.__rows[Number(b[i].value)].row);}}' +
+    'document.getElementById("out").innerHTML="<p class=\'muted\'>Saving...</p>";' +
+    'google.script.run.withSuccessHandler(function(r){' +
+    'document.getElementById("out").innerHTML="<div class=\'free\'><b>Saved.</b> "+' +
+    '(r.happened?r.showed+" worked, "+r.missed+" did not.":"Tour recorded as not having ' +
+    'happened - "+r.missed+" row(s) marked.")+"<br>The counts on the Ambassadors sheet ' +
+    'are up to date.</div>";}).withFailureHandler(fail)' +
+    '.api_saveConfirm(document.getElementById("d").value,out,' +
+    '!document.getElementById("cancelled").checked);}' +
+    '<\/script>';
+  dialog_(html, 'Confirm a Tour', 620, 620);
 }
 
 function showLockerSlipDialog() {
