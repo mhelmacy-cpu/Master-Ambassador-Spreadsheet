@@ -479,6 +479,8 @@ function setupSpreadsheet() {
   setupKeepApart_();
   setupEligibility_();
   setupTeachers_();
+  const toppedUp = topUpTeachers_();
+  if (toppedUp) added.push(toppedUp + ' teacher initials filled in');
   setupBellSchedule_();
   setupRoutes_();
   setupSettings_();
@@ -900,6 +902,58 @@ function setupEligibility_() {
     'One row per ambassador, refreshed whenever you run setup or staffing. ' +
     'Set a job to No and they are never offered for it.');
   s.autoResizeColumns(1, h.length);
+}
+
+/**
+ * Initials learned since her Teachers sheet was made.
+ *
+ * Only ever adds: a set of initials she has typed is never replaced,
+ * and a teacher already on the sheet keeps their row, their email and
+ * their note. Without this, every initial we work out together would
+ * have to be retyped by hand.
+ */
+function topUpTeachers_() {
+  const N = SHEETS.TEACHERS;
+  const s = sheet_(N);
+  if (s.getLastRow() < 2) return 0;
+  const iCol = col_(N, 'Initials');
+  const nCol = col_(N, 'Teacher Name');
+  const data = rows_(N);
+  const at = {};
+  data.forEach(function (r, i) {
+    const name = trim_(r[nCol]);
+    if (name) at[norm_(name)] = i;
+  });
+
+  const known = {};
+  Object.keys(TEACHER_INITIALS_).forEach(function (n) { known[n] = TEACHER_INITIALS_[n]; });
+  EXTRA_TEACHERS_.forEach(function (t) { if (!known[t.name]) known[t.name] = t.initials; });
+
+  const column = data.map(function (r) { return [r[iCol]]; });
+  const add = [];
+  let changed = 0;
+  Object.keys(known).forEach(function (name) {
+    const want = String(known[name]).split(',').map(trim_).filter(Boolean);
+    const i = at[norm_(name)];
+    if (i === undefined) {
+      add.push([name, known[name], '', 'Added when the schedule was checked.']);
+      return;
+    }
+    const have = String(column[i][0]).split(',').map(trim_).filter(Boolean);
+    const missing = want.filter(function (code) {
+      return !have.some(function (x) { return norm_(x) === norm_(code); });
+    });
+    if (!missing.length) return;
+    column[i] = [have.concat(missing).join(', ')];
+    changed++;
+  });
+
+  if (changed) s.getRange(2, iCol + 1, column.length, 1).setValues(column);
+  if (add.length) {
+    s.getRange(s.getLastRow() + 1, 1, add.length, add[0].length).setValues(add);
+  }
+  if (changed || add.length) clearReadCache_();
+  return changed + add.length;
 }
 
 function setupTeachers_() {

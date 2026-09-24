@@ -93,7 +93,9 @@ const TEACHER_INITIALS_ = {
   'Sharyn': 'M207',
   'Janet': 'M208',
   'Mary Katherine': 'M209',
-  'Jeremiah': 'M306'
+  // Jeremiah takes 5th grade lunch as JL and teaches out of M306.
+  'Jeremiah': 'JL, M306',
+  'Mala': 'MB'
 };
 
 const EXTRA_TEACHERS_ = [
