@@ -192,6 +192,23 @@ date brings her own answers back rather than a fresh list.
 A no-show is not charged against the child: fairness counts every job
 except one marked No, so a child pulled on the day goes first next time.
 
+## Writing an email by hand
+
+"Write an Email..." is her own correspondence, not the automatic
+reminders. She picks an audience, ticks the people, types the message,
+and gets a **Gmail draft** to read over and send herself. Nothing in
+this dialog ever sends.
+
+    Teachers                        from the Teachers sheet
+    Ambassadors                     their own addresses
+    Ambassadors and their parents   both, per child
+    Parents only                    labelled by the child, addressed to the parents
+
+Everyone goes in Bcc by default, so a family never sees another family's
+address; one untick puts them all in the To line instead. Anybody ticked
+who has no address on file is named back to her rather than quietly
+dropped.
+
 ## Printouts
 
 Two documents, both built as Google Docs so they can be corrected on the

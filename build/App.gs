@@ -2972,6 +2972,145 @@ function api_saveConfirm(dateStr, showedRows, happened) {
 }
 
 /* =========================================================
+ * Writing an email to whoever she chooses
+ *
+ * Not the automatic reminders: this is her, at her desk, wanting to
+ * write to six teachers or to one family. She picks the people, types
+ * what she wants to say, and gets a Gmail draft to open, read and send
+ * herself. Nothing here ever sends on its own.
+ * ========================================================= */
+
+const AUDIENCES_ = {
+  teachers: 'Teachers',
+  students: 'Ambassadors',
+  both: 'Ambassadors and their parents',
+  parents: 'Parents only'
+};
+
+/**
+ * Who she can pick from, for one audience.
+ *
+ * A parents-only list is still labelled by the child, because that is
+ * who she knows them by - the addresses underneath are the parents'.
+ */
+function emailPeople_(kind) {
+  const out = [];
+  if (kind === 'teachers') {
+    const N = SHEETS.TEACHERS;
+    rows_(N).forEach(function (r, i) {
+      const name = trim_(r[col_(N, 'Teacher Name')]);
+      const email = trim_(r[col_(N, 'Teacher Email')]);
+      if (!name) return;
+      out.push({
+        id: 't' + i, label: name, sub: email || 'no email on the Teachers sheet',
+        emails: email ? [email] : []
+      });
+    });
+    return out;
+  }
+
+  const N = SHEETS.AMBASSADORS;
+  rows_(N).forEach(function (r, i) {
+    const name = fullName_(r[col_(N, 'First Name')], r[col_(N, 'Last Name')]);
+    if (!name) return;
+    const student = trim_(r[col_(N, 'Student Email')]);
+    const parents = [
+      trim_(cell_(r, N, 'Parent 1 Email')),
+      trim_(cell_(r, N, 'Parent 2 Email'))
+    ].filter(Boolean);
+    const parentNames = [
+      trim_(cell_(r, N, 'Parent 1 Name')),
+      trim_(cell_(r, N, 'Parent 2 Name'))
+    ].filter(Boolean);
+
+    let emails = [];
+    let sub = '';
+    if (kind === 'students') {
+      emails = student ? [student] : [];
+      sub = student || 'no student email';
+    } else if (kind === 'parents') {
+      emails = parents;
+      sub = parents.length
+        ? (parentNames.length ? parentNames.join(', ') + ' - ' : '') + parents.join(', ')
+        : 'no parent email';
+    } else {
+      emails = (student ? [student] : []).concat(parents);
+      sub = emails.length ? emails.join(', ') : 'no addresses';
+    }
+    out.push({
+      id: 'a' + i, label: name, sub: sub, emails: emails,
+      grade: trim_(r[col_(N, 'Grade')]),
+      active: norm_(r[col_(N, 'Active')]) === 'yes'
+    });
+  });
+  return out;
+}
+
+function api_emailPeople(kind) {
+  clearReadCache_();
+  if (!AUDIENCES_[kind]) throw new Error('Pick who the email is going to first.');
+  const people = emailPeople_(kind);
+  if (!people.length) throw new Error('Nobody is on that sheet yet.');
+  return { kind: kind, label: AUDIENCES_[kind], people: people };
+}
+
+/**
+ * Builds the draft and hands back a link to it.
+ *
+ * Everyone goes in Bcc by default, so a family never sees another
+ * family's address and a teacher is not handed a class list.
+ */
+function api_makeDraft(kind, ids, subject, body, useBcc) {
+  clearReadCache_();
+  if (!AUDIENCES_[kind]) throw new Error('Pick who the email is going to first.');
+  if (!trim_(subject)) throw new Error('Give the email a subject first.');
+  const want = {};
+  (ids || []).forEach(function (id) { want[id] = true; });
+
+  const chosen = emailPeople_(kind).filter(function (p) { return want[p.id]; });
+  if (!chosen.length) throw new Error('Tick at least one person.');
+
+  const to = [];
+  const noAddress = [];
+  chosen.forEach(function (p) {
+    if (!p.emails.length) { noAddress.push(p.label); return; }
+    p.emails.forEach(function (e) { if (to.indexOf(e) === -1) to.push(e); });
+  });
+  if (!to.length) {
+    throw new Error('None of the people you ticked have an email address on the sheet.');
+  }
+
+  const me = previewAddress_();
+  const html = '<div style="' + MAIL_STYLE_ + '">' +
+    escapeHtml_(String(body == null ? '' : body)).replace(/\n/g, '<br>') + '</div>';
+  const options = {
+    htmlBody: html,
+    name: setting_('Sender Display Name', 'LREI Middle School Tours')
+  };
+  const reply = setting_('Reply-To Email', '');
+  if (reply) options.replyTo = reply;
+  if (useBcc === false) {
+    options.to = to.join(',');
+  } else {
+    options.bcc = to.join(',');
+  }
+
+  const draft = GmailApp.createDraft(useBcc === false ? to.join(',') : (me || ''),
+    trim_(subject), String(body == null ? '' : body), options);
+
+  let url = 'https://mail.google.com/mail/u/0/#drafts';
+  try {
+    url = 'https://mail.google.com/mail/u/0/#drafts?compose=' + draft.getId();
+  } catch (err) {
+    // An older Gmail service with no getId: the drafts folder still opens.
+  }
+  return {
+    url: url, addresses: to.length, people: chosen.length,
+    bcc: useBcc !== false, noAddress: noAddress
+  };
+}
+
+/* =========================================================
  * The roster
  *
  * One line per ambassador on duty: their name, what they are doing,
@@ -3550,6 +3689,8 @@ function onOpen() {
     .addItem('Print Tour Routes...', 'showRouteSheetDialog')
     .addItem('Print Locker Slips...', 'showLockerSlipDialog')
     .addItem('Confirm a Tour Afterwards...', 'showConfirmDialog')
+    .addSeparator()
+    .addItem('Write an Email...', 'showWriteDialog')
     .addItem('Send Emails Now...', 'showEmailDialog')
     .addSeparator()
     .addSubMenu(SpreadsheetApp.getUi().createMenu('Automation')
@@ -3602,6 +3743,8 @@ const DIALOG_CSS_ =
   'margin:12px 0 0;cursor:pointer;line-height:1.45;}' +
   'label.opt input{width:16px;height:16px;margin-top:1px;flex:none;cursor:pointer;}' +
   'label.opt b{font-weight:bold;}' +
+  'select{font:inherit;padding:6px;border:1px solid #bbb;border-radius:4px;}' +
+  'textarea{font-family:inherit;}' +
   '.panel .yel{color:#8a5a12;font-size:11px;}' +
   '.muted{color:#777;}';
 
@@ -3792,6 +3935,72 @@ function showRouteSheetDialog() {
     '.api_buildRouteSheets(document.getElementById("d").value);}' +
     '<\/script>';
   dialog_(html, 'Print Tour Routes', 600, 460);
+}
+
+function showWriteDialog() {
+  const html =
+    '<style>' + DIALOG_CSS_ + '</style>' +
+    '<h2>Write an email</h2>' +
+    '<p class="sub">Pick who it goes to, type it, and get a Gmail draft to read over and ' +
+    'send yourself. Nothing is sent from here.</p>' +
+    '<label for="kind">Who it goes to</label>' +
+    '<select id="kind" onchange="load()">' +
+    '<option value="">Choose...</option>' +
+    '<option value="teachers">Teachers</option>' +
+    '<option value="students">Ambassadors</option>' +
+    '<option value="both">Ambassadors and their parents</option>' +
+    '<option value="parents">Parents only</option>' +
+    '</select>' +
+    '<div id="who"></div>' +
+    '<div id="out"></div>' +
+    '<script>' +
+    'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
+    'function fail(e){document.getElementById("out").innerHTML=' +
+    '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    'function load(){var k=document.getElementById("kind").value;' +
+    'document.getElementById("out").innerHTML="";' +
+    'if(!k){document.getElementById("who").innerHTML="";return;}' +
+    'document.getElementById("who").innerHTML="<p class=\'muted\'>Loading...</p>";' +
+    'google.script.run.withSuccessHandler(show).withFailureHandler(fail).api_emailPeople(k);}' +
+    'function show(p){window.__kind=p.kind;' +
+    'var h="<label>"+esc(p.label)+" <span class=\'muted\'>("+p.people.length+")</span></label>";' +
+    'h+="<div style=\'margin-bottom:6px;\'><button class=\'ghost\' onclick=\'all(true)\'>Tick all</button>' +
+    '<button class=\'ghost\' onclick=\'all(false)\'>Untick all</button>' +
+    '<button class=\'ghost\' onclick=\'onlyActive()\'>Active only</button></div>";' +
+    'h+="<div class=\'panel\' style=\'max-height:220px;overflow:auto;\'>";' +
+    'p.people.forEach(function(x){' +
+    'h+="<label><input type=\'checkbox\' class=\'who\' value=\'"+esc(x.id)+"\'"+' +
+    '(x.active===false?" data-idle=\'1\'":"")+"> "+esc(x.label)+' +
+    '"<span class=\'muted\'> "+esc(x.sub)+"</span></label>";});' +
+    'h+="</div>";' +
+    'h+="<label for=\'subj\'>Subject</label><input id=\'subj\' type=\'text\' ' +
+    'style=\'width:100%;font:inherit;padding:6px;border:1px solid #bbb;border-radius:4px;\'>";' +
+    'h+="<label for=\'body\'>Message</label><textarea id=\'body\' rows=\'8\' ' +
+    'style=\'width:100%;font:inherit;padding:6px;border:1px solid #bbb;border-radius:4px;\'></textarea>";' +
+    'h+="<label class=\'opt\'><input type=\'checkbox\' id=\'bcc\' checked><span>' +
+    '<b>Everyone in Bcc.</b> They cannot see each other\'s addresses. Untick to put them ' +
+    'all in the To line.</span></label>";' +
+    'h+="<div style=\'margin-top:12px;\'><button onclick=\'make()\'>Create the draft</button></div>";' +
+    'document.getElementById("who").innerHTML=h;}' +
+    'function all(on){var b=document.querySelectorAll("input.who");' +
+    'for(var i=0;i<b.length;i++){b[i].checked=on;}}' +
+    'function onlyActive(){var b=document.querySelectorAll("input.who");' +
+    'for(var i=0;i<b.length;i++){b[i].checked=!b[i].getAttribute("data-idle");}}' +
+    'function make(){var ids=[],b=document.querySelectorAll("input.who");' +
+    'for(var i=0;i<b.length;i++){if(b[i].checked){ids.push(b[i].value);}}' +
+    'document.getElementById("out").innerHTML="<p class=\'muted\'>Building the draft...</p>";' +
+    'google.script.run.withSuccessHandler(function(r){' +
+    'var h="<div class=\'free\'><b>Draft ready.</b> "+r.people+" person/people, "+' +
+    'r.addresses+" address(es), in "+(r.bcc?"Bcc":"To")+".<br>' +
+    '<a href=\'"+r.url+"\' target=\'_blank\'>Open it in Gmail</a>' +
+    '<br><span class=\'muted\'>Read it over and send it yourself.</span></div>";' +
+    'if(r.noAddress&&r.noAddress.length){h+="<div class=\'warn\'><b>No address on file, ' +
+    'so left out:</b><br>"+esc(r.noAddress.join(", "))+"</div>";}' +
+    'document.getElementById("out").innerHTML=h;}).withFailureHandler(fail)' +
+    '.api_makeDraft(window.__kind,ids,document.getElementById("subj").value,' +
+    'document.getElementById("body").value,document.getElementById("bcc").checked);}' +
+    '<\/script>';
+  dialog_(html, 'Write an Email', 640, 680);
 }
 
 function showConfirmDialog() {
