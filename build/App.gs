@@ -1838,6 +1838,7 @@ function planTour(dateStr, keepExisting) {
     // at a time rather than taken off a single ranked list.
     const chosen = [];
     const missing = [];
+    const stretched = [];
     // Every grade this pair will accept anywhere, for the case where a
     // place would otherwise go empty. One guide from the year below
     // beats one guide and a gap.
@@ -1867,6 +1868,20 @@ function planTour(dateStr, keepExisting) {
         candidates = freeIn([wantGrade[i]]);
       }
       if (!candidates.length) candidates = freeIn(anyGrade);
+
+      // Last resort. Every rule we have has failed to produce anybody,
+      // so the grade goes too: a visitor walking round with one guide,
+      // or none, is worse than a guide from the wrong year. Only the
+      // three she sets by hand still hold - Active, a No on Eligibility,
+      // and Keep Apart - because those are her decisions, not matching.
+      let lastResort = false;
+      if (!candidates.length) {
+        candidates = pool.filter(function (a) {
+          if (used[a.name] || !canDo(a, JOBS.GUIDE)) return false;
+          return !chosen.some(function (x) { return keptApart_(a.name, x.name); });
+        });
+        lastResort = candidates.length > 0;
+      }
 
       /* Two things a pair owes the visitor, each satisfied by one guide
        * rather than both:
@@ -1944,6 +1959,9 @@ function planTour(dateStr, keepExisting) {
       if (candidates.length) {
         used[candidates[0].name] = JOBS.GUIDE;
         chosen.push(candidates[0]);
+        if (lastResort) {
+          stretched.push(candidates[0].name + ' (grade ' + (candidates[0].grade || '?') + ')');
+        }
       } else {
         missing.push(wantGrade);
       }
@@ -1978,6 +1996,7 @@ function planTour(dateStr, keepExisting) {
       needsSoC: needsSoC,
       guideMix: traitMix_(chosen.map(function (a) { return a.name; }), pool, 'presenting'),
       guideRead: chosen.map(guideRead_).join('  |  '),
+      stretched: stretched.join(', '),
       priority: priorityWhy_(v),
       strengths: chosen.map(function (a) {
         return a.name + ' (' + (trim_(a.strength) || 'no strength set') + ')';
@@ -2534,13 +2553,24 @@ function commitTour(dateStr, keepExisting, panelists) {
  */
 function savePanel_(dateVal, names, plan) {
   if (!names) return null;
+  return saveByHand_(dateVal, JOBS.PANELIST, names,
+    (plan.free || []).map(function (f) { return f.name; }));
+}
+
+/**
+ * People she has put on a job herself, written to the tracker.
+ *
+ * Only names she was offered are hers to take off again: anyone typed
+ * straight onto the tracker who was never in the list is left alone.
+ */
+function saveByHand_(dateVal, job, names, offeredNames) {
   const N = SHEETS.TRACKER;
   const tracker = sheet_(N);
   const want = {};
   (names || []).forEach(function (n) { if (trim_(n)) want[norm_(n)] = trim_(n); });
 
   const offered = {};
-  (plan.free || []).forEach(function (f) { offered[norm_(f.name)] = true; });
+  (offeredNames || []).forEach(function (n) { offered[norm_(n)] = true; });
 
   let removed = 0;
   const have = {};
@@ -2548,7 +2578,7 @@ function savePanel_(dateVal, names, plan) {
   for (let i = existing.length - 1; i >= 0; i--) {
     const r = existing[i];
     if (!sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal)) continue;
-    if (trim_(r[col_(N, 'Job')]) !== JOBS.PANELIST) continue;
+    if (trim_(r[col_(N, 'Job')]) !== job) continue;
     const who = norm_(r[col_(N, 'Ambassador')]);
     if (want[who]) { have[who] = true; continue; }
     if (!offered[who]) continue;          // never offered, so not hers to lose
@@ -2562,7 +2592,7 @@ function savePanel_(dateVal, names, plan) {
     const row = blankRow_(N);
     row[col_(N, 'Tour Date')] = dateVal;
     row[col_(N, 'Ambassador')] = want[k];
-    row[col_(N, 'Job')] = JOBS.PANELIST;
+    row[col_(N, 'Job')] = job;
     add.push(row);
   });
   if (add.length) {
@@ -3762,6 +3792,9 @@ const DIALOG_CSS_ =
   '.panel label{display:flex;align-items:center;gap:6px;font-weight:normal;margin:0;' +
   'width:calc(50% - 14px);cursor:pointer;}' +
   '.panel input{width:15px;height:15px;cursor:pointer;}' +
+  '.byhand{border:1px solid #e0e0e0;border-radius:6px;padding:10px 12px;margin-top:14px;' +
+  'background:#fafafa;}' +
+  '.byhand label:first-child{margin-top:0;}' +
   'label.opt{display:flex;align-items:flex-start;gap:8px;font-weight:normal;' +
   'margin:12px 0 0;cursor:pointer;line-height:1.45;}' +
   'label.opt input{width:16px;height:16px;margin-top:1px;flex:none;cursor:pointer;}' +
@@ -3783,6 +3816,16 @@ function showStaffDialog() {
     '<span><b>Keep what is already assigned.</b> Only students with no guides yet are ' +
     'staffed, for someone who signed up late. Untick to start this date over.' +
     '</span></label>' +
+    '<div class="byhand">' +
+    '<label for="hj">Fill a job yourself first <span class="muted">(optional)</span></label>' +
+    '<select id="hj" onchange="handLoad()">' +
+    '<option value="">Choose a job...</option>' +
+    '<option value="' + JOBS.PANELIST + '">' + JOBS.PANELIST + '</option>' +
+    '<option value="' + JOBS.LOBBY + '">' + JOBS.LOBBY + '</option>' +
+    '<option value="' + JOBS.TABLE + '">' + JOBS.TABLE + '</option>' +
+    '</select>' +
+    '<div id="hand"></div>' +
+    '</div>' +
     '<div style="margin-top:12px;">' +
     '<button id="preview" onclick="doPreview()">Preview</button>' +
     '<button id="save" class="ghost" onclick="doSave()" disabled>Save to Tour Tracker</button>' +
@@ -3790,6 +3833,29 @@ function showStaffDialog() {
     '<script>' +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function busy(b){document.getElementById("preview").disabled=b;}' +
+    'function handLoad(){var j=document.getElementById("hj").value;' +
+    'if(!j){document.getElementById("hand").innerHTML="";return;}' +
+    'document.getElementById("hand").innerHTML="<p class=\'muted\'>Loading...</p>";' +
+    'google.script.run.withSuccessHandler(handShow).withFailureHandler(fail)' +
+    '.api_handChoices(document.getElementById("d").value,j);}' +
+    'function handShow(p){window.__hand=p.rows;' +
+    'var h="<div class=\'panel\' style=\'max-height:170px;overflow:auto;\'>";' +
+    'p.rows.forEach(function(r,i){' +
+    'h+="<label><input type=\'checkbox\' class=\'hnd\' value=\'"+i+"\'"+' +
+    '(r.onJob?" checked":"")+"> "+esc(r.name)+" <span class=\'muted\'>"+' +
+    '(r.grade?"gr "+esc(r.grade)+", ":"")+r.tours+"</span>"+' +
+    '(r.yellow?" <b class=\'yel\'>check first</b>":"")+"</label>";});' +
+    'h+="</div><button class=\'ghost\' onclick=\'handSave()\'>Save these to "+' +
+    'esc(p.job)+"</button><span id=\'handout\' class=\'muted\'></span>";' +
+    'document.getElementById("hand").innerHTML=h;}' +
+    'function handSave(){var out=[],b=document.querySelectorAll("input.hnd");' +
+    'for(var i=0;i<b.length;i++){if(b[i].checked){out.push(window.__hand[Number(b[i].value)].name);}}' +
+    'document.getElementById("handout").innerHTML=" saving...";' +
+    'google.script.run.withSuccessHandler(function(r){' +
+    'document.getElementById("handout").innerHTML=" "+r.total+" on "+esc(r.job)+' +
+    '(r.added?", "+r.added+" added":"")+(r.removed?", "+r.removed+" taken off":"")+' +
+    '". Preview now leaves them where they are.";}).withFailureHandler(fail)' +
+    '.api_saveByHand(document.getElementById("d").value,document.getElementById("hj").value,out);}' +
     'function doPreview(){busy(true);document.getElementById("out").innerHTML="<p class=\'muted\'>Working...</p>";' +
     'google.script.run.withSuccessHandler(render).withFailureHandler(fail)' +
     '.api_planTour(document.getElementById("d").value,' +
@@ -3814,6 +3880,8 @@ function showStaffDialog() {
     '(x.guideRead?"<br><span class=\'muted\'>"+esc(x.guideRead)+"</span>":"")+' +
     '(x.priority&&x.strengths?"<br><span class=\'muted\'>"+esc(x.strengths)+"</span>":"")+' +
     '(x.weakGuide?"<br><b>a Low ambassador was the only one who fit</b>":"")+' +
+    '(x.stretched?"<br><b>no rule could be met for this place, so "+esc(x.stretched)+' +
+    '" was used - check this pair</b>":"")+' +
     '(x.buddy?"<br><span class=\'muted\'>class visit: "+esc(x.buddy.name)+' +
     '(x.buddy.gender?" ("+esc(x.buddy.gender)+")":"")+" - "+esc(x.buddy.language)+' +
     '", "+esc(x.buddy.teacher)+", "+esc(x.buddy.room)+"</span>":"")+' +
@@ -4112,6 +4180,62 @@ function showLockerSlipDialog() {
 
 function api_buildLockerSlips(dateStr) { return buildLockerSlips(dateStr); }
 function api_buildRouteSheets(dateStr) { return buildRouteSheets(dateStr); }
+/**
+ * Who is free for a job on a date, so she can fill it herself before
+ * the command fills anything else.
+ *
+ * Anyone already on that job comes back ticked. Anyone already doing
+ * something else that day is not offered, because nobody works two
+ * jobs on one tour.
+ */
+function api_handChoices(dateStr, job) {
+  clearReadCache_();
+  const dateVal = toDate_(dateStr);
+  if (!dateVal) throw new Error('Pick a tour date first.');
+  if (!job) throw new Error('Pick a job first.');
+
+  const busy = {};
+  const onThis = {};
+  assignmentsOn_(dateVal).forEach(function (a) {
+    if (a.job === job) { onThis[norm_(a.name)] = true; return; }
+    busy[norm_(a.name)] = a.job;
+  });
+
+  const elig = eligibility_();
+  const hist = jobHistory_();
+  const rows = ambassadors_().filter(function (a) {
+    if (!a.active) return false;
+    if (busy[norm_(a.name)]) return false;
+    const e = elig[norm_(a.name)];
+    return !e || e[job] !== false;
+  }).map(function (a) {
+    const h = hist[norm_(a.name)] || { total: 0 };
+    return {
+      name: a.name, grade: a.grade, tours: h.total,
+      onJob: !!onThis[norm_(a.name)],
+      yellow: norm_(a.light) === 'yellow'
+    };
+  }).sort(function (a, b) {
+    if (a.tours !== b.tours) return a.tours - b.tours;
+    return a.name < b.name ? -1 : 1;
+  });
+
+  return { date: dateKey_(dateVal), job: job, rows: rows };
+}
+
+function api_saveByHand(dateStr, job, names) {
+  clearReadCache_();
+  const dateVal = toDate_(dateStr);
+  if (!dateVal) throw new Error('Pick a tour date first.');
+  if (!job) throw new Error('Pick a job first.');
+  const offered = api_handChoices(dateStr, job).rows.map(function (r) { return r.name; });
+  const out = saveByHand_(dateVal, job, names || [], offered);
+  clearReadCache_();
+  refreshCounts_();
+  out.job = job;
+  return out;
+}
+
 function api_planTour(dateStr, keep) { return planTour(dateStr, keep); }
 function api_commitTour(dateStr, keep, panelists) {
   return commitTour(dateStr, keep, panelists);
