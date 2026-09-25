@@ -3084,12 +3084,19 @@ function api_emailPeople(kind) {
 }
 
 /**
- * Builds the draft and hands back a link to it.
+ * Opens Gmail with the message already in it.
  *
- * Everyone goes in Bcc by default, so a family never sees another
- * family's address and a teacher is not handed a class list.
+ * This deliberately touches no mail-reading service. The moment one is
+ * named anywhere in this file, Apps Script asks for access to her whole
+ * mailbox and refuses to run anything at all until she grants it - and
+ * a school account may not be allowed to. A compose link is only a URL:
+ * it opens a compose window with the addresses, the subject and the
+ * text already in it, and she sends it from there.
+ *
+ * Long address lists outgrow what a URL can carry, so the addresses
+ * come back as text to copy as well, and the dialog says which to use.
  */
-function api_makeDraft(kind, ids, subject, body, useBcc) {
+function api_composeEmail(kind, ids, subject, body, useBcc) {
   clearReadCache_();
   if (!AUDIENCES_[kind]) throw new Error('Pick who the email is going to first.');
   if (!trim_(subject)) throw new Error('Give the email a subject first.');
@@ -3109,32 +3116,19 @@ function api_makeDraft(kind, ids, subject, body, useBcc) {
     throw new Error('None of the people you ticked have an email address on the sheet.');
   }
 
-  const me = previewAddress_();
-  const html = '<div style="' + MAIL_STYLE_ + '">' +
-    escapeHtml_(String(body == null ? '' : body)).replace(/\n/g, '<br>') + '</div>';
-  const options = {
-    htmlBody: html,
-    name: setting_('Sender Display Name', 'LREI Middle School Tours')
-  };
-  const reply = setting_('Reply-To Email', '');
-  if (reply) options.replyTo = reply;
-  if (useBcc === false) {
-    options.to = to.join(',');
-  } else {
-    options.bcc = to.join(',');
-  }
+  const list = to.join(', ');
+  const text = String(body == null ? '' : body);
+  const url = 'https://mail.google.com/mail/?view=cm&fs=1' +
+    (useBcc === false ? '&to=' : '&bcc=') + encodeURIComponent(to.join(',')) +
+    '&su=' + encodeURIComponent(trim_(subject)) +
+    '&body=' + encodeURIComponent(text);
 
-  const draft = GmailApp.createDraft(useBcc === false ? to.join(',') : (me || ''),
-    trim_(subject), String(body == null ? '' : body), options);
-
-  let url = 'https://mail.google.com/mail/u/0/#drafts';
-  try {
-    url = 'https://mail.google.com/mail/u/0/#drafts?compose=' + draft.getId();
-  } catch (err) {
-    // An older Gmail service with no getId: the drafts folder still opens.
-  }
   return {
-    url: url, addresses: to.length, people: chosen.length,
+    url: url,
+    // A URL much over 2000 characters is refused by the browser, so a
+    // long list is copied across by hand instead.
+    tooLong: url.length > 1900,
+    addresses: to.length, people: chosen.length, list: list,
     bcc: useBcc !== false, noAddress: noAddress
   };
 }
@@ -3970,8 +3964,8 @@ function showWriteDialog() {
   const html =
     '<style>' + DIALOG_CSS_ + '</style>' +
     '<h2>Write an email</h2>' +
-    '<p class="sub">Pick who it goes to, type it, and get a Gmail draft to read over and ' +
-    'send yourself. Nothing is sent from here.</p>' +
+    '<p class="sub">Pick who it goes to, type it, and it opens in Gmail with everything ' +
+    'filled in for you to read over and send. Nothing is sent from here.</p>' +
     '<label for="kind">Who it goes to</label>' +
     '<select id="kind" onchange="load()">' +
     '<option value="">Choose...</option>' +
@@ -4009,7 +4003,7 @@ function showWriteDialog() {
     'h+="<label class=\'opt\'><input type=\'checkbox\' id=\'bcc\' checked><span>' +
     '<b>Everyone in Bcc.</b> They cannot see each other\'s addresses. Untick to put them ' +
     'all in the To line.</span></label>";' +
-    'h+="<div style=\'margin-top:12px;\'><button onclick=\'make()\'>Create the draft</button></div>";' +
+    'h+="<div style=\'margin-top:12px;\'><button onclick=\'make()\'>Open it in Gmail</button></div>";' +
     'document.getElementById("who").innerHTML=h;}' +
     'function all(on){var b=document.querySelectorAll("input.who");' +
     'for(var i=0;i<b.length;i++){b[i].checked=on;}}' +
@@ -4017,16 +4011,22 @@ function showWriteDialog() {
     'for(var i=0;i<b.length;i++){b[i].checked=!b[i].getAttribute("data-idle");}}' +
     'function make(){var ids=[],b=document.querySelectorAll("input.who");' +
     'for(var i=0;i<b.length;i++){if(b[i].checked){ids.push(b[i].value);}}' +
-    'document.getElementById("out").innerHTML="<p class=\'muted\'>Building the draft...</p>";' +
+    'document.getElementById("out").innerHTML="<p class=\'muted\'>Getting it ready...</p>";' +
     'google.script.run.withSuccessHandler(function(r){' +
-    'var h="<div class=\'free\'><b>Draft ready.</b> "+r.people+" person/people, "+' +
-    'r.addresses+" address(es), in "+(r.bcc?"Bcc":"To")+".<br>' +
-    '<a href=\'"+r.url+"\' target=\'_blank\'>Open it in Gmail</a>' +
-    '<br><span class=\'muted\'>Read it over and send it yourself.</span></div>";' +
+    'var h="<div class=\'free\'><b>Ready.</b> "+r.people+" person/people, "+' +
+    'r.addresses+" address(es), in "+(r.bcc?"Bcc":"To")+".";' +
+    'if(!r.tooLong){h+="<br><a href=\'"+r.url+"\' target=\'_blank\'>Open it in Gmail</a>' +
+    '<br><span class=\'muted\'>It opens with everything filled in. Read it over and ' +
+    'send it yourself.</span>";}' +
+    'else{h+="<br><span class=\'muted\'>Too many addresses to carry in a link, so copy ' +
+    'them across:</span>";}' +
+    'h+="<br><br><b>The addresses</b><br><textarea rows=\'3\' readonly ' +
+    'style=\'width:100%;font:inherit;padding:6px;\' onclick=\'this.select()\'>"+' +
+    'esc(r.list)+"</textarea></div>";' +
     'if(r.noAddress&&r.noAddress.length){h+="<div class=\'warn\'><b>No address on file, ' +
     'so left out:</b><br>"+esc(r.noAddress.join(", "))+"</div>";}' +
     'document.getElementById("out").innerHTML=h;}).withFailureHandler(fail)' +
-    '.api_makeDraft(window.__kind,ids,document.getElementById("subj").value,' +
+    '.api_composeEmail(window.__kind,ids,document.getElementById("subj").value,' +
     'document.getElementById("body").value,document.getElementById("bcc").checked);}' +
     '<\/script>';
   dialog_(html, 'Write an Email', 640, 680);

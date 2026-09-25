@@ -196,8 +196,15 @@ except one marked No, so a child pulled on the day goes first next time.
 
 "Write an Email..." is her own correspondence, not the automatic
 reminders. She picks an audience, ticks the people, types the message,
-and gets a **Gmail draft** to read over and send herself. Nothing in
-this dialog ever sends.
+and it **opens in Gmail** with the addresses, subject and text already
+in it, for her to read over and send. Nothing in this dialog ever sends.
+
+It works through a compose link, which is only a URL. Nothing here
+touches a mail service, deliberately: the moment one is named anywhere
+in the file, Apps Script demands access to her whole mailbox and
+refuses to run anything at all until it is granted, which a school
+account may not be allowed to do. A list too long for a URL is flagged,
+and the addresses come back as text to copy instead.
 
     Teachers                        from the Teachers sheet
     Ambassadors                     their own addresses
