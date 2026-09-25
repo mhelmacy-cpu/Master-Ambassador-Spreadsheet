@@ -117,8 +117,15 @@ One command, run once the prospective students are entered. It assigns:
 - **Lobby Greeters** - three.
 - **Table Greeters** - two.
 
-It does **not** assign **Panelists**. Those are chosen by hand - but by
-ticking them in the dialog rather than typing them onto the tracker. The
+It does **not** assign **Panelists**. Those are chosen by hand, and they
+are chosen **first**: the staffing dialog opens on the panel, and only
+once she has submitted it (or said there is no panel this week) does the
+rest appear. Everything after that is assigned around her panel, so a
+panelist is never handed a second job - including when she unticks
+"keep what is already assigned" and starts the date over, because the
+panel is hers and a re-run never clears it.
+
+She ticks them in the dialog rather than typing them onto the tracker. The
 command offers everyone still free (and anyone already on the panel,
 ticked), marks the yellow lights, and whoever is ticked when she saves is
 written to the Tour Tracker as a Panelist. That is what puts them in the

@@ -1760,6 +1760,12 @@ function planTour(dateStr, keepExisting) {
   if (kept) {
     Object.keys(kept.busy).forEach(function (n) { used[n] = kept.busy[n]; });
   }
+  // The panel is hers and is never cleared by a re-run, so whoever is on
+  // it is busy whatever else this run is doing. Without this, starting
+  // the date over would hand a panelist a tour guide slot as well.
+  assignmentsOn_(dateVal).forEach(function (a) {
+    if (a.job === JOBS.PANELIST) used[a.name] = JOBS.PANELIST;
+  });
   const canDo = function (a, job) {
     if (jobsOn[job] === undefined ? false : !jobsOn[job]) return false;
     const e = elig[norm_(a.name)];
@@ -3795,6 +3801,8 @@ const DIALOG_CSS_ =
   '.byhand{border:1px solid #e0e0e0;border-radius:6px;padding:10px 12px;margin-top:14px;' +
   'background:#fafafa;}' +
   '.byhand label:first-child{margin-top:0;}' +
+  '.step{display:inline-block;width:19px;height:19px;line-height:19px;text-align:center;' +
+  'border-radius:50%;background:#a8322a;color:#fff;font-size:11px;margin-right:6px;}' +
   'label.opt{display:flex;align-items:flex-start;gap:8px;font-weight:normal;' +
   'margin:12px 0 0;cursor:pointer;line-height:1.45;}' +
   'label.opt input{width:16px;height:16px;margin-top:1px;flex:none;cursor:pointer;}' +
@@ -3808,36 +3816,40 @@ function showStaffDialog() {
   const html =
     '<style>' + DIALOG_CSS_ + '</style>' +
     '<h2>Staff this Wednesday tour</h2>' +
-    '<p class="sub">Pairs each visiting student with two guides and a route, then picks the greeters. ' +
-    'Panelists are left for you.</p>' +
+    '<p class="sub">Your panel first. Everything after it is assigned around whoever ' +
+    'you pick, so a panelist is never given a second job.</p>' +
     '<label for="d">Tour date</label>' +
-    '<input type="date" id="d" value="' + nextWednesday() + '">' +
+    '<input type="date" id="d" value="' + nextWednesday() + '" onchange="restart()">' +
+    '<div class="byhand">' +
+    '<label><span class="step">1</span> Your panel</label>' +
+    '<div id="hand"><button id="startpanel" onclick="handLoad()">Show who is free</button>' +
+    '<span class="muted"> - pick your panelists, then move on.</span></div>' +
+    '</div>' +
+    '<div class="byhand" id="step2" hidden>' +
+    '<label><span class="step">2</span> Everything else</label>' +
+    '<p class="sub" style="margin:0 0 8px;">Tour guides, routes and the greeting crews, ' +
+    'assigned around your panel.</p>' +
     '<label class="opt"><input type="checkbox" id="keep" checked>' +
     '<span><b>Keep what is already assigned.</b> Only students with no guides yet are ' +
     'staffed, for someone who signed up late. Untick to start this date over.' +
     '</span></label>' +
-    '<div class="byhand">' +
-    '<label for="hj">Fill a job yourself first <span class="muted">(optional)</span></label>' +
-    '<select id="hj" onchange="handLoad()">' +
-    '<option value="">Choose a job...</option>' +
-    '<option value="' + JOBS.PANELIST + '">' + JOBS.PANELIST + '</option>' +
-    '<option value="' + JOBS.LOBBY + '">' + JOBS.LOBBY + '</option>' +
-    '<option value="' + JOBS.TABLE + '">' + JOBS.TABLE + '</option>' +
-    '</select>' +
-    '<div id="hand"></div>' +
-    '</div>' +
-    '<div style="margin-top:12px;">' +
+    '<div style="margin-top:10px;">' +
     '<button id="preview" onclick="doPreview()">Preview</button>' +
     '<button id="save" class="ghost" onclick="doSave()" disabled>Save to Tour Tracker</button>' +
-    '</div><div id="out"></div>' +
+    '</div></div><div id="out"></div>' +
     '<script>' +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function busy(b){document.getElementById("preview").disabled=b;}' +
-    'function handLoad(){var j=document.getElementById("hj").value;' +
-    'if(!j){document.getElementById("hand").innerHTML="";return;}' +
+    'function restart(){document.getElementById("step2").hidden=true;' +
+    'document.getElementById("out").innerHTML="";' +
+    'document.getElementById("hand").innerHTML="<button id=\'startpanel\' ' +
+    'onclick=\'handLoad()\'>Show who is free</button><span class=\'muted\'> - pick ' +
+    'your panelists, then move on.</span>";}' +
+    'var PANEL="' + JOBS.PANELIST + '";' +
+    'function handLoad(){' +
     'document.getElementById("hand").innerHTML="<p class=\'muted\'>Loading...</p>";' +
     'google.script.run.withSuccessHandler(handShow).withFailureHandler(fail)' +
-    '.api_handChoices(document.getElementById("d").value,j);}' +
+    '.api_handChoices(document.getElementById("d").value,PANEL);}' +
     'function handShow(p){window.__hand=p.rows;' +
     'var h="<div class=\'panel\' style=\'max-height:170px;overflow:auto;\'>";' +
     'p.rows.forEach(function(r,i){' +
@@ -3845,17 +3857,21 @@ function showStaffDialog() {
     '(r.onJob?" checked":"")+"> "+esc(r.name)+" <span class=\'muted\'>"+' +
     '(r.grade?"gr "+esc(r.grade)+", ":"")+r.tours+"</span>"+' +
     '(r.yellow?" <b class=\'yel\'>check first</b>":"")+"</label>";});' +
-    'h+="</div><button class=\'ghost\' onclick=\'handSave()\'>Save these to "+' +
-    'esc(p.job)+"</button><span id=\'handout\' class=\'muted\'></span>";' +
+    'h+="</div><button onclick=\'handSave()\'>Submit the panel</button>' +
+    '<button class=\'ghost\' onclick=\'skipPanel()\'>No panel this week</button>' +
+    '<div id=\'handout\' class=\'muted\'></div>";' +
     'document.getElementById("hand").innerHTML=h;}' +
+    'function openStep2(){document.getElementById("step2").hidden=false;}' +
+    'function skipPanel(){document.getElementById("handout").innerHTML=' +
+    '"No panel saved. Everyone stays available for the other jobs.";openStep2();}' +
     'function handSave(){var out=[],b=document.querySelectorAll("input.hnd");' +
     'for(var i=0;i<b.length;i++){if(b[i].checked){out.push(window.__hand[Number(b[i].value)].name);}}' +
-    'document.getElementById("handout").innerHTML=" saving...";' +
+    'document.getElementById("handout").innerHTML="Saving...";' +
     'google.script.run.withSuccessHandler(function(r){' +
-    'document.getElementById("handout").innerHTML=" "+r.total+" on "+esc(r.job)+' +
-    '(r.added?", "+r.added+" added":"")+(r.removed?", "+r.removed+" taken off":"")+' +
-    '". Preview now leaves them where they are.";}).withFailureHandler(fail)' +
-    '.api_saveByHand(document.getElementById("d").value,document.getElementById("hj").value,out);}' +
+    'document.getElementById("handout").innerHTML="<b>"+r.total+" on the panel.</b>"+' +
+    '(r.added?" "+r.added+" added.":"")+(r.removed?" "+r.removed+" taken off.":"")+' +
+    '" They are out of the running for everything else.";openStep2();}).withFailureHandler(fail)' +
+    '.api_saveByHand(document.getElementById("d").value,PANEL,out);}' +
     'function doPreview(){busy(true);document.getElementById("out").innerHTML="<p class=\'muted\'>Working...</p>";' +
     'google.script.run.withSuccessHandler(render).withFailureHandler(fail)' +
     '.api_planTour(document.getElementById("d").value,' +
