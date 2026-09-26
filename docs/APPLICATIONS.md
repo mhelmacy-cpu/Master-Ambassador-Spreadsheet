@@ -87,18 +87,37 @@ It works them out for itself, three ways, in this order:
    itself. What it reads:
 
         Male, Female, M, F                   Gender
+        Middle School, 5, 6                  App. Type
+        Lower School, 1,2,3,4                App. Type
         1-5, 1st-5th, K-5, PK-4, 1 to 5      Grades Attended
         6, 6th, Grade 6, K                   App. Grade
-        Middle School, 5,6                   App. Grade
         2026-09-14 14:32:00, 9/16/2026       Core Submitted
         Rivera, Samuel (Sam)                 Name
         Samuel (Sam) Rivera                  Name
         PS 321, St Anns Academy              School
 
-   A **range** is always what they have already done, so it is Grades
-   Attended. A **single grade**, or a division with its years after it,
-   is what they are applying to, so it is App. Grade. That is the one
-   distinction the two grade columns turn on.
+### The three grade columns
+
+These are the three that are easiest to get the wrong way round, and the
+hardest to spot once they are on the sheet. They are told apart by the
+shape of the value, not by the heading:
+
+    a division, then the grades it takes    App. Type
+    Middle School, 5, 6
+
+    a range                                 Grades Attended
+    1-5, 1st-5th, K-5, PK-4
+
+    a single grade                          App. Grade
+    6, 6th, Grade 6, K
+
+Here alone, **the values overrule the heading**. `Middle School, 5, 6`
+is an application type whatever column it arrived in, so a column headed
+`Entry Grade` carrying it is moved to App. Type and labelled *read from
+the values*. Your own choice for a column is never overruled.
+
+A school is not an application type: the division has to come first, so
+`Brooklyn Middle School` stays a school.
 
 A column placed from its values is labelled *read from the values, worth
 a look*, and the column panel opens itself so you see it.

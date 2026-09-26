@@ -1,7 +1,7 @@
 /**
  * Ravenna paste, formatted into the applications sheet.
  *
- * PASTED IN FULL? This file is 1254 lines. Scroll to the bottom of the
+ * PASTED IN FULL? This file is 1316 lines. Scroll to the bottom of the
  * editor: the last line should read END OF FILE. If it does not, the
  * paste was cut short, and nothing will work until it is pasted again.
  *
@@ -62,10 +62,11 @@ const APP_ALIASES_ = [
   ['App. Grade', ['app grade', 'app. grade', 'application grade', 'entry grade',
     'entering grade', 'grade applying for', 'applying for', 'applying for grade',
     'applying grade', 'admit grade', 'grade level', 'grade', 'entry year',
-    'applying to', 'grade applying to', 'grades applying to', 'applying to grade',
-    'division', 'division applying to', 'school applying to', 'applying']],
+    'grade applying to', 'applying to grade', 'applying']],
   ['App. Type', ['app type', 'app. type', 'application type', 'applicant type', 'type',
-    'admission type', 'candidate type', 'inquiry type']],
+    'admission type', 'candidate type', 'inquiry type', 'division', 'applying to',
+    'division applying to', 'school applying to', 'applying to school', 'program',
+    'programme', 'division and grades']],
   ['Core Submitted', ['core submitted', 'core app submitted', 'core application submitted',
     'core application', 'core app', 'core', 'application submitted', 'submitted',
     'date submitted', 'core status', 'application status', 'status']],
@@ -342,20 +343,32 @@ function isGradeRange_(v) {
 }
 
 /**
- * The grade being applied to.
+ * The grade being applied to: a single year and nothing else.
  *
- * A single number is the plain case: 6 means applying to 6th. Ravenna
- * also writes it as a division and the years within it, "Middle School,
- * 5,6" or "Lower School, 1,2", which is the same column said the long
- * way. A range is not this, which is why it is ruled out first.
+ * 6 means applying to 6th. A range is what they have already done, and a
+ * division with its years after it is the application type, so both are
+ * ruled out rather than swept in here.
  */
 function isAppliedGrade_(v) {
   const t = trim_(v);
-  if (!t || isGradeRange_(t)) return false;
-  if (new RegExp('^(grade\\s*)?' + ONE_GRADE_ + '(\\s*grade)?$', 'i').test(t)) return true;
-  const division = '(lower|middle|upper|high|primary|elementary|senior|junior)\\s+school';
-  return new RegExp('^' + division + '\\s*[,:]', 'i').test(t) ||
-    new RegExp('^' + division + '$', 'i').test(t);
+  if (!t || isGradeRange_(t) || isAppType_(t)) return false;
+  return new RegExp('^(grade\\s*)?' + ONE_GRADE_ + '(\\s*grade)?$', 'i').test(t);
+}
+
+/**
+ * The application type: the division, and the grades that division
+ * takes. "Middle School, 5,6" and "Lower School, 1,2,3,4" are both this.
+ *
+ * The division has to come first for this to count, so a school called
+ * "Brooklyn Middle School" is a school and not an application type.
+ */
+const DIVISION_ = '(lower|middle|upper|high|primary|elementary|senior|junior)\\s+school';
+
+function isAppType_(v) {
+  const t = trim_(v);
+  if (!t) return false;
+  return new RegExp('^' + DIVISION_ + '\\s*[,:]', 'i').test(t) ||
+    new RegExp('^' + DIVISION_ + '$', 'i').test(t);
 }
 
 /** "Rivera, Sam" - a surname, a comma, a first name. */
@@ -424,6 +437,30 @@ function dateText_(d) {
   return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear();
 }
 
+/* The three columns that are all about grades in one way or another.
+ * A heading is the least reliable thing about these, and getting them
+ * the wrong way round is the mistake hardest to spot on the sheet
+ * afterwards, so the values are allowed to overrule a heading here. */
+const GRADE_FAMILY_ = ['App. Type', 'Grades Attended', 'App. Grade'];
+
+/** Which of the three a column's values say it is, or '' if they do not say. */
+function gradeFamilyFromValues_(values) {
+  if (!values.length) return '';
+  let type = 0;
+  let range = 0;
+  let one = 0;
+  values.forEach(function (v) {
+    if (isAppType_(v)) type++;
+    else if (isGradeRange_(v)) range++;
+    else if (isAppliedGrade_(v)) one++;
+  });
+  const n = values.length;
+  if (type / n >= 0.6) return 'App. Type';
+  if (range / n >= 0.6) return 'Grades Attended';
+  if (one / n >= 0.6) return 'App. Grade';
+  return '';
+}
+
 /**
  * Which column these values look like, or '' if they look like nothing.
  *
@@ -443,6 +480,7 @@ function targetFromValues_(values, headers, taken) {
     return named && !isByHand_(named) && !taken[named] ? named : '';
   };
   if (share(isGenderWord_) >= 0.6) return free('Gender');
+  if (share(isAppType_) >= 0.6) return free('App. Type');
   if (share(isGradeRange_) >= 0.6) return free('Grades Attended');
   if (share(isAppliedGrade_) >= 0.6) return free('App. Grade');
   if (share(isDateish_) >= 0.6) return free('Core Submitted');
@@ -665,17 +703,41 @@ function readPaste_(tab, text, overrides) {
     });
   }
 
+  const valuesIn = function (i) {
+    const out = [];
+    dataRows.forEach(function (r) {
+      const v = trim_(r[i] || '');
+      if (v) out.push(v);
+    });
+    return out;
+  };
+
+  // "Middle School, 5,6" is an application type whatever the column it
+  // arrived in was called, and "1-5" is what they have already done. So
+  // among those three, and only those three, the values overrule the
+  // heading. Her own choice for a column is never overruled.
+  const familyName = {};
+  const inFamily = {};
+  GRADE_FAMILY_.forEach(function (want) {
+    const named = appColumnNamed_(headers, want);
+    if (!named || isByHand_(named)) return;
+    familyName[want] = named;
+    inFamily[named] = true;
+  });
+  columns.forEach(function (c) {
+    if (!c.target || !inFamily[c.target] || picked[String(c.index)] !== undefined) return;
+    const says = gradeFamilyFromValues_(valuesIn(c.index));
+    if (!says || !familyName[says] || familyName[says] === c.target) return;
+    c.target = familyName[says];
+    c.source = 'values';
+  });
+
   // Anything the headings did not place, worked out from its own values.
   const taken = {};
   columns.forEach(function (c) { if (c.target) taken[c.target] = true; });
   columns.forEach(function (c) {
     if (c.target || picked[String(c.index)] !== undefined) return;
-    const values = [];
-    dataRows.forEach(function (r) {
-      const v = trim_(r[c.index] || '');
-      if (v) values.push(v);
-    });
-    const guess = targetFromValues_(values, headers, taken);
+    const guess = targetFromValues_(valuesIn(c.index), headers, taken);
     if (!guess) return;
     c.target = guess;
     c.source = 'values';
