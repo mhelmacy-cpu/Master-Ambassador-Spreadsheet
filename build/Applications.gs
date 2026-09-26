@@ -1,6 +1,10 @@
 /**
  * Ravenna paste, formatted into the applications sheet.
  *
+ * PASTED IN FULL? This file is 1175 lines. Scroll to the bottom of the
+ * editor: the last line should read END OF FILE. If it does not, the
+ * paste was cut short, and nothing will work until it is pasted again.
+ *
  * This is a SEPARATE script from the Wednesday tour scheduler. It is
  * pasted into the Apps Script editor of the applications spreadsheet,
  * not the tour one, and it is the only file that project needs.
@@ -1152,3 +1156,19 @@ function showPasteDialog() {
 
 function api_readPaste(tab, text, overrides) { return readPaste_(tab, text, overrides); }
 function api_writePaste(tab, text, overrides) { return writePaste_(tab, text, overrides); }
+
+/* =========================================================
+ * END OF FILE
+ *
+ * If you cannot see this block at the bottom of the Apps Script editor,
+ * the paste stopped early and the script will not run at all. Select
+ * everything in the editor, delete it, and copy the script again.
+ *
+ * If it IS here and the Admissions menu still does not appear:
+ *   - Save, then reload the spreadsheet tab. The menu is only built
+ *     when the file opens.
+ *   - Check this is the applications spreadsheet's own script project,
+ *     not the tour scheduler's. Both define onOpen, and a project with
+ *     two of them refuses to load anything at all.
+ *   - Check nothing else is left in the editor above this file.
+ * ========================================================= */
