@@ -34,7 +34,7 @@ const SHEETS = {
 
 const HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
-  'Borough', 'Gender', 'Race (Presenting)', 'Light', 'Strength', 'Active',
+  'Borough', 'Gender', 'Race (Presenting)', 'Light', 'Strength', 'Can Solo', 'Active',
   'Signed Up', 'Confirmed', 'Jobs Done',
   'Student Email', 'Parent 1 Name', 'Parent 1 Email', 'Parent 2 Name', 'Parent 2 Email'];
 
@@ -466,6 +466,9 @@ function setupSpreadsheet() {
   if (ensureColumn_(SHEETS.AMBASSADORS, 'Strength', STRENGTH_OPTIONS)) {
     added.push('Strength on Ambassadors');
   }
+  if (ensureColumn_(SHEETS.AMBASSADORS, 'Can Solo', YES_NO)) {
+    added.push('Can Solo on Ambassadors');
+  }
   if (ensureColumn_(SHEETS.PROSPECTIVE, 'Full Pay', YES_NO)) {
     added.push('Full Pay on Prospective Students');
   }
@@ -550,6 +553,7 @@ function setupAmbassadors_() {
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Borough') + 1, BOROUGHS);
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Light') + 1, LIGHT_OPTIONS);
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Strength') + 1, STRENGTH_OPTIONS, true);
+  dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Can Solo') + 1, YES_NO, true);
   dropdown_(s, last, col_(SHEETS.AMBASSADORS, 'Active') + 1, YES_NO);
 
   note_(s, SHEETS.AMBASSADORS, 'Split',
@@ -580,6 +584,11 @@ function setupAmbassadors_() {
     'anyone. A visitor marked Full Pay or Well Connected is given High guides first, ' +
     'where the grade and gender rules still allow it. Leave it blank and they are ' +
     'treated as Medium.');
+  note_(s, SHEETS.AMBASSADORS, 'Can Solo',
+    'Yes means this one is steady enough to walk a family round on their own.\n\n'
+    + 'Everybody is paired up first. Only when there is nobody left to pair them with '
+    + 'does a Yes here let them take the family by themselves, and the tour is marked '
+    + 'so you can see it happened. Blank or No means they are never sent out alone.');
   note_(s, SHEETS.AMBASSADORS, 'Student Email',
     'Their lrei.org address. Without it they never get told they are on duty.');
   s.autoResizeColumns(1, h.length);
@@ -1491,7 +1500,8 @@ function ambassadors_() {
         presenting: trim_(cell_(r, N, 'Race (Presenting)')),
         email: trim_(r[col_(N, 'Student Email')]),
         light: trim_(cell_(r, N, 'Light')),
-      strength: trim_(cell_(r, N, 'Strength')),
+        strength: trim_(cell_(r, N, 'Strength')),
+        canSolo: isYes_(cell_(r, N, 'Can Solo')),
         active: norm_(r[col_(N, 'Active')]) === 'yes'
       };
     }).filter(function (a) { return a.name !== ''; });
@@ -1912,6 +1922,7 @@ function planTour(dateStr, keepExisting) {
     const chosen = [];
     const missing = [];
     const stretched = [];
+    let soloed = false;
     // Every grade this pair will accept anywhere, for the case where a
     // place would otherwise go empty. One guide from the year below
     // beats one guide and a gap.
@@ -1941,6 +1952,15 @@ function planTour(dateStr, keepExisting) {
         candidates = freeIn([wantGrade[i]]);
       }
       if (!candidates.length) candidates = freeIn(anyGrade);
+
+      // Nobody is left to pair this one with. If everybody already on the
+      // pair is marked Can Solo, she would rather send them out alone than
+      // reach outside the rules for a second body, so that is tried first.
+      if (!candidates.length && chosen.length &&
+          chosen.every(function (a) { return a.canSolo; })) {
+        soloed = true;
+        return;
+      }
 
       // Last resort. Every rule we have has failed to produce anybody,
       // so the grade goes too: a visitor walking round with one guide,
@@ -2070,6 +2090,7 @@ function planTour(dateStr, keepExisting) {
       guideMix: traitMix_(chosen.map(function (a) { return a.name; }), pool, 'presenting'),
       guideRead: chosen.map(guideRead_).join('  |  '),
       stretched: stretched.join(', '),
+      solo: soloed ? chosen.map(function (a) { return a.name; }).join(', ') : '',
       priority: priorityWhy_(v),
       strengths: chosen.map(function (a) {
         return a.name + ' (' + (trim_(a.strength) || 'no strength set') + ')';
@@ -2088,7 +2109,7 @@ function planTour(dateStr, keepExisting) {
       }).map(function (a) { return a.name; }).join(' and ') : '',
       genderShortfall: !!v.gender && chosen.length > 0 &&
         !chosen.some(function (a) { return norm_(a.gender) === norm_(v.gender); }),
-      short: Math.max(0, perVisitor - chosen.length),
+      short: soloed ? 0 : Math.max(0, perVisitor - chosen.length),
       anyGrade: !v.grade,
       why: missing.length
         ? guideMissReason_(v, missing, pool, used, canDo, all.length,
@@ -3018,6 +3039,177 @@ function buildLockerSlips(dateStr) {
 }
 
 /* =========================================================
+ * Swapping one person out
+ *
+ * A child is off sick, or she simply wants somebody else on a pair.
+ * Editing the Tour Tracker by hand works - the emails and printouts all
+ * read it - but it means finding the row, knowing who is free, and
+ * knowing the rules well enough not to break one by accident. This does
+ * all three: the list of who is on, who could take their place, and
+ * what the swap does to the pair.
+ * ========================================================= */
+
+function rosterRows_(dateVal) {
+  const N = SHEETS.TRACKER;
+  const out = [];
+  rows_(N).forEach(function (r, i) {
+    if (!sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal)) return;
+    const name = trim_(r[col_(N, 'Ambassador')]);
+    if (!name) return;
+    out.push({
+      row: i + 2,
+      name: name,
+      job: trim_(r[col_(N, 'Job')]),
+      visitor: trim_(r[col_(N, 'Prospective Student(s)')]),
+      route: trim_(r[col_(N, 'Route')])
+    });
+  });
+  return out;
+}
+
+/** The other people on this person's pair or crew. */
+function alongside_(roster, entry) {
+  return roster.filter(function (r) {
+    if (r.row === entry.row) return false;
+    if (r.job !== entry.job) return false;
+    if (entry.job === JOBS.GUIDE || entry.job === JOBS.BUDDY) {
+      return norm_(r.visitor) === norm_(entry.visitor);
+    }
+    return true;
+  });
+}
+
+/**
+ * What a pair looks like once these people are on it, in her own terms.
+ * Returns the things that are wrong, or an empty list.
+ */
+function pairProblems_(visitor, names) {
+  const amb = {};
+  ambassadors_().forEach(function (a) { amb[norm_(a.name)] = a; });
+  const on = names.map(function (n) { return amb[norm_(n)] || { name: n }; });
+  const out = [];
+  if (!visitor) return out;
+
+  if (visitor.gender && on.length &&
+      !on.some(function (a) { return norm_(a.gender) === norm_(visitor.gender); })) {
+    out.push('nobody on this pair is ' + visitor.gender.toLowerCase());
+  }
+  const socs = on.filter(function (a) { return isStudentOfColor_(a.presenting); });
+  if (socs.length > 1) {
+    out.push('both guides are students of color');
+  }
+  if (needsSoCGuide_(visitor.race) && !socs.length) {
+    out.push('no student of color on the pair, and ' + visitor.name + ' is one');
+  }
+  if (isPriorityVisitor_(visitor) &&
+      on.some(function (a) { return strengthRank_(a.strength) === 1; })) {
+    out.push('a Low ambassador on a ' + priorityWhy_(visitor) + ' family');
+  }
+  const wanted = [];
+  usableGrades_(guideGradesFor_(visitor.grade, on.length || 2), ambassadors_()
+    .filter(function (a) { return a.active; }))
+    .forEach(function (slot) {
+      [].concat(slot).forEach(function (g) { if (wanted.indexOf(g) === -1) wanted.push(g); });
+    });
+  if (wanted.length) {
+    const wrong = on.filter(function (a) {
+      return a.grade && wanted.indexOf(a.grade) === -1;
+    });
+    wrong.forEach(function (a) {
+      out.push(a.name + ' is grade ' + a.grade + ', not ' + wanted.join(' or '));
+    });
+  }
+  return out;
+}
+
+function api_swapList(dateStr) {
+  clearReadCache_();
+  const dateVal = toDate_(dateStr);
+  if (!dateVal) throw new Error('Pick a tour date first.');
+  const roster = rosterRows_(dateVal);
+  if (!roster.length) throw new Error('Nothing is staffed for ' + longDate_(dateVal) + '.');
+
+  const busy = {};
+  roster.forEach(function (r) { busy[norm_(r.name)] = true; });
+  const elig = eligibility_();
+  const hist = jobHistory_();
+  const pool = ambassadors_().filter(function (a) { return a.active; });
+  const visitors = {};
+  prospectiveFor_(dateVal).forEach(function (v) { visitors[norm_(v.name)] = v; });
+
+  const out = roster.map(function (entry) {
+    const with_ = alongside_(roster, entry);
+    const withNames = with_.map(function (r) { return r.name; });
+    const can = pool.filter(function (a) {
+      if (busy[norm_(a.name)]) return false;
+      const e = elig[norm_(a.name)];
+      if (e && e[entry.job] === false) return false;
+      return !withNames.some(function (n) { return keptApart_(a.name, n); });
+    }).sort(function (a, b) {
+      const ha = (hist[norm_(a.name)] || {}).total || 0;
+      const hb = (hist[norm_(b.name)] || {}).total || 0;
+      if (ha !== hb) return ha - hb;
+      return a.name < b.name ? -1 : 1;
+    }).map(function (a) {
+      return {
+        name: a.name,
+        note: [a.grade ? 'gr ' + a.grade : '', a.gender, trim_(a.presenting),
+          trim_(a.strength), ((hist[norm_(a.name)] || {}).total || 0) + ' job(s)']
+          .filter(Boolean).join(', '),
+        yellow: norm_(a.light) === 'yellow'
+      };
+    });
+    return {
+      row: entry.row, name: entry.name, job: entry.job,
+      visitor: entry.visitor, route: entry.route,
+      alongside: withNames.join(', '),
+      candidates: can
+    };
+  });
+
+  return { date: dateKey_(dateVal), dateLabel: longDate_(dateVal), rows: out };
+}
+
+function api_swapAmbassador(dateStr, row, newName) {
+  clearReadCache_();
+  const dateVal = toDate_(dateStr);
+  if (!dateVal) throw new Error('Pick a tour date first.');
+  if (!trim_(newName)) throw new Error('Choose who is taking their place.');
+  const N = SHEETS.TRACKER;
+  const at = Number(row);
+  const roster = rosterRows_(dateVal);
+  const entry = roster.filter(function (r) { return r.row === at; })[0];
+  if (!entry) throw new Error('That row is not on this tour any more - reload the list.');
+
+  const who = ambassadors_().filter(function (a) {
+    return norm_(a.name) === norm_(newName);
+  })[0];
+  if (!who) throw new Error(trim_(newName) + ' is not on the Ambassadors sheet.');
+  if (roster.some(function (r) { return r.row !== at && norm_(r.name) === norm_(who.name); })) {
+    throw new Error(who.name + ' is already working this tour.');
+  }
+
+  sheet_(N).getRange(at, col_(N, 'Ambassador') + 1).setValue(who.name);
+  clearReadCache_();
+  refreshCounts_();
+
+  // What the swap did to the pair, said plainly rather than left to be found.
+  const after = rosterRows_(dateVal);
+  const now = after.filter(function (r) { return r.row === at; })[0];
+  const names = [who.name].concat(alongside_(after, now).map(function (r) { return r.name; }));
+  let visitor = null;
+  prospectiveFor_(dateVal).forEach(function (v) {
+    if (norm_(v.name) === norm_(entry.visitor)) visitor = v;
+  });
+  const problems = entry.job === JOBS.GUIDE ? pairProblems_(visitor, names) : [];
+
+  return {
+    from: entry.name, to: who.name, job: entry.job, visitor: entry.visitor,
+    problems: problems
+  };
+}
+
+/* =========================================================
  * Confirming a tour, afterwards
  *
  * Being given a job and turning up are not the same thing. She pulls
@@ -3814,6 +4006,7 @@ function onOpen() {
     .addItem('Staff This Wednesday Tour...', 'showStaffDialog')
     .addItem('Print Tour Routes...', 'showRouteSheetDialog')
     .addItem('Print Locker Slips...', 'showLockerSlipDialog')
+    .addItem('Change Who Is Working...', 'showSwapDialog')
     .addItem('Confirm a Tour Afterwards...', 'showConfirmDialog')
     .addSeparator()
     .addItem('Write an Email...', 'showWriteDialog')
@@ -3965,6 +4158,8 @@ function showStaffDialog() {
     '(x.weakGuide?"<br><b>a Low ambassador was the only one who fit</b>":"")+' +
     '(x.stretched?"<br><b>no rule could be met for this place, so "+esc(x.stretched)+' +
     '" was used - check this pair</b>":"")+' +
+    '(x.solo?"<br><b>"+esc(x.solo)+" is taking this family alone. Nobody was left ' +
+    'to pair with, and they are marked Can Solo.</b>":"")+' +
     '(x.buddy?"<br><span class=\'muted\'>class visit: "+esc(x.buddy.name)+' +
     '(x.buddy.gender?" ("+esc(x.buddy.gender)+")":"")+" - "+esc(x.buddy.language)+' +
     '", "+esc(x.buddy.teacher)+", "+esc(x.buddy.room)+"</span>":"")+' +
@@ -4259,6 +4454,64 @@ function showLockerSlipDialog() {
     '.api_buildLockerSlips(document.getElementById("d").value);}' +
     '<\/script>';
   dialog_(html, 'Print Locker Slips', 600, 460);
+}
+
+/**
+ * Change who is working a tour that is already staffed.
+ *
+ * The whole roster for the day, each person shown with everybody who is
+ * free to take their place. The swap is written to the Tour Tracker, and
+ * every email is built from the tracker, so the emails follow it.
+ */
+function showSwapDialog() {
+  const next = nextTourDate_();
+  const html =
+    '<style>' + DIALOG_CSS_ + '</style>' +
+    '<h2>Change who is working</h2>' +
+    '<p class="sub">Everyone on the tour, and next to each of them everybody who is ' +
+    'free to take their place. Pick a name and press Swap. It goes straight onto the ' +
+    'Tour Tracker, and the emails are built from the tracker, so they follow it.</p>' +
+    '<label for="d">Tour date</label>' +
+    '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
+    '<div style="margin-top:12px;"><button id="load" onclick="load()">Load that tour</button></div>' +
+    '<div id="msg"></div>' +
+    '<div id="out"></div>' +
+    '<script>' +
+    'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
+    'function load(){document.getElementById("load").disabled=true;' +
+    'document.getElementById("out").innerHTML="<p class=\'muted\'>Loading...</p>";' +
+    'google.script.run.withSuccessHandler(show).withFailureHandler(fail)' +
+    '.api_swapList(document.getElementById("d").value);}' +
+    'function fail(e){document.getElementById("load").disabled=false;' +
+    'document.getElementById("msg").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";' +
+    'document.getElementById("out").innerHTML="";}' +
+    'function show(p){document.getElementById("load").disabled=false;window.__rows=p.rows;' +
+    'var h="<div class=\'out\'><h3>"+esc(p.dateLabel)+"</h3>";' +
+    'p.rows.forEach(function(r,i){' +
+    'h+="<div class=\'panel\'><b>"+esc(r.name)+"</b> <span class=\'muted\'>"+esc(r.job)+' +
+    '(r.visitor?" for "+esc(r.visitor):"")+(r.route?", route "+esc(r.route):"")+' +
+    '(r.alongside?"<br>working with "+esc(r.alongside):"")+"</span><br>";' +
+    'if(!r.candidates.length){h+="<span class=\'muted\'>nobody else is free that day</span>";}' +
+    'else{h+="<select id=\'s"+i+"\'><option value=\'\'>leave as is</option>";' +
+    'r.candidates.forEach(function(c,j){h+="<option value=\'"+j+"\'>"+esc(c.name)+' +
+    '" ("+esc(c.note)+")"+(c.yellow?" - check with me first":"")+"</option>";});' +
+    'h+="</select> <button onclick=\'swap("+i+")\'>Swap</button>";}' +
+    'h+="</div>";});' +
+    'h+="</div>";document.getElementById("out").innerHTML=h;}' +
+    'function swap(i){var r=window.__rows[i];' +
+    'var sel=document.getElementById("s"+i);if(!sel||!sel.value){return;}' +
+    'var name=r.candidates[Number(sel.value)].name;' +
+    'document.getElementById("msg").innerHTML="<p class=\'muted\'>Swapping...</p>";' +
+    'google.script.run.withSuccessHandler(done).withFailureHandler(fail)' +
+    '.api_swapAmbassador(document.getElementById("d").value,r.row,name);}' +
+    'function done(res){var h="<div class=\'free\'><b>"+esc(res.to)+"</b> is now "+' +
+    'esc(res.job)+(res.visitor?" for "+esc(res.visitor):"")+", in place of "+' +
+    'esc(res.from)+". The counts are up to date.";' +
+    'if(res.problems&&res.problems.length){h+="<br><b>Worth a look:</b> "+' +
+    'esc(res.problems.join("; "));}' +
+    'h+="</div>";document.getElementById("msg").innerHTML=h;load();}' +
+    '<\/script>';
+  dialog_(html, 'Change Who Is Working', 640, 640);
 }
 
 function api_buildLockerSlips(dateStr) { return buildLockerSlips(dateStr); }

@@ -10,8 +10,8 @@ Seeded with the 31 student names and nothing else - every other column
 is entered by the office.
 
     First Name | Last Name | Homeroom | Split | Grade | Advisor | Borough |
-    Gender | Parent 1 Name | Parent 1 Email | Parent 2 Name |
-    Parent 2 Email | Active (Yes/No dropdown)
+    Gender | Race (Presenting) | Light | Strength | Can Solo |
+    Active (Yes/No dropdown)
 
 - `Split` is A/B/C and is load-bearing: it decides which class a student
   is missing on any lettered period. See "Reading the schedule" below.
@@ -110,7 +110,15 @@ One command, run once the prospective students are entered. It assigns:
   Strength ambassadors, then Medium (which is what a blank counts as).
   A Low is used only if nobody else fits at all, and the dialog says so
   when that happens. It never overrides grade, gender or race - it only
-  decides who is picked among the ones who already fit. Each guide pair is assigned a **tour route** (one family
+  decides who is picked among the ones who already fit.
+
+  **Can Solo.** A Yes in that column on Ambassadors says this one is
+  steady enough to walk a family round by themselves. It is not a
+  shortcut: everybody is paired up first, and only when the second place
+  has nobody in it at all does it come into play. Then, rather than
+  reach outside the rules for a second body, the family goes out with
+  the one guide, and the dialog says who is on their own. Blank or No
+  and they are never sent out alone. Each guide pair is assigned a **tour route** (one family
   per route, seven routes available), for the Wednesday morning slot.
   With more families than routes, the list starts again at route 1 and
   the sharing is flagged in the dialog.
@@ -140,6 +148,25 @@ anyone who is already guiding or greeting.
 
 Nobody is given two jobs in the same slot. Whoever has done fewest jobs
 so far is offered first, so the work spreads evenly across the year.
+
+## Changing who is working
+
+"Change Who Is Working..." opens the whole roster for a date: every job,
+who has it, who they are working with, and a list of everybody free to
+take it over. Free means active, allowed that job on Eligibility, not
+already working that tour, and not kept apart from anyone on the same
+pair. Each name is shown with grade, gender, race, strength and how many
+jobs they have done, least busy first.
+
+Pick a name, press Swap, and it is written to the Tour Tracker there and
+then. Every email, route sheet and locker slip is built from the tracker
+at the moment it goes out, so they all follow the change without
+anything else being re-run.
+
+After a guide swap it says what the new pair looks like: a gender or
+race rule no longer met, a Low on a priority family, a guide from the
+wrong year. It swaps anyway. The decision is hers; the note is so she
+sees what she has done.
 
 ### Reference sheets
 Bell Schedule, Teachers, Tour Routes, Settings.
