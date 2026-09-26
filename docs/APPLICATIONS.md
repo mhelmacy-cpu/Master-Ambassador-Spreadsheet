@@ -65,6 +65,10 @@ Under the paste box there is a line reading, for instance,
   that message is what to pass on.
 - **A character count and rows.** It worked.
 
+- **"The script sent nothing back."** The paste was read, but the answer
+  could not be handed to the window. Press **Sort the rows** to try
+  again.
+
 **Sort the rows** beside that line does by hand what pasting does on its
 own, for when the automatic read does not fire.
 

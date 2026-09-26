@@ -23,3 +23,16 @@ Two spreadsheets, two Apps Script projects, and they share nothing.
   same project.
 
 Plain ASCII only in the source: anything else corrupts on paste.
+
+## What a dialog can be handed
+
+Whatever a script returns to a dialog is turned into plain data first.
+A **Date does not survive it**, and when any part of the answer cannot be
+converted the dialog receives `null` rather than a partial answer, then
+throws on the first property it reads. Nothing in the logs, nothing on
+screen.
+
+So an `api_` function returns strings, numbers and arrays of them, and
+nothing else. Dates stay on the script's side, where writing to the
+sheet needs them, and the dialog is sent the printed form. This has cost
+a day once already.

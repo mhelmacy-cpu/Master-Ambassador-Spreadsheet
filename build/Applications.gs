@@ -1,7 +1,7 @@
 /**
  * Ravenna paste, formatted into the applications sheet.
  *
- * PASTED IN FULL? This file is 1192 lines. Scroll to the bottom of the
+ * PASTED IN FULL? This file is 1254 lines. Scroll to the bottom of the
  * editor: the last line should read END OF FILE. If it does not, the
  * paste was cut short, and nothing will work until it is pasted again.
  *
@@ -1067,7 +1067,10 @@ function showPasteDialog() {
 
     // What it worked out, then the rows, then the button. The column
     // controls stay shut unless something needs her.
-    'function show(p){var h="";' +
+    'function show(p){if(!p){document.getElementById("out").innerHTML=' +
+    '"<div class=\'warn\'><b>The script sent nothing back.</b><br>It read your paste but ' +
+    'could not hand the result to this window. Press Sort the rows to try again.</div>";' +
+    'return;}var h="";' +
     'var need=p.unplaced>0||p.fromValues>0;' +
     'if(COLS===false&&need){COLS=true;}' +
     'h+="<div class=\'status"+(p.adding?"":" thin")+"\'><b>"+p.people.length+" applicant"+' +
@@ -1171,8 +1174,67 @@ function showPasteDialog() {
     HtmlService.createHtmlOutput(html).setWidth(820).setHeight(720), 'Paste from Ravenna');
 }
 
-function api_readPaste(tab, text, overrides) { return readPaste_(tab, text, overrides); }
-function api_writePaste(tab, text, overrides) { return writePaste_(tab, text, overrides); }
+/**
+ * The preview, cut down to what can cross to the dialog.
+ *
+ * Whatever a script hands a dialog has to survive being turned into
+ * plain data first. A cell holding a real date does not survive it, and
+ * when any part of the answer cannot be converted the dialog is handed
+ * nothing at all rather than a partial answer - which is why a date in
+ * Core Submitted stopped the rows appearing and said nothing about it.
+ *
+ * So the dates stay on this side, where writing needs them, and the
+ * dialog is sent the printed version and nothing else. Everything here
+ * is a string, a number or an array of them, on purpose: it is the only
+ * way to be sure the answer arrives.
+ */
+function api_readPaste(tab, text, overrides) {
+  const p = readPaste_(tab, text, overrides);
+  const str = function (v) { return String(v == null ? '' : v); };
+  return {
+    tab: str(p.tab),
+    placed: Number(p.placed),
+    unplaced: Number(p.unplaced),
+    fromValues: Number(p.fromValues),
+    adding: Number(p.adding),
+    columns: p.columns.map(function (c) {
+      return {
+        index: Number(c.index),
+        header: str(c.header),
+        sample: str(c.sample),
+        target: str(c.target),
+        source: str(c.source)
+      };
+    }),
+    targets: p.targets.map(str),
+    byHand: p.byHand.map(str),
+    fields: p.fields.map(str),
+    people: p.people.map(function (x) {
+      const shown = {};
+      p.fields.forEach(function (f) { shown[f] = str(x.shown[f]); });
+      return {
+        name: str(x.name),
+        shown: shown,
+        duplicate: str(x.duplicate),
+        preferred: str(x.preferred)
+      };
+    }),
+    wentBy: p.wentBy.map(str),
+    warnings: p.warnings.map(str)
+  };
+}
+
+function api_writePaste(tab, text, overrides) {
+  const r = writePaste_(tab, text, overrides);
+  return {
+    added: Number(r.added),
+    skipped: Number(r.skipped),
+    startRow: Number(r.startRow),
+    tab: String(r.tab),
+    names: r.names.map(function (n) { return String(n); }),
+    warnings: r.warnings.map(function (w) { return String(w); })
+  };
+}
 
 /* =========================================================
  * END OF FILE
