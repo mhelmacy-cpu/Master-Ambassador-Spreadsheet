@@ -52,10 +52,14 @@ const APP_ALIASES_ = [
   ['Last Name', ['last', 'last name', 'lastname', 'surname', 'family name',
     'student last name', 'applicant last name', 'child last name', 'legal last name']],
   ['Name', ['name', 'student', 'student name', 'applicant', 'applicant name', 'full name',
-    'child', 'child name', 'candidate', 'candidate name', 'applicant full name']],
+    'child', 'child name', 'candidate', 'candidate name', 'applicant full name',
+    'legal name', 'student full name', 'child full name', 'name last first',
+    'name (last, first)', 'applicant/student', 'student/applicant']],
   ['App. Grade', ['app grade', 'app. grade', 'application grade', 'entry grade',
     'entering grade', 'grade applying for', 'applying for', 'applying for grade',
-    'applying grade', 'admit grade', 'grade level', 'grade', 'entry year']],
+    'applying grade', 'admit grade', 'grade level', 'grade', 'entry year',
+    'applying to', 'grade applying to', 'grades applying to', 'applying to grade',
+    'division', 'division applying to', 'school applying to', 'applying']],
   ['App. Type', ['app type', 'app. type', 'application type', 'applicant type', 'type',
     'admission type', 'candidate type', 'inquiry type']],
   ['Core Submitted', ['core submitted', 'core app submitted', 'core application submitted',
@@ -65,7 +69,8 @@ const APP_ALIASES_ = [
   ['School', ['school', 'current school', 'present school', 'school name', 'sending school',
     'current school name', 'previous school', 'school attending']],
   ['Grades Attended', ['grades attended', 'grade attended', 'years attended',
-    'grades at current school', 'grade range', 'attended']],
+    'grades at current school', 'grade range', 'attended', 'grades completed',
+    'years at current school', 'grades enrolled', 'enrolled grades']],
   ['Notes:', ['notes', 'note', 'notes:', 'comments', 'comment', 'remarks']]
 ];
 
@@ -315,8 +320,35 @@ const GENDER_WORDS_ = ['m', 'f', 'male', 'female', 'boy', 'girl', 'man', 'woman'
 
 function isGenderWord_(v) { return GENDER_WORDS_.indexOf(norm_(v)) !== -1; }
 
-function isGradeWord_(v) {
-  return /^(grade\s*)?(pre-?k|k|\d{1,2})(st|nd|rd|th)?(\s*grade)?$/i.test(trim_(v));
+/** One year: 6, 6th, Grade 6, K, PK, PreK, TK. */
+const ONE_GRADE_ = '(pre-?k|p-?k|t-?k|k|\\d{1,2}(st|nd|rd|th)?)';
+
+/**
+ * A span of years: 1-5, 1st-5th, K-5, 1-4th, PK through 4.
+ *
+ * A range is always what they have already done, never what they are
+ * applying to, so it is Grades Attended and it is checked first.
+ */
+function isGradeRange_(v) {
+  return new RegExp('^' + ONE_GRADE_ + '\\s*(-|to|through|thru)\\s*' + ONE_GRADE_ + '$', 'i')
+    .test(trim_(v));
+}
+
+/**
+ * The grade being applied to.
+ *
+ * A single number is the plain case: 6 means applying to 6th. Ravenna
+ * also writes it as a division and the years within it, "Middle School,
+ * 5,6" or "Lower School, 1,2", which is the same column said the long
+ * way. A range is not this, which is why it is ruled out first.
+ */
+function isAppliedGrade_(v) {
+  const t = trim_(v);
+  if (!t || isGradeRange_(t)) return false;
+  if (new RegExp('^(grade\\s*)?' + ONE_GRADE_ + '(\\s*grade)?$', 'i').test(t)) return true;
+  const division = '(lower|middle|upper|high|primary|elementary|senior|junior)\\s+school';
+  return new RegExp('^' + division + '\\s*[,:]', 'i').test(t) ||
+    new RegExp('^' + division + '$', 'i').test(t);
 }
 
 /** "Rivera, Sam" - a surname, a comma, a first name. */
@@ -324,9 +356,65 @@ function isFlippedName_(v) {
   return /^[A-Za-z][A-Za-z'.\- ]+,\s*[A-Za-z]/.test(trim_(v));
 }
 
+/* Two words that are not a person: an application type reads like a name
+ * until you look at the words. */
+const NOT_PEOPLE_ = ['new', 'returning', 'student', 'students', 'applicant', 'transfer',
+  'reapplicant', 're-applicant', 'inquiry', 'sibling', 'legacy', 'yes', 'no', 'none',
+  'active', 'inactive', 'complete', 'incomplete', 'submitted', 'pending', 'grade',
+  'school', 'lower', 'middle', 'upper', 'male', 'female'];
+
+/**
+ * A person's name, flipped or not.
+ *
+ * "Rivera, Samuel (Sam)" and "Samuel (Sam) Rivera" are both names, so a
+ * name column is recognised whichever way round Ravenna writes it. A
+ * value carrying a digit, a school word, or one of the application words
+ * above is not somebody's name.
+ */
+function isPersonName_(v) {
+  const t = trim_(v);
+  if (!t || /\d/.test(t) || isSchoolish_(t)) return false;
+  if (isFlippedName_(t)) return true;
+  const words = stripBrackets_(t).split(/\s+/).filter(function (w) { return w !== ''; });
+  if (words.length < 2 || words.length > 5) return false;
+  for (let i = 0; i < words.length; i++) {
+    if (!/^[A-Za-z][A-Za-z'.-]*$/.test(words[i])) return false;
+    if (NOT_PEOPLE_.indexOf(norm_(words[i])) !== -1) return false;
+  }
+  return true;
+}
+
 function isSchoolish_(v) {
   return /\b(school|academy|prep|preparatory|collegiate|montessori|friends|lycee|yeshiva)\b/i
     .test(trim_(v)) || /^(ps|is|ms|jhs)\s*\d+/i.test(trim_(v));
+}
+
+/**
+ * A submitted date, with the time Ravenna staples to it taken off.
+ *
+ * Ravenna hands back "2026-09-14 14:32:00", which is a timestamp and not
+ * what she wants to read down a column. The day is kept as a real date,
+ * so the column sorts and formats as a date rather than as text, and
+ * anything this does not recognise is left exactly as it came.
+ */
+function readSubmitted_(v) {
+  if (v instanceof Date) return v;
+  const t = trim_(v);
+  if (!t) return '';
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ,]|$)/.exec(t);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[T ,]|$)/.exec(t);
+  if (m) return new Date(Number(m[3]), Number(m[1]) - 1, Number(m[2]));
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{2})(?:[T ,]|$)/.exec(t);
+  if (m) return new Date(2000 + Number(m[3]), Number(m[1]) - 1, Number(m[2]));
+  return t;
+}
+
+function isDateish_(v) { return readSubmitted_(v) instanceof Date; }
+
+/** A date as she would write it. */
+function dateText_(d) {
+  return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear();
 }
 
 /**
@@ -348,8 +436,10 @@ function targetFromValues_(values, headers, taken) {
     return named && !isByHand_(named) && !taken[named] ? named : '';
   };
   if (share(isGenderWord_) >= 0.6) return free('Gender');
-  if (share(isGradeWord_) >= 0.6) return free('App. Grade');
-  if (share(isFlippedName_) >= 0.6) return free('Name');
+  if (share(isGradeRange_) >= 0.6) return free('Grades Attended');
+  if (share(isAppliedGrade_) >= 0.6) return free('App. Grade');
+  if (share(isDateish_) >= 0.6) return free('Core Submitted');
+  if (share(isPersonName_) >= 0.6) return free('Name');
   if (share(isSchoolish_) >= 0.5) return free('School');
   return '';
 }
@@ -619,6 +709,7 @@ function readPaste_(tab, text, overrides) {
   const nameCol = appColumnNamed_(headers, 'Name');
   const firstCol = appColumnNamed_(headers, 'First Name');
   const lastCol = appColumnNamed_(headers, 'Last Name');
+  const dateCol = appColumnNamed_(headers, 'Core Submitted');
   [nameCol, firstCol, lastCol].forEach(function (h) {
     if (h && filling.indexOf(h) === -1 && (seen[nameCol] || seen[firstCol] || seen[lastCol])) {
       filling.push(h);
@@ -643,12 +734,19 @@ function readPaste_(tab, text, overrides) {
       if (row.some(function (c) { return trim_(c) !== ''; })) unnamed.push(n + (hasHeaders ? 2 : 1));
       return;
     }
+    // `row` is what gets written, `shown` is what the dialog prints. They
+    // differ only where a cell is a real date rather than text.
     const out = {};
+    const shown = {};
     filling.forEach(function (h) {
-      if (h === nameCol) out[h] = names.name;
-      else if (h === firstCol) out[h] = names.first;
-      else if (h === lastCol) out[h] = names.last;
-      else out[h] = at(row, h);
+      let v;
+      if (h === nameCol) v = names.name;
+      else if (h === firstCol) v = names.first;
+      else if (h === lastCol) v = names.last;
+      else if (h === dateCol) v = readSubmitted_(at(row, h));
+      else v = at(row, h);
+      out[h] = v;
+      shown[h] = v instanceof Date ? dateText_(v) : v;
     });
     if (firstCol && lastCol && !names.last) {
       warn(names.name + ' is one word, so Last Name was left blank.');
@@ -656,6 +754,7 @@ function readPaste_(tab, text, overrides) {
     people.push({
       name: names.name,
       row: out,
+      shown: shown,
       preferred: names.preferred,
       given: names.given
     });
@@ -746,6 +845,17 @@ function writePaste_(tab, text, overrides) {
   const range = sheet.getRange(startRow, 1, out.length, width);
   range.setValues(out);
   plainText_(range);
+
+  // A cell holding a real date is formatted as one, so the column reads
+  // and sorts as dates instead of as text. Only the rows just written.
+  const dateAt = {};
+  out.forEach(function (row) {
+    row.forEach(function (cell, i) { if (cell instanceof Date) dateAt[i] = true; });
+  });
+  Object.keys(dateAt).forEach(function (i) {
+    sheet.getRange(startRow, Number(i) + 1, out.length, 1).setNumberFormat('M/d/yyyy');
+  });
+
   rememberMap_(p.columns);
 
   return {
@@ -945,7 +1055,7 @@ function showPasteDialog() {
     'p.fields.forEach(function(f){h+="<th>"+esc(f)+"</th>";});' +
     'h+="<th></th></tr>";' +
     'p.people.forEach(function(x){h+="<tr"+(x.duplicate?" class=\'dupe\'":"")+">";' +
-    'p.fields.forEach(function(f){var v=esc(x.row[f]||"");' +
+    'p.fields.forEach(function(f){var v=esc((x.shown&&x.shown[f])||"");' +
     'if(x.preferred&&f.indexOf("First")===0&&!x.duplicate){v="<b class=\'pref\'>"+v+"</b>";}' +
     'h+="<td>"+v+"</td>";});' +
     'h+="<td class=\'muted\'>"+esc(x.duplicate||"")+"</td></tr>";});' +
@@ -992,7 +1102,8 @@ function showPasteDialog() {
     'h+="<br><br><span class=\'muted\'>Paste the next lot in above whenever you are ready.' +
     '</span></div>";' +
     'document.getElementById("paste").value="";OVER={};COLS=false;SEQ++;' +
-    'document.getElementById("out").innerHTML=h;})' +
+    'document.getElementById("out").innerHTML=h;' +
+    'var b2=document.getElementById("paste");b2.focus();})' +
     '.withFailureHandler(function(e){var b=document.getElementById("add");' +
     'if(b){b.disabled=false;}fail(e);})' +
     '.api_writePaste(document.getElementById("tab").value,' +

@@ -45,9 +45,22 @@ It works them out for itself, three ways, in this order:
    `Core Application Submitted` and the rest of the usual wording.
 2. **Your own corrections**, remembered from last time.
 3. **The values themselves**, for anything the first two could not place.
-   A column of Male and Female is the gender column whatever it is
-   called, and `Rivera, Samuel` is a name. This is what lets a paste with
-   no heading row at all still sort itself.
+   This is what lets a paste with no heading row at all still sort
+   itself. What it reads:
+
+        Male, Female, M, F                   Gender
+        1-5, 1st-5th, K-5, PK-4, 1 to 5      Grades Attended
+        6, 6th, Grade 6, K                   App. Grade
+        Middle School, 5,6                   App. Grade
+        2026-09-14 14:32:00, 9/16/2026       Core Submitted
+        Rivera, Samuel (Sam)                 Name
+        Samuel (Sam) Rivera                  Name
+        PS 321, St Anns Academy              School
+
+   A **range** is always what they have already done, so it is Grades
+   Attended. A **single grade**, or a division with its years after it,
+   is what they are applying to, so it is App. Grade. That is the one
+   distinction the two grade columns turn on.
 
 A column placed from its values is labelled *read from the values, worth
 a look*, and the column panel opens itself so you see it.
@@ -108,6 +121,15 @@ longer than two words are left alone, and First Name stays as it was.
 - **Surnames in several words.** `van der Berg` and `de la Cruz` go into
   Last Name whole, and `Jr.` stays on the end rather than becoming a
   surname.
+
+## Dates
+
+Ravenna gives the submission as a timestamp, `2026-09-14 14:32:00`. The
+time is dropped and the day is written as a real date, formatted
+`9/14/2026`, so the column sorts as dates rather than as text.
+
+Anything it does not recognise as a date, `Rolling` for instance, is left
+exactly as it came.
 
 ## How the rows look
 
