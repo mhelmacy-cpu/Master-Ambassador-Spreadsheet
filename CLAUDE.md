@@ -11,6 +11,15 @@ Maren (mhelmacy@lrei.org) drafts and edits admissions emails here.
 
 ## The code
 
-Two files, `build/Data.gs` and `build/App.gs`, pasted by hand into the
-Apps Script editor. `docs/SPEC.md` is the agreed design. Plain ASCII only
-in the source: anything else corrupts on paste.
+Two spreadsheets, two Apps Script projects, and they share nothing.
+
+- **The Wednesday tour scheduler.** `build/Data.gs` and `build/App.gs`,
+  pasted by hand into that spreadsheet's Apps Script editor.
+  `docs/SPEC.md` is the agreed design.
+- **The applications spreadsheet.** `build/Applications.gs` on its own,
+  pasted into that spreadsheet's editor. `docs/APPLICATIONS.md` is how it
+  works. It is standalone on purpose: it carries its own helpers rather
+  than calling anything in `App.gs`, because the two never run in the
+  same project.
+
+Plain ASCII only in the source: anything else corrupts on paste.
