@@ -296,6 +296,64 @@ function targetFor_(header, headers) {
   return { target: '', source: 'none' };
 }
 
+/* =========================================================
+ * Working a column out from what is in it
+ *
+ * The headings do most of the work. This is for the rest: a column
+ * Ravenna has renamed, or a paste made without its heading row. A
+ * column whose values are all Male and Female is the gender column
+ * whatever it is called, so the script says so rather than leaving her
+ * to point at it.
+ *
+ * Only ever applied to a column the headings could not place, only to a
+ * sheet column nothing else is going to, and always shown as read from
+ * the values so she knows to give it a second look.
+ * ========================================================= */
+
+const GENDER_WORDS_ = ['m', 'f', 'male', 'female', 'boy', 'girl', 'man', 'woman', 'nb',
+  'enby', 'nonbinary', 'non binary', 'non-binary', 'other', 'x'];
+
+function isGenderWord_(v) { return GENDER_WORDS_.indexOf(norm_(v)) !== -1; }
+
+function isGradeWord_(v) {
+  return /^(grade\s*)?(pre-?k|k|\d{1,2})(st|nd|rd|th)?(\s*grade)?$/i.test(trim_(v));
+}
+
+/** "Rivera, Sam" - a surname, a comma, a first name. */
+function isFlippedName_(v) {
+  return /^[A-Za-z][A-Za-z'.\- ]+,\s*[A-Za-z]/.test(trim_(v));
+}
+
+function isSchoolish_(v) {
+  return /\b(school|academy|prep|preparatory|collegiate|montessori|friends|lycee|yeshiva)\b/i
+    .test(trim_(v)) || /^(ps|is|ms|jhs)\s*\d+/i.test(trim_(v));
+}
+
+/**
+ * Which column these values look like, or '' if they look like nothing.
+ *
+ * Wants a clear majority rather than a single match, so one stray value
+ * cannot carry a column, and hands back '' the moment the sheet column
+ * it would pick is already spoken for.
+ */
+function targetFromValues_(values, headers, taken) {
+  if (!values.length) return '';
+  const share = function (test) {
+    let n = 0;
+    values.forEach(function (v) { if (test(v)) n++; });
+    return n / values.length;
+  };
+  const free = function (want) {
+    const named = appColumnNamed_(headers, want);
+    return named && !isByHand_(named) && !taken[named] ? named : '';
+  };
+  if (share(isGenderWord_) >= 0.6) return free('Gender');
+  if (share(isGradeWord_) >= 0.6) return free('App. Grade');
+  if (share(isFlippedName_) >= 0.6) return free('Name');
+  if (share(isSchoolish_) >= 0.5) return free('School');
+  return '';
+}
+
 /**
  * Whether the first line of a paste is headings rather than an applicant.
  *
@@ -384,23 +442,86 @@ function splitName_(whole) {
 }
 
 /**
+ * Things in brackets that are plainly a note rather than a name.
+ *
+ * Ravenna's name field collects both. Anything on this list, or with a
+ * digit in it, or longer than two words, is left where it is.
+ */
+const NOT_A_NAME_ = ['sibling', 'siblings', 'legacy', 'transfer', 'transferring', 'deferred',
+  'waitlist', 'waitlisted', 'reapplicant', 're-applicant', 'reapply', 'returning', 'new',
+  'applied', 'inquiry', 'international', 'boarding', 'day', 'faculty', 'staff', 'alum',
+  'alumni', 'twin', 'twins', 'tbd', 'n/a', 'na', 'none', 'unknown', 'deceased'];
+
+/**
+ * The name in brackets, which is the name they actually go by.
+ *
+ * Ravenna carries a preferred name inside the name field, as
+ * "Samuel (Sam)" or Samuel "Sam". That is the name the child answers to
+ * and the one the office uses, so it is what goes in First Name.
+ *
+ * Only something that reads like a name is taken: one or two words, all
+ * letters, nothing on the list of notes above. A bracket holding
+ * "(sibling)" or "(2026)" is not a name and is passed over, so a note in
+ * the same field cannot end up as a child's first name.
+ */
+function preferredName_(text) {
+  const t = String(text == null ? '' : text);
+  const m = /\(([^)]*)\)|\[([^\]]*)\]|"([^"]*)"/.exec(t);
+  if (!m) return '';
+  const inside = trim_(m[1] !== undefined ? m[1] : (m[2] !== undefined ? m[2] : m[3]));
+  if (!inside || inside.length > 24) return '';
+  if (NOT_A_NAME_.indexOf(norm_(inside)) !== -1) return '';
+  const words = inside.split(/\s+/);
+  if (words.length > 2) return '';
+  for (let i = 0; i < words.length; i++) {
+    if (!/^[A-Za-z][A-Za-z'.-]*$/.test(words[i])) return '';
+  }
+  return fixCase_(inside);
+}
+
+/** A name with any bracketed aside taken out of it. */
+function stripBrackets_(text) {
+  return trim_(String(text == null ? '' : text)
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .replace(/\s*\[[^\]]*\]\s*/g, ' ')
+    .replace(/\s*"[^"]*"\s*/g, ' ')
+    .replace(/\s+/g, ' '));
+}
+
+/**
  * The three name cells, from whatever the paste gave.
  *
  * What the paste carries is kept. Only the blanks are worked out, so a
  * Ravenna report that already has a first and a last column is never
  * second-guessed.
+ *
+ * A name in brackets wins for First Name: "Rivera, Samuel (Sam)" is
+ * Sam Rivera, filed under Sam. The brackets stay in the Name column, so
+ * the name on the application is still on the sheet, and First Name and
+ * Last Name hold the name and nothing else.
  */
 function readNames_(whole, first, last) {
   let f = fixCase_(trim_(first));
   let l = fixCase_(trim_(last));
   let n = fixCase_(unflipName_(whole));
   if (!n && (f || l)) n = trim_(f + ' ' + l);
+
+  // Whichever field carries it, the bracket is read the same way.
+  const pref = preferredName_(f) || preferredName_(n);
+
   if (n && (!f || !l)) {
-    const halves = splitName_(n);
+    const halves = splitName_(stripBrackets_(n));
     if (!f) f = halves.first;
     if (!l) l = halves.last;
   }
-  return { name: n, first: f, last: l };
+  const given = stripBrackets_(f);
+  return {
+    name: n,
+    first: pref || given,
+    last: stripBrackets_(l),
+    preferred: pref && norm_(pref) !== norm_(given) ? pref : '',
+    given: given
+  };
 }
 
 /* =========================================================
@@ -447,24 +568,48 @@ function readPaste_(tab, text, overrides) {
     });
   }
 
+  // Anything the headings did not place, worked out from its own values.
+  const taken = {};
+  columns.forEach(function (c) { if (c.target) taken[c.target] = true; });
+  columns.forEach(function (c) {
+    if (c.target || picked[String(c.index)] !== undefined) return;
+    const values = [];
+    dataRows.forEach(function (r) {
+      const v = trim_(r[c.index] || '');
+      if (v) values.push(v);
+    });
+    const guess = targetFromValues_(values, headers, taken);
+    if (!guess) return;
+    c.target = guess;
+    c.source = 'values';
+    taken[guess] = true;
+  });
+
   const warnings = [];
   const warn = function (m) { if (warnings.indexOf(m) === -1) warnings.push(m); };
 
+  const unplacedNow = columns.filter(function (c) {
+    return !c.target && (c.header || c.sample);
+  }).length;
   if (!hasHeaders) {
-    warn('The first line does not read like Ravenna headings, so it was treated as an ' +
-      'applicant. Set the columns by hand above.');
+    warn(unplacedNow ?
+      'There is no heading row, so the columns had to be worked out from the values ' +
+      'themselves, and ' + unplacedNow + ' could not be. Set those under "Check the ' +
+      'columns" below.' :
+      'There is no heading row, so the columns were worked out from the values ' +
+      'themselves. Worth a glance under "Check the columns" below before you add them.');
   }
   columns.forEach(function (c) {
     if (c.target || !c.header || !c.sample) return;
     warn('Column "' + c.header + '" was left out. Nothing here knows what it is, so set ' +
-      'it above if it belongs on the sheet.');
+      'it under "Check the columns" below if it belongs on the sheet.');
   });
   const seen = {};
   columns.forEach(function (c) {
     if (!c.target) return;
     if (seen[c.target]) {
       warn('Two columns are both going to ' + c.target + ', so the later one wins. Send ' +
-        'one of them to "leave this out" if that is wrong.');
+        'one of them to "leave this out" under "Check the columns" below if that is wrong.');
     }
     seen[c.target] = true;
   });
@@ -508,7 +653,12 @@ function readPaste_(tab, text, overrides) {
     if (firstCol && lastCol && !names.last) {
       warn(names.name + ' is one word, so Last Name was left blank.');
     }
-    people.push({ name: names.name, row: out });
+    people.push({
+      name: names.name,
+      row: out,
+      preferred: names.preferred,
+      given: names.given
+    });
   });
 
   if (unnamed.length) {
@@ -516,8 +666,8 @@ function readPaste_(tab, text, overrides) {
       'so ' + (unnamed.length > 1 ? 'they were' : 'it was') + ' left out.');
   }
   if (!people.length && dataRows.length) {
-    warn('No name was found in any line. Check that a column is pointed at Name, or at ' +
-      'First Name and Last Name, above.');
+    warn('No name was found in any line. Under "Check the columns" below, point a column ' +
+      'at Name, or at First Name and Last Name.');
   }
 
   // Anyone already on the sheet, and anyone listed twice in the paste.
@@ -537,13 +687,22 @@ function readPaste_(tab, text, overrides) {
     twice[key] = true;
   });
 
+  const wentBy = people.filter(function (x) { return x.preferred; })
+    .map(function (x) { return x.preferred + ', not ' + x.given; });
+
   return {
     tab: tab,
     columns: columns,
+    placed: columns.filter(function (c) { return c.target; }).length,
+    unplaced: columns.filter(function (c) {
+      return !c.target && (c.header || c.sample);
+    }).length,
+    fromValues: columns.filter(function (c) { return c.source === 'values'; }).length,
     targets: [''].concat(headers.order.filter(function (h) { return !isByHand_(h); })),
     byHand: headers.order.filter(isByHand_),
     fields: filling,
     people: people,
+    wentBy: wentBy,
     adding: people.filter(function (p) { return !p.duplicate; }).length,
     warnings: warnings
   };
@@ -563,7 +722,7 @@ function writePaste_(tab, text, overrides) {
   if (!fresh.length) {
     throw new Error(p.people.length ?
       'Every one of them is on the sheet already. Nothing to add.' :
-      'No applicants were found in the paste. Check the columns above.');
+      'No applicants were found in the paste. Check the columns below.');
   }
   const sheet = ss_().getSheetByName(tab);
   const headers = appHeaderIndex_(sheet);
@@ -702,25 +861,34 @@ const PASTE_CSS_ =
   'button{font:inherit;padding:8px 16px;border-radius:4px;border:1px solid #a8322a;' +
   'background:#a8322a;color:#fff;cursor:pointer;margin-right:8px;}' +
   'button.ghost{background:#fff;color:#a8322a;}' +
+  'button.big{padding:11px 22px;font-weight:bold;}' +
   'button[disabled]{opacity:.5;cursor:default;}' +
+  'a.plain{color:#a8322a;cursor:pointer;text-decoration:underline;}' +
   'table{border-collapse:collapse;width:100%;font-size:12px;margin-top:6px;}' +
   'th{background:#a8322a;color:#fff;text-align:left;padding:4px 8px;white-space:nowrap;}' +
   'td{border:1px solid #e0e0e0;padding:4px 8px;vertical-align:top;}' +
   'tr.dupe td{background:#faf6f6;color:#999;}' +
-  '.scroll{max-height:240px;overflow:auto;border:1px solid #e0e0e0;border-radius:6px;' +
+  'td b.pref{color:#1f6b3a;}' +
+  '.scroll{max-height:230px;overflow:auto;border:1px solid #e0e0e0;border-radius:6px;' +
   'margin-top:6px;}' +
   '.scroll table{margin:0;}' +
   '.scroll th{position:sticky;top:0;}' +
+  '.status{background:#eef5ee;border:1px solid #bcd6bf;border-radius:6px;padding:10px 12px;' +
+  'margin-top:14px;}' +
+  '.status.thin{background:#fdf3e7;border-color:#e8c89a;}' +
+  '.status b{font-size:14px;}' +
+  '.status .line{margin-top:4px;color:#555;}' +
   '.warn{background:#fdf3e7;border:1px solid #e8c89a;border-radius:6px;padding:10px;' +
   'margin-top:12px;}' +
   '.warn b{color:#8a5a12;}' +
   '.warn ul{margin:6px 0 0;padding-left:20px;}' +
-  '.free{background:#eef5ee;border:1px solid #bcd6bf;border-radius:6px;padding:10px;' +
-  'margin-top:12px;}' +
   '.mine{background:#fafafa;border:1px solid #e0e0e0;border-radius:6px;padding:10px;' +
   'margin-top:12px;color:#666;}' +
+  '.free{background:#eef5ee;border:1px solid #bcd6bf;border-radius:6px;padding:10px;' +
+  'margin-top:12px;}' +
   '.muted{color:#777;}' +
-  '.guess{color:#777;font-size:11px;}';
+  '.guess{color:#777;font-size:11px;}' +
+  '.guess.check{color:#8a5a12;}';
 
 function showPasteDialog() {
   const tabs = appTabs_();
@@ -734,37 +902,63 @@ function showPasteDialog() {
   const html =
     '<style>' + PASTE_CSS_ + '</style>' +
     '<h2>Paste from Ravenna</h2>' +
-    '<p class="sub">Copy the applicants out of Ravenna, headings and all, and paste them ' +
-    'here. It sorts them into your columns, works out the names, and shows you the rows ' +
-    'before any of it reaches the sheet. They land in ' + APP_FONT_ + ' ' + APP_FONT_SIZE_ +
-    ', black, with no underline and no border, whatever Ravenna sent along with them.</p>' +
+    '<p class="sub">Copy the applicants out of Ravenna and paste them below. The rows ' +
+    'appear as soon as you do, sorted into your columns, with the names worked out. ' +
+    'Read them over and press Add. Nothing reaches the sheet until you do.</p>' +
     '<label for="tab">Add them to</label>' +
-    '<select id="tab" onchange="clearOut()">' + options + '</select>' +
-    '<label for="paste">What you copied</label>' +
-    '<textarea id="paste" rows="7" placeholder="Paste here"></textarea>' +
-    '<div style="margin-top:12px;">' +
-    '<button id="go" onclick="read()">Read it</button>' +
-    '<button class="ghost" onclick="document.getElementById(\'paste\').value=\'\';clearOut();">' +
-    'Clear</button></div>' +
+    '<select id="tab" onchange="read()">' + options + '</select>' +
+    '<label for="paste">Paste here</label>' +
+    '<textarea id="paste" rows="5" placeholder="Paste straight out of Ravenna"></textarea>' +
     '<div id="out"></div>' +
     '<script>' +
-    'var OVER={};' +
+    'var OVER={},SEQ=0,TIMER=null,COLS=false;' +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;")' +
     '.replace(/>/g,"&gt;").replace(/"/g,"&quot;");}' +
-    'function clearOut(){OVER={};document.getElementById("out").innerHTML="";}' +
-    'function fail(e){document.getElementById("go").disabled=false;' +
-    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+' +
-    '"</b></div>";}' +
+    'function fail(e){document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+' +
+    'esc(e.message)+"</b></div>";}' +
     'function read(){var t=document.getElementById("paste").value;' +
-    'if(!t.replace(/\\s/g,"")){document.getElementById("out").innerHTML=' +
-    '"<div class=\'warn\'><b>Nothing in the box yet.</b></div>";return;}' +
-    'document.getElementById("go").disabled=true;' +
-    'document.getElementById("out").innerHTML="<p class=\'muted\'>Reading it...</p>";' +
-    'google.script.run.withSuccessHandler(show).withFailureHandler(fail)' +
+    'if(!t.replace(/\\s/g,"")){document.getElementById("out").innerHTML="";return;}' +
+    'var mine=++SEQ;' +
+    'google.script.run.withSuccessHandler(function(p){if(mine===SEQ){show(p);}})' +
+    '.withFailureHandler(function(e){if(mine===SEQ){fail(e);}})' +
     '.api_readPaste(document.getElementById("tab").value,t,OVER);}' +
-    'function remap(i,v){OVER[i]=v;read();}' +
-    'function show(p){document.getElementById("go").disabled=false;' +
-    'var h="<label>What each column you pasted was taken to mean</label>";' +
+    'function later(){clearTimeout(TIMER);TIMER=setTimeout(read,350);}' +
+    'function remap(i,v){OVER[i]=v;COLS=true;read();}' +
+    'function showCols(){COLS=!COLS;read();}' +
+
+    // What it worked out, then the rows, then the button. The column
+    // controls stay shut unless something needs her.
+    'function show(p){var h="";' +
+    'var need=p.unplaced>0||p.fromValues>0;' +
+    'if(COLS===false&&need){COLS=true;}' +
+    'h+="<div class=\'status"+(p.adding?"":" thin")+"\'><b>"+p.people.length+" applicant"+' +
+    '(p.people.length===1?"":"s")+" read, "+p.adding+" to add.</b>";' +
+    'h+="<div class=\'line\'>"+p.placed+" of "+(p.placed+p.unplaced)+" columns sorted ' +
+    'for you"+(p.unplaced?", "+p.unplaced+" it could not place":"")+". ";' +
+    'h+="<a class=\'plain\' onclick=\'showCols()\'>"+(COLS?"Hide":"Check")+" the ' +
+    'columns</a></div></div>";' +
+
+    'if(p.wentBy&&p.wentBy.length){h+="<div class=\'mine\'><b>Went by the name in ' +
+    'brackets:</b> "+esc(p.wentBy.join("; "))+".</div>";}' +
+
+    'if(p.people.length){h+="<div class=\'scroll\'><table><tr>";' +
+    'p.fields.forEach(function(f){h+="<th>"+esc(f)+"</th>";});' +
+    'h+="<th></th></tr>";' +
+    'p.people.forEach(function(x){h+="<tr"+(x.duplicate?" class=\'dupe\'":"")+">";' +
+    'p.fields.forEach(function(f){var v=esc(x.row[f]||"");' +
+    'if(x.preferred&&f.indexOf("First")===0&&!x.duplicate){v="<b class=\'pref\'>"+v+"</b>";}' +
+    'h+="<td>"+v+"</td>";});' +
+    'h+="<td class=\'muted\'>"+esc(x.duplicate||"")+"</td></tr>";});' +
+    'h+="</table></div>";}' +
+
+    'if(p.warnings.length){h+="<div class=\'warn\'><b>Worth a look:</b><ul>";' +
+    'p.warnings.forEach(function(w){h+="<li>"+esc(w)+"</li>";});h+="</ul></div>";}' +
+
+    'if(p.adding){h+="<div style=\'margin-top:14px;\'><button class=\'big\' id=\'add\' ' +
+    'onclick=\'add()\'>Add "+p.adding+" to "+esc(p.tab)+"</button>";' +
+    'h+="<button class=\'ghost\' onclick=\'clearAll()\'>Clear</button></div>";}' +
+
+    'if(COLS){h+="<label>Where each column went</label>";' +
     'h+="<div class=\'scroll\'><table><tr><th>Your paste</th><th>First value</th>' +
     '<th>Goes to</th></tr>";' +
     'p.columns.forEach(function(c){' +
@@ -775,39 +969,39 @@ function showPasteDialog() {
     'h+="<option value=\\""+esc(t)+"\\""+(t===c.target?" selected":"")+">"+' +
     '(t?esc(t):"- leave this out -")+"</option>";});' +
     'h+="</select>";' +
-    'if(c.target){h+="<div class=\'guess\'>"+(c.source==="remembered"?"remembered from ' +
-    'last time":c.source==="yours"?"your choice, remembered when you add them":' +
+    'if(c.target){h+="<div class=\'guess"+(c.source==="values"?" check":"")+"\'>"+' +
+    '(c.source==="remembered"?"remembered from last time":' +
+    'c.source==="yours"?"your choice, remembered when you add them":' +
+    'c.source==="values"?"read from the values, worth a look":' +
     '"read from the heading")+"</div>";}' +
     'h+="</td></tr>";});' +
     'h+="</table></div>";' +
     'if(p.byHand&&p.byHand.length){h+="<div class=\'mine\'><b>Left alone, as always:</b> "+' +
-    'esc(p.byHand.join(", "))+". No pasted column can be sent to these.</div>";}' +
-    'h+="<label>"+p.people.length+" applicant"+(p.people.length===1?"":"s")+" read, "+' +
-    'p.adding+" to add</label>";' +
-    'if(p.people.length){' +
-    'h+="<div class=\'scroll\'><table><tr>";' +
-    'p.fields.forEach(function(f){h+="<th>"+esc(f)+"</th>";});' +
-    'h+="<th></th></tr>";' +
-    'p.people.forEach(function(x){h+="<tr"+(x.duplicate?" class=\'dupe\'":"")+">";' +
-    'p.fields.forEach(function(f){h+="<td>"+esc(x.row[f]||"")+"</td>";});' +
-    'h+="<td class=\'muted\'>"+esc(x.duplicate||"")+"</td></tr>";});' +
-    'h+="</table></div>";}' +
-    'if(p.warnings.length){h+="<div class=\'warn\'><b>Worth a look:</b><ul>";' +
-    'p.warnings.forEach(function(w){h+="<li>"+esc(w)+"</li>";});h+="</ul></div>";}' +
-    'if(p.adding){h+="<div style=\'margin-top:14px;\'><button id=\'add\' onclick=\'add()\'>Add "+' +
-    'p.adding+" to "+esc(p.tab)+"</button></div>";}' +
+    'esc(p.byHand.join(", "))+". No pasted column can be sent to these.</div>";}}' +
+
     'document.getElementById("out").innerHTML=h;}' +
+
+    'function clearAll(){document.getElementById("paste").value="";OVER={};COLS=false;' +
+    'document.getElementById("out").innerHTML="";}' +
     'function add(){document.getElementById("add").disabled=true;' +
     'google.script.run.withSuccessHandler(function(r){' +
     'var h="<div class=\'free\'><b>"+r.added+" added to "+esc(r.tab)+"</b>, from row "+' +
     'r.startRow+".<br>"+esc(r.names.join(", "));' +
     'if(r.skipped){h+="<br><span class=\'muted\'>"+r.skipped+" skipped as already there.' +
     '</span>";}' +
-    'h+="</div>";document.getElementById("out").innerHTML=h;' +
-    'document.getElementById("paste").value="";OVER={};})' +
-    '.withFailureHandler(function(e){document.getElementById("add").disabled=false;fail(e);})' +
+    'h+="<br><br><span class=\'muted\'>Paste the next lot in above whenever you are ready.' +
+    '</span></div>";' +
+    'document.getElementById("paste").value="";OVER={};COLS=false;SEQ++;' +
+    'document.getElementById("out").innerHTML=h;})' +
+    '.withFailureHandler(function(e){var b=document.getElementById("add");' +
+    'if(b){b.disabled=false;}fail(e);})' +
     '.api_writePaste(document.getElementById("tab").value,' +
     'document.getElementById("paste").value,OVER);}' +
+
+    // Pasting is the whole command, so pasting is what sets it going.
+    'var box=document.getElementById("paste");' +
+    'box.addEventListener("input",later);' +
+    'box.focus();' +
     '<\/script>';
   SpreadsheetApp.getUi().showModalDialog(
     HtmlService.createHtmlOutput(html).setWidth(820).setHeight(720), 'Paste from Ravenna');

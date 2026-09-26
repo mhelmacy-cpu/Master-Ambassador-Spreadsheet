@@ -24,19 +24,35 @@ nothing in the tour spreadsheet touches it.
 
 **Admissions > Paste from Ravenna...**
 
-1. Copy the applicants out of Ravenna, headings and all.
-2. Paste into the box and press **Read it**.
-3. It shows two things: what it made of every column you pasted, and the
-   rows exactly as they would be written.
-4. Anything it read wrongly, correct with the dropdown beside that
-   column. The preview redraws as you do.
-5. **Add N to <tab>** writes them.
+1. Copy the applicants out of Ravenna.
+2. Paste into the box. The rows appear on their own, sorted into your
+   columns, with the names worked out. There is nothing to press first.
+3. Read them over.
+4. **Add N to <tab>** writes them.
 
 Nothing reaches the sheet until that last button.
 
+There is no column-by-column setting up to do. The top line says how many
+columns it sorted for you, and **Check the columns** opens the detail if
+you want to see it, or to move one. It opens itself when there is
+something it wants you to look at.
+
 ## The columns
 
-The sheet's own row 1 is what the command reads, so a heading that is
+It works them out for itself, three ways, in this order:
+
+1. **Ravenna's heading.** `Entry Grade`, `Current School`,
+   `Core Application Submitted` and the rest of the usual wording.
+2. **Your own corrections**, remembered from last time.
+3. **The values themselves**, for anything the first two could not place.
+   A column of Male and Female is the gender column whatever it is
+   called, and `Rivera, Samuel` is a name. This is what lets a paste with
+   no heading row at all still sort itself.
+
+A column placed from its values is labelled *read from the values, worth
+a look*, and the column panel opens itself so you see it.
+
+The sheet's own row 1 is what it matches against, so a heading that is
 worded differently, or a column that has been moved or added, changes
 nothing about where values land. `App. Grade` and `App Grade` are the
 same column to it, and so are `Notes:` and `Notes`.
@@ -63,7 +79,27 @@ Whatever the paste carries is kept as it came; only the missing cells are
 worked out from it. So a report that already has proper first and last
 columns is never second-guessed.
 
-Two smaller things it handles:
+### The name they go by
+
+A name in brackets is the name the child actually answers to, so it is
+the one that goes in **First Name**:
+
+    Rivera, Samuel (Sam)     Name        Samuel (Sam) Rivera
+                             First Name  Sam
+                             Last Name   Rivera
+
+It reads `Samuel "Sam"` the same way, and picks it up from a First Name
+column as readily as from a whole name.
+
+The brackets stay in the **Name** column, so the name on the application
+is still on the sheet, while First Name and Last Name hold the name and
+nothing else. Every one it used is listed above the rows, as *Went by the
+name in brackets: Sam, not Samuel*, so you can see it at a glance.
+
+Not everything in brackets is a name. `(sibling)`, `(2026)`, and anything
+longer than two words are left alone, and First Name stays as it was.
+
+### Two smaller things it handles
 
 - **Capitals.** A report that comes out as `RIVERA` is put back to
   `Rivera`. A name already in mixed case is somebody's own spelling of
