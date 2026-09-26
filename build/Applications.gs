@@ -1,7 +1,7 @@
 /**
  * Ravenna paste, formatted into the applications sheet.
  *
- * PASTED IN FULL? This file is 1175 lines. Scroll to the bottom of the
+ * PASTED IN FULL? This file is 1192 lines. Scroll to the bottom of the
  * editor: the last line should read END OF FILE. If it does not, the
  * paste was cut short, and nothing will work until it is pasted again.
  *
@@ -237,6 +237,9 @@ function pasteGrid_(text) {
     })
   };
 }
+
+/** Printed in the dialog, so which version she is running is never a guess. */
+const APP_VERSION_ = 'v5';
 
 const APP_MAP_KEY_ = 'ravennaColumnMap';
 
@@ -1031,6 +1034,11 @@ function showPasteDialog() {
     '</div>' +
     '<textarea id="paste" rows="5" placeholder="Click here, then press Cmd+V"></textarea>' +
     '<div id="hint" class="hint"></div>' +
+    '<div class="pasterow">' +
+    '<button onclick="read(1)">Sort the rows</button>' +
+    '<span class="muted" id="count">Nothing in the box yet.</span>' +
+    '<span class="muted" style="margin-left:auto;">' + APP_VERSION_ + '</span>' +
+    '</div>' +
     '<div id="out"></div>' +
     '<script>' +
     'var OVER={},SEQ=0,TIMER=null,COLS=false;' +
@@ -1038,15 +1046,24 @@ function showPasteDialog() {
     '.replace(/>/g,"&gt;").replace(/"/g,"&quot;");}' +
     'function fail(e){document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+' +
     'esc(e.message)+"</b></div>";}' +
-    'function read(){var t=document.getElementById("paste").value;' +
-    'if(!t.replace(/\\s/g,"")){document.getElementById("out").innerHTML="";return;}' +
+    'function count(m){document.getElementById("count").innerHTML=m;}' +
+    'function read(pressed){var t=document.getElementById("paste").value;' +
+    'if(!t.replace(/\\s/g,"")){document.getElementById("out").innerHTML="";' +
+    'count(pressed?"Nothing in the box to sort yet. Paste the applicants in first.":' +
+    '"Nothing in the box yet.");return;}' +
+    'var lines=t.replace(/\\s+$/,"").split("\\n").length;' +
+    'count(t.length+" characters, "+lines+" line"+(lines===1?"":"s")+". Reading...");' +
     'var mine=++SEQ;' +
-    'google.script.run.withSuccessHandler(function(p){if(mine===SEQ){show(p);}})' +
-    '.withFailureHandler(function(e){if(mine===SEQ){fail(e);}})' +
+    'google.script.run.withSuccessHandler(function(p){if(mine!==SEQ){return;}' +
+    'try{show(p);count(t.length+" characters, "+lines+" line"+(lines===1?"":"s")+".");}' +
+    'catch(err){count("");document.getElementById("out").innerHTML=' +
+    '"<div class=\'warn\'><b>The rows could not be drawn.</b><br>"+esc(err.message)+' +
+    '"<br><span class=\'muted\'>Tell Claude this message and it can be fixed.</span></div>";}})' +
+    '.withFailureHandler(function(e){if(mine===SEQ){count("");fail(e);}})' +
     '.api_readPaste(document.getElementById("tab").value,t,OVER);}' +
-    'function later(){clearTimeout(TIMER);TIMER=setTimeout(read,350);}' +
-    'function remap(i,v){OVER[i]=v;COLS=true;read();}' +
-    'function showCols(){COLS=!COLS;read();}' +
+    'function later(){clearTimeout(TIMER);TIMER=setTimeout(function(){read(0);},350);}' +
+    'function remap(i,v){OVER[i]=v;COLS=true;read(0);}' +
+    'function showCols(){COLS=!COLS;read(0);}' +
 
     // What it worked out, then the rows, then the button. The column
     // controls stay shut unless something needs her.
@@ -1104,7 +1121,7 @@ function showPasteDialog() {
     'document.getElementById("out").innerHTML=h;}' +
 
     'function clearAll(){document.getElementById("paste").value="";OVER={};COLS=false;' +
-    'document.getElementById("out").innerHTML="";}' +
+    'document.getElementById("out").innerHTML="";count("Nothing in the box yet.");}' +
     'function add(){document.getElementById("add").disabled=true;' +
     'google.script.run.withSuccessHandler(function(r){' +
     'var h="<div class=\'free\'><b>"+r.added+" added to "+esc(r.tab)+"</b>, from row "+' +
@@ -1125,7 +1142,7 @@ function showPasteDialog() {
     'function say(m){document.getElementById("hint").innerHTML=m||"";}' +
     'function takeIt(t){if(!t||!t.replace(/\\s/g,"")){' +
     'say("There was nothing on the clipboard. Copy the applicants out of Ravenna first.");' +
-    'return;}var b=document.getElementById("paste");b.value=t;say("");read();}' +
+    'return;}var b=document.getElementById("paste");b.value=t;say("");read(0);}' +
 
     // A button can only reach the clipboard where the browser allows it,
     // which inside a Sheets dialog it often does not. When it cannot, the

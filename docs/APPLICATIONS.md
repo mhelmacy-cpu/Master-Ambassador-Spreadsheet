@@ -51,6 +51,26 @@ columns it sorted for you, and **Check the columns** opens the detail if
 you want to see it, or to move one. It opens itself when there is
 something it wants you to look at.
 
+## When nothing seems to happen
+
+The dialog now says what it is doing, so a failure is never invisible.
+
+Under the paste box there is a line reading, for instance,
+`1,240 characters, 5 lines.` That single line answers the question:
+
+- **"Nothing in the box yet."** The paste never arrived. The keystroke
+  went somewhere else, or the clipboard is empty.
+- **A character count, then nothing below.** The paste arrived but the
+  rows could not be drawn. The reason is printed in an orange box, and
+  that message is what to pass on.
+- **A character count and rows.** It worked.
+
+**Sort the rows** beside that line does by hand what pasting does on its
+own, for when the automatic read does not fire.
+
+The version is printed at the right of the same line. Quoting it says
+exactly which script is running, which saves guessing after an update.
+
 ## The columns
 
 It works them out for itself, three ways, in this order:
