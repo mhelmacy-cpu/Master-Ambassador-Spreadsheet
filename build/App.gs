@@ -3828,7 +3828,7 @@ function showStaffDialog() {
     '<div class="byhand" id="step2" hidden>' +
     '<label><span class="step">2</span> Everything else</label>' +
     '<p class="sub" style="margin:0 0 8px;">Tour guides, routes and the greeting crews, ' +
-    'assigned around your panel.</p>' +
+    'assigned around your panel. Nothing is written until you save.</p>' +
     '<label class="opt"><input type="checkbox" id="keep" checked>' +
     '<span><b>Keep what is already assigned.</b> Only students with no guides yet are ' +
     'staffed, for someone who signed up late. Untick to start this date over.' +
@@ -3861,7 +3861,7 @@ function showStaffDialog() {
     '<button class=\'ghost\' onclick=\'skipPanel()\'>No panel this week</button>' +
     '<div id=\'handout\' class=\'muted\'></div>";' +
     'document.getElementById("hand").innerHTML=h;}' +
-    'function openStep2(){document.getElementById("step2").hidden=false;}' +
+    'function openStep2(){document.getElementById("step2").hidden=false;doPreview();}' +
     'function skipPanel(){document.getElementById("handout").innerHTML=' +
     '"No panel saved. Everyone stays available for the other jobs.";openStep2();}' +
     'function handSave(){var out=[],b=document.querySelectorAll("input.hnd");' +
