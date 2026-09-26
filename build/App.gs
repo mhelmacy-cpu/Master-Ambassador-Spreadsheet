@@ -429,6 +429,17 @@ function setupSpreadsheet() {
   // columns sized. Run this again later and it fills gaps without
   // touching a single thing already there.
   clearReadCache_();
+
+  // Before anything reads a column by name, put back any heading that
+  // has gone missing - otherwise every lookup below falls back to the
+  // order this script expects, which may not be hers.
+  const repaired = [];
+  Object.keys(SHEETS).forEach(function (k) {
+    repairHeaders_(SHEETS[k]).forEach(function (h) {
+      repaired.push(h + ' on ' + SHEETS[k]);
+    });
+  });
+
   const before = ss_().getSheetByName(SHEETS.AMBASSADORS);
   const firstRun = !before || before.getLastRow() < 2;
   Object.keys(SHEETS).forEach(function (k) { sheet_(SHEETS[k]); });
@@ -436,6 +447,7 @@ function setupSpreadsheet() {
   // These are added to a sheet however old it is, because they are new
   // columns rather than formatting. Nothing else about the sheet changes.
   const added = [];
+  repaired.forEach(function (h) { added.push('put back the heading ' + h); });
   if (ensureColumn_(SHEETS.AMBASSADORS, 'Race (Presenting)', PRESENTING_OPTIONS)) {
     added.push('Race (Presenting) on Ambassadors');
   }
@@ -1171,6 +1183,61 @@ function ensureJobHourColumns_() {
     if (b) s.getRange(i + 2, to).setValue(hours[1]);
   });
   return true;
+}
+
+/**
+ * Puts back a heading that has gone missing from row 1.
+ *
+ * A sheet whose headings are blank still holds every row of data, but
+ * nothing can be read from it, because every lookup here goes by the
+ * name in row 1. The data is fine and only the labels are gone, so the
+ * labels come back.
+ *
+ * It only ever fills a blank cell, and only with a heading that is not
+ * already somewhere else in the row, in the order this script uses. A
+ * heading she has renamed herself is never touched.
+ */
+function repairHeaders_(name) {
+  const want = HEADERS[name];
+  if (!want) return [];
+  const s = ss_().getSheetByName(name);
+  if (!s) return [];
+  const width = Math.max(s.getLastColumn(), want.length);
+  const row = s.getRange(1, 1, 1, width).getValues()[0];
+
+  const present = {};
+  row.forEach(function (cell) {
+    const key = trim_(cell);
+    if (key) present[norm_(key)] = true;
+  });
+  // A heading she has renamed to one of the names this script also
+  // answers to - "Date" for "Tour Date" - is already there.
+  const missing = want.filter(function (h) {
+    if (present[norm_(h)]) return false;
+    const alts = HEADER_ALIASES_[h] || [];
+    return !alts.some(function (alt) { return present[norm_(alt)]; });
+  });
+  if (!missing.length) return [];
+
+  const blanks = [];
+  row.forEach(function (cell, i) { if (!trim_(cell)) blanks.push(i); });
+  if (!blanks.length) return [];
+
+  // A row with nothing in it at all is the standard set, in order.
+  // A row with gaps takes the missing names into those gaps, in order.
+  const fixed = [];
+  const howMany = Math.min(blanks.length, missing.length);
+  for (let i = 0; i < howMany; i++) {
+    s.getRange(1, blanks[i] + 1).setValue(missing[i]);
+    fixed.push(missing[i]);
+  }
+  if (fixed.length) {
+    s.getRange(1, 1, 1, width).setFontWeight('bold')
+      .setBackground('#a8322a').setFontColor('#ffffff');
+    delete HEADER_CACHE_[name];
+    clearReadCache_();
+  }
+  return fixed;
 }
 
 function ensureColumn_(name, header, options) {
