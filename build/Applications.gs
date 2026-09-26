@@ -998,7 +998,10 @@ const PASTE_CSS_ =
   'margin-top:12px;}' +
   '.muted{color:#777;}' +
   '.guess{color:#777;font-size:11px;}' +
-  '.guess.check{color:#8a5a12;}';
+  '.guess.check{color:#8a5a12;}' +
+  '.pasterow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 6px;}' +
+  '.hint{margin-top:6px;font-size:12px;color:#8a5a12;min-height:16px;}' +
+  'textarea:focus{outline:2px solid #a8322a;outline-offset:1px;}';
 
 function showPasteDialog() {
   const tabs = appTabs_();
@@ -1018,7 +1021,12 @@ function showPasteDialog() {
     '<label for="tab">Add them to</label>' +
     '<select id="tab" onchange="read()">' + options + '</select>' +
     '<label for="paste">Paste here</label>' +
-    '<textarea id="paste" rows="5" placeholder="Paste straight out of Ravenna"></textarea>' +
+    '<div class="pasterow">' +
+    '<button class="ghost" onclick="pasteIn()">Paste from the clipboard</button>' +
+    '<span class="muted">or click the box and press Cmd+V (Ctrl+V on Windows)</span>' +
+    '</div>' +
+    '<textarea id="paste" rows="5" placeholder="Click here, then press Cmd+V"></textarea>' +
+    '<div id="hint" class="hint"></div>' +
     '<div id="out"></div>' +
     '<script>' +
     'var OVER={},SEQ=0,TIMER=null,COLS=false;' +
@@ -1110,8 +1118,32 @@ function showPasteDialog() {
     'document.getElementById("paste").value,OVER);}' +
 
     // Pasting is the whole command, so pasting is what sets it going.
+    'function say(m){document.getElementById("hint").innerHTML=m||"";}' +
+    'function takeIt(t){if(!t||!t.replace(/\\s/g,"")){' +
+    'say("There was nothing on the clipboard. Copy the applicants out of Ravenna first.");' +
+    'return;}var b=document.getElementById("paste");b.value=t;say("");read();}' +
+
+    // A button can only reach the clipboard where the browser allows it,
+    // which inside a Sheets dialog it often does not. When it cannot, the
+    // box is put in front of her ready for the keys rather than failing.
+    'function pasteIn(){' +
+    'if(navigator.clipboard&&navigator.clipboard.readText){' +
+    'navigator.clipboard.readText().then(takeIt,byHand);return;}byHand();}' +
+    'function byHand(){var b=document.getElementById("paste");b.focus();b.select();' +
+    'say("Your browser will not let a button read the clipboard. The box below is ready ' +
+    'and the cursor is in it, so press Cmd+V (or Ctrl+V) now.");}' +
+
+    // Cmd+V anywhere in this dialog, not only inside the box. Without
+    // this the keystroke goes to the spreadsheet behind the dialog when
+    // the box does not happen to have the cursor.
+    'document.addEventListener("paste",function(e){' +
+    'var d=e.clipboardData||window.clipboardData;if(!d){return;}' +
+    'var t=d.getData("text");if(!t){return;}' +
+    'e.preventDefault();takeIt(t);});' +
+
     'var box=document.getElementById("paste");' +
     'box.addEventListener("input",later);' +
+    'box.addEventListener("focus",function(){say("");});' +
     'box.focus();' +
     '<\/script>';
   SpreadsheetApp.getUi().showModalDialog(

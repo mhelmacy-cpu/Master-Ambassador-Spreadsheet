@@ -25,10 +25,24 @@ nothing in the tour spreadsheet touches it.
 **Admissions > Paste from Ravenna...**
 
 1. Copy the applicants out of Ravenna.
-2. Paste into the box. The rows appear on their own, sorted into your
-   columns, with the names worked out. There is nothing to press first.
-3. Read them over.
-4. **Add N to <tab>** writes them.
+2. Get it into the box, whichever way works:
+   - **Paste from the clipboard**, the button. Where the browser allows
+     it, this is the whole thing in one click.
+   - **Cmd+V** (Ctrl+V on Windows) anywhere in the dialog. It does not
+     matter whether the cursor is in the box.
+3. The rows appear on their own, sorted into your columns, with the names
+   worked out. There is nothing else to press first.
+4. Read them over.
+5. **Add N to <tab>** writes them.
+
+A Google Sheets dialog is a frame inside the page, and a browser will
+often not let a button inside one read the clipboard. When that happens
+the button says so, puts the cursor in the box, and asks for Cmd+V. That
+is a browser rule, not a fault.
+
+If Cmd+V used to do nothing, this is why: the keystroke goes wherever the
+cursor is, and if it was not in the dialog it went to the spreadsheet
+behind it. The dialog now catches the paste wherever the cursor is.
 
 Nothing reaches the sheet until that last button.
 
