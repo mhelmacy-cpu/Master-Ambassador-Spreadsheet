@@ -264,6 +264,21 @@ on each row where that row's family goes at the end:
 
 A greeter's row is left blank, because they take nobody anywhere.
 
+It is rewritten whenever anything changes it: saving the staffing
+dialog, a swap or a hand-off on "Change Who Is Working...", or saving a
+job by hand. It is read entirely off the sheets rather than off a plan,
+so it is right whichever of those did the changing, and a row that no
+longer takes anybody anywhere is cleared rather than left saying
+yesterday's answer.
+
+**Typing a name into Class Visit To works on its own.** The script
+always writes the long form, "Jane Moss - Math in M311 (Chantilly)", so
+a bare name is hers and is followed at once, with no need to set Pass
+Off. The long form is only followed where Pass Off says it is meant, or
+where it still names one of the visitor's own guides, which is what
+stops a name left over from a swapped-out guide putting them back in
+charge.
+
 Whoever is handed a family gets a **Pass Off** row on the Tour Tracker,
 so they are on the roster, in the counts and there to tick off
 afterwards. Handing the family on again moves the row; saving twice
@@ -516,6 +531,11 @@ click shows everything that will really arrive:
 
     [TEST - Students, Tuesday 12:00 PM] Your Tour Job - Tomorrow
     [TEST - Students, Wednesday 7:45 AM] Your Tour Job - Today
+
+**Every one of them** is a second tick box beside Test. Still a test,
+still only to her, but one email per person rather than one per job, for
+reading what one particular student or teacher gets. On a four-family
+tour that is 27 student emails against 9.
 
 A test sends **one example of every job**, not one per person, and it
 does so for each kind of reader: the student, their advisor and their

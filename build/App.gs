@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-27 r';
+var BUILD_ = '2026-09-27 s';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -2982,6 +2982,83 @@ function applySwaps_(plan, swaps) {
   return out;
 }
 
+/**
+ * Writes the Class Visit column on the Tour Tracker for one date.
+ *
+ * Read entirely off the sheets, so it is right whatever changed it: the
+ * staffing dialog, a swap on Change Who Is Working, or a name she typed
+ * into Class Visit To herself. Every one of those calls it, because a
+ * column that quietly goes stale is worse than no column.
+ */
+function refreshClassVisits_(dateVal) {
+  const N = SHEETS.TRACKER;
+  const cvCol = optionalCol_(N, 'Class Visit');
+  if (cvCol === -1) return 0;
+  const tracker = sheet_(N);
+  const landing = handbackChoices_(dateVal).byVisitor;
+
+  // The 5th grade buddy each family is going to, off the tracker's own
+  // Class Buddy rows rather than off a plan that may not exist.
+  const buddyIndex = {};
+  buddies_().forEach(function (b) { buddyIndex[norm_(b.name)] = b; });
+  const buddyOf = {};
+  const guidesOf = {};
+  rows_(N).forEach(function (r) {
+    if (!sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal)) return;
+    const job = trim_(r[col_(N, 'Job')]);
+    const visitor = norm_(r[col_(N, 'Prospective Student(s)')]);
+    if (job === JOBS.BUDDY) {
+      const b = buddyIndex[norm_(r[col_(N, 'Ambassador')])];
+      if (b) buddyOf[visitor] = b;
+    } else if (job === JOBS.GUIDE) {
+      (guidesOf[visitor] = guidesOf[visitor] || []).push(trim_(r[col_(N, 'Ambassador')]));
+    }
+  });
+
+  let written = 0;
+  rows_(N).forEach(function (r, i) {
+    if (!sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal)) return;
+    const job = trim_(r[col_(N, 'Job')]);
+    const who = trim_(r[col_(N, 'Ambassador')]);
+    const visitor = trim_(r[col_(N, 'Prospective Student(s)')]);
+    const b = buddyOf[norm_(visitor)];
+    const c = landing[norm_(visitor)];
+    let say = '';
+    if (job === JOBS.BUDDY && b) {
+      say = b.language + ' with ' + b.teacher + ' in ' + b.room;
+    } else if (job === JOBS.PASSOFF && c && c.where) {
+      say = 'Given ' + visitor + ' in ' + c.where.label;
+    } else if (job === JOBS.GUIDE) {
+      if (b) {
+        say = 'Hands over to ' + b.name + ' - ' + b.language + ' in ' + b.room;
+      } else if (c && c.where) {
+        const mine = c.takers.some(function (n) { return norm_(n) === norm_(who); });
+        const pair = guidesOf[norm_(visitor)] || [];
+        const passed = !c.takers.some(function (n) {
+          return pair.some(function (g) { return norm_(g) === norm_(n); });
+        });
+        if (mine) {
+          say = 'Takes them to ' + c.where.label +
+            (c.where.teacher ? ' (' + c.where.teacher + ')' : '');
+        } else if (passed) {
+          say = 'PASS OFF to ' + c.takers.join(' and ') + ' - ' + c.where.label;
+        } else {
+          say = 'Goes back to class - ' + c.takers.join(' and ') + ' takes them to ' +
+            c.where.label;
+        }
+      }
+    }
+    // Cleared as well as set, so a row that no longer takes anybody
+    // anywhere does not keep yesterday's answer.
+    if (trim_(r[cvCol]) !== say) {
+      tracker.getRange(i + 2, cvCol + 1).setValue(say);
+      written++;
+    }
+  });
+  clearReadCache_();
+  return written;
+}
+
 /** Writes a plan to the Tour Tracker and back onto Prospective Students. */
 function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
   const plan = planTour(dateStr, keepExisting);
@@ -3183,57 +3260,7 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
    * tracker says what is happening without her having to hold the
    * Prospective Students sheet beside it. Only the rows it means
    * anything for: a greeter is not taking anybody anywhere. */
-  const cvCol = optionalCol_(N, 'Class Visit');
-  if (cvCol !== -1) {
-    const buddyOf = {};
-    plan.pairs.forEach(function (p) {
-      if (p.buddy) buddyOf[norm_(p.visitor.name)] = p.buddy;
-    });
-    // Who is guiding each family, so a guide who is not the one walking
-    // them in is told that rather than being read as the one who is.
-    const guidesOf = {};
-    rows_(N).forEach(function (r) {
-      if (!sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal)) return;
-      if (trim_(r[col_(N, 'Job')]) !== JOBS.GUIDE) return;
-      const k = norm_(r[col_(N, 'Prospective Student(s)')]);
-      (guidesOf[k] = guidesOf[k] || []).push(trim_(r[col_(N, 'Ambassador')]));
-    });
-    rows_(N).forEach(function (r, i) {
-      if (!sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal)) return;
-      const job = trim_(r[col_(N, 'Job')]);
-      const who = trim_(r[col_(N, 'Ambassador')]);
-      const visitor = trim_(r[col_(N, 'Prospective Student(s)')]);
-      const b = buddyOf[norm_(visitor)];
-      const c = landing[norm_(visitor)];
-      let say = '';
-      if (job === JOBS.BUDDY && b) {
-        say = b.language + ' with ' + b.teacher + ' in ' + b.room;
-      } else if (job === JOBS.PASSOFF && c && c.where) {
-        say = 'Given ' + visitor + ' in ' + c.where.label;
-      } else if (job === JOBS.GUIDE) {
-        if (b) {
-          say = 'Hands over to ' + b.name + ' - ' + b.language + ' in ' + b.room;
-        } else if (c && c.where) {
-          const mine = c.takers.some(function (n) { return norm_(n) === norm_(who); });
-          const pair = guidesOf[norm_(visitor)] || [];
-          const passed = !c.takers.some(function (n) {
-            return pair.some(function (g) { return norm_(g) === norm_(n); });
-          });
-          if (mine) {
-            say = 'Takes them to ' + c.where.label +
-              (c.where.teacher ? ' (' + c.where.teacher + ')' : '');
-          } else if (passed) {
-            say = 'PASS OFF to ' + c.takers.join(' and ') + ' - ' + c.where.label;
-          } else {
-            say = 'Goes back to class - ' + c.takers.join(' and ') + ' takes them to ' +
-              c.where.label;
-          }
-        }
-      }
-      if (say) sheet_(N).getRange(i + 2, cvCol + 1).setValue(say);
-    });
-    clearReadCache_();
-  }
+  refreshClassVisits_(dateVal);
 
   plan.pairs.forEach(function (p) {
     psheet.getRange(p.visitor.row, col_(P, 'Route') + 1).setValue(p.route);
@@ -3550,12 +3577,21 @@ function handbackAllocate_(dateVal, entries) {
   const chosenBy = {};
   if (optionalCol_(SHEETS.PROSPECTIVE, 'Class Visit To') !== -1) {
     prospectiveFor_(dateVal).forEach(function (v) {
-      const said = trim_(String(v.classVisitTo || '')
-        .replace(/^\s*pass\s*off\s*:?\s*/i, '')).split(' - ')[0];
+      const raw = trim_(String(v.classVisitTo || ''))
+        .replace(/^\s*pass\s*off\s*:?\s*/i, '');
+      const said = trim_(raw.split(' - ')[0]);
       if (!said) return;
+      // The script always writes "Name - Class (Teacher)". A bare name is
+      // therefore hers, typed in to say who should take the family, and
+      // is followed at once. The long form is only a record of what was
+      // decided, so it is followed only where Pass Off says it is meant,
+      // or where it still names one of the visitor's own guides. That is
+      // what stops a name left over from a guide she has since swapped
+      // out putting them quietly back in charge.
+      const hers = raw.indexOf(' - ') === -1;
       const theirs = (byVisitor[norm_(v.name)] || { guides: [] }).guides;
       const stillGuiding = theirs.some(function (g) { return norm_(g) === norm_(said); });
-      if (v.passOff || stillGuiding) chosenBy[norm_(v.name)] = trim_(said);
+      if (hers || v.passOff || stillGuiding) chosenBy[norm_(v.name)] = said;
     });
   }
 
@@ -4227,6 +4263,7 @@ function api_swapAmbassador(dateStr, row, newName) {
   sheet_(N).getRange(at, col_(N, 'Ambassador') + 1).setValue(who.name);
   clearReadCache_();
   refreshCounts_();
+  refreshClassVisits_(dateVal);
 
   // What the swap did to the pair, said plainly rather than left to be found.
   const after = rosterRows_(dateVal);
@@ -4305,6 +4342,7 @@ function api_dropAmbassador(dateStr, row) {
   sheet_(N).deleteRow(at);
   clearReadCache_();
   refreshCounts_();
+  refreshClassVisits_(dateVal);
 
   let visitor = null;
   prospectiveFor_(dateVal).forEach(function (v) {
@@ -5588,6 +5626,10 @@ function showEmailDialog() {
     'comes to you instead - one per job, one advisor, one class teacher - for the ' +
     'Tuesday send and the Wednesday send, so you can read each as it will arrive.' +
     '</span></label>' +
+    '<label class="opt"><input type="checkbox" id="everyone">' +
+    '<span><b>Every one of them.</b> Still a test, still only to you, but one email ' +
+    'per person rather than one per job. Use it to read what one particular student ' +
+    'or teacher gets. It is a lot of email.</span></label>' +
     '<div style="margin-top:12px;">' +
     '<button onclick="go(\'students\')">Send to students</button>' +
     '<button onclick="go(\'teachers\')">Send to teachers and advisors</button>' +
@@ -5598,11 +5640,14 @@ function showEmailDialog() {
     'google.script.run.withSuccessHandler(done).withFailureHandler(function(e){' +
     'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";})' +
     '.api_sendEmails(which,document.getElementById("d").value,' +
-    'document.getElementById("test").checked);}' +
+    'document.getElementById("test").checked,' +
+    'document.getElementById("everyone").checked);}' +
     'function done(r){var h="<div class=\'free\'>";' +
     'if(r.testTo){h+="<b>Test only.</b> Everything below went to "+esc(r.testTo)+' +
     '" and nowhere else"+(r.testDays&&r.testDays.length>1?", once for each send: "+' +
-    'esc(r.testDays.join(" and ")):"")+". One of each kind, not one per person.<br>";}' +
+    'esc(r.testDays.join(" and ")):"")+". "+' +
+    '(r.everyone?"Every single one, not a sample.":"One of each kind, not one per person.")+' +
+    '"<br>";}' +
     'if(r.note){h+=esc(r.note);}else{' +
     'if(r.sent!=null){h+="<b>"+r.sent+"</b> student email(s) sent for "+esc(r.date)+".";}' +
     'else{h+="<b>"+r.advisorsSent+"</b> advisor email(s), <b>"+r.teachersSent+' +
@@ -6183,6 +6228,7 @@ function api_saveByHand(dateStr, job, names) {
   const out = saveByHand_(dateVal, job, names || [], offered);
   clearReadCache_();
   refreshCounts_();
+  refreshClassVisits_(dateVal);
   out.job = job;
   return out;
 }
@@ -6230,7 +6276,7 @@ function sendDaysFor_(handler, dateVal) {
   return days;
 }
 
-function api_sendEmails(which, dateStr, test) {
+function api_sendEmails(which, dateStr, test, everyone) {
   const students = which === 'students';
   const run = function () {
     return students ? sendStudentEmails(dateStr) : sendTeacherEmails(dateStr);
@@ -6254,13 +6300,17 @@ function api_sendEmails(which, dateStr, test) {
   days.forEach(function (day) {
     PRETEND_TODAY_ = day.when;
     TEST_LABEL_ = day.label;
-    SAMPLE_SEEN_ = {};                 // one of each per day, not one per person
+    // One of each job per day by default. Asked for the lot, nothing is
+    // sampled: every email that would really go out comes to her instead,
+    // which is the only way to read what one particular person gets.
+    SAMPLE_SEEN_ = everyone ? null : {};
     try {
       const r = asTest_(to, run);
       if (!out) {
         out = r;
       } else {
-        ['sent', 'advisorsSent', 'teachersSent', 'hostsSent'].forEach(function (k) {
+        ['sent', 'advisorsSent', 'teachersSent', 'hostsSent', 'landingSent']
+          .forEach(function (k) {
           if (typeof r[k] === 'number') out[k] = (out[k] || 0) + r[k];
         });
       }
@@ -6272,7 +6322,8 @@ function api_sendEmails(which, dateStr, test) {
   });
   out.testTo = to;
   out.testDays = days.map(function (d) { return d.label; }).filter(Boolean);
-  out.sampled = true;
+  out.sampled = !everyone;
+  out.everyone = !!everyone;
   if (dateVal) out.roster = mailTourRoster_(dateVal);
   return out;
 }
