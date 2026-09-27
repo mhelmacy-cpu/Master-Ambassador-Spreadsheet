@@ -532,6 +532,20 @@ click shows everything that will really arrive:
     [TEST - Students, Tuesday 12:00 PM] Your Tour Job - Tomorrow
     [TEST - Students, Wednesday 7:45 AM] Your Tour Job - Today
 
+**Every Tuesday email** and **Every Wednesday email** are two buttons
+of their own. Each sends the whole postbag for that day to her and
+nowhere else: students and teachers together, one email per person, no
+sampling. It is always a test whatever the tick boxes above it say. The
+result is one summary, broken down by who would have heard:
+
+    13 to ambassadors
+    1 to advisors
+    1 to the teachers whose class they walk out of
+    1 to the teachers whose class they walk into
+
+Asked for a weekday nothing goes out on, it says so by name rather than
+sending nothing quietly.
+
 **Every one of them** is a second tick box beside Test. Still a test,
 still only to her, but one email per person rather than one per job, for
 reading what one particular student or teacher gets. On a four-family

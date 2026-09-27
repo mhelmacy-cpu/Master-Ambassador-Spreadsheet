@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-27 s';
+var BUILD_ = '2026-09-27 t';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -5633,6 +5633,14 @@ function showEmailDialog() {
     '<div style="margin-top:12px;">' +
     '<button onclick="go(\'students\')">Send to students</button>' +
     '<button onclick="go(\'teachers\')">Send to teachers and advisors</button>' +
+    '</div>' +
+    '<div class="panel" style="margin-top:14px;">' +
+    '<b>The whole postbag, to you</b>' +
+    '<p class="sub" style="margin:4px 0 8px;">Every email that day would send, ' +
+    'students and teachers together, one per person. Always a test: nothing reaches ' +
+    'a child or a teacher whatever the boxes above say.</p>' +
+    '<button onclick="all(\'Tuesday\')">Every Tuesday email</button>' +
+    '<button onclick="all(\'Wednesday\')">Every Wednesday email</button>' +
     '</div><div id="out"></div>' +
     '<script>' +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
@@ -5642,7 +5650,27 @@ function showEmailDialog() {
     '.api_sendEmails(which,document.getElementById("d").value,' +
     'document.getElementById("test").checked,' +
     'document.getElementById("everyone").checked);}' +
+    'function all(day){document.getElementById("out").innerHTML=' +
+    '"<p class=\'muted\'>Sending every "+esc(day)+" email to you. This takes a ' +
+    'moment...</p>";' +
+    'google.script.run.withSuccessHandler(done).withFailureHandler(function(e){' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+' +
+    '"</b></div>";}).api_sendEveryEmail(document.getElementById("d").value,day);}' +
     'function done(r){var h="<div class=\'free\'>";' +
+    'if(r.combined){h+="<b>"+(r.day?esc(r.day)+"\'s":"The")+" whole postbag.</b> "+' +
+    'r.total+" email(s) went to "+esc(r.testTo)+" and nowhere else"+' +
+    '(r.testDays&&r.testDays.length?", covering "+esc(r.testDays.join(" and ")):"")+".";' +
+    'if(r.lines&&r.lines.length){h+="<ul><li>"+r.lines.map(esc).join("</li><li>")+' +
+    '"</li></ul>";}' +
+    'if(!r.total){h+="<br>Nothing was staffed for that date.";}' +
+    'h+="</div>";' +
+    'if(r.skipped&&r.skipped.length){h+="<div class=\'warn\'><b>No Student Email on ' +
+    'file, so nothing was written for:</b><br>"+esc(r.skipped.join(", "))+"</div>";}' +
+    'if(r.needsYou&&r.needsYou.length){h+="<div class=\'warn\'><b>Needs you</b><ul>"+' +
+    'r.needsYou.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>";}' +
+    'if(r.roster){h+="<div class=\'free\'><b>Who is on duty</b><br><a href=\'"+' +
+    'r.roster.url+"\' target=\'_blank\'>"+esc(r.roster.name)+"</a></div>";}' +
+    'document.getElementById("out").innerHTML=h;return;}' +
     'if(r.testTo){h+="<b>Test only.</b> Everything below went to "+esc(r.testTo)+' +
     '" and nowhere else"+(r.testDays&&r.testDays.length>1?", once for each send: "+' +
     'esc(r.testDays.join(" and ")):"")+". "+' +
@@ -5663,7 +5691,7 @@ function showEmailDialog() {
     'r.needsYou.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>";}' +
     'document.getElementById("out").innerHTML=h;}' +
     '<\/script>';
-  dialog_(html, 'Send Emails Now', 620, 560);
+  dialog_(html, 'Send Emails Now', 620, 680);
 }
 
 /* ---------- what the dialogs call ---------- */
@@ -6276,7 +6304,7 @@ function sendDaysFor_(handler, dateVal) {
   return days;
 }
 
-function api_sendEmails(which, dateStr, test, everyone) {
+function api_sendEmails(which, dateStr, test, everyone, skipRoster, onlyDay) {
   const students = which === 'students';
   const run = function () {
     return students ? sendStudentEmails(dateStr) : sendTeacherEmails(dateStr);
@@ -6294,6 +6322,16 @@ function api_sendEmails(which, dateStr, test, everyone) {
   const days = dateVal
     ? sendDaysFor_(students ? HANDLER_STUDENT_EMAILS : HANDLER_TEACHER_EMAILS, dateVal)
     : [];
+  // One weekday's sends only, where that is what was asked for.
+  const wanted = days.filter(function (d) {
+    return !onlyDay || (d.when && WEEKDAYS_[d.when.getDay()] === onlyDay);
+  });
+  if (onlyDay && !wanted.length) {
+    throw new Error('Nothing goes out on a ' + onlyDay + ' for ' +
+      (dateVal ? longDate_(dateVal) : 'that date') + '.');
+  }
+  days.length = 0;
+  wanted.forEach(function (d) { days.push(d); });
   if (!days.length) days.push({ when: null, label: '' });
 
   let out = null;
@@ -6324,6 +6362,54 @@ function api_sendEmails(which, dateStr, test, everyone) {
   out.testDays = days.map(function (d) { return d.label; }).filter(Boolean);
   out.sampled = !everyone;
   out.everyone = !!everyone;
-  if (dateVal) out.roster = mailTourRoster_(dateVal);
+  if (dateVal && !skipRoster) out.roster = mailTourRoster_(dateVal);
   return out;
+}
+
+/**
+ * Every email a tour would send, to her and nowhere else.
+ *
+ * Students and teachers, Tuesday and Wednesday, one per person rather
+ * than one per job: the whole postbag for that date in one go, so she
+ * can read the lot before a single message reaches a child. Nothing is
+ * sampled and nothing is skipped.
+ */
+function api_sendEveryEmail(dateStr, onlyDay) {
+  const stu = api_sendEmails('students', dateStr, true, true, true, onlyDay);
+  const tea = api_sendEmails('teachers', dateStr, true, true, true, onlyDay);
+  const dateVal = dateStr ? toDate_(dateStr) : nextTourDate_();
+
+  const days = [];
+  (stu.testDays || []).concat(tea.testDays || []).forEach(function (d) {
+    if (d && days.indexOf(d) === -1) days.push(d);
+  });
+  const lines = [];
+  const say = function (n, what) {
+    if (typeof n === 'number' && n > 0) lines.push(n + ' ' + what);
+  };
+  say(stu.sent, 'to ambassadors');
+  say(tea.advisorsSent, 'to advisors');
+  say(tea.teachersSent, 'to the teachers whose class they walk out of');
+  say(tea.landingSent, 'to the teachers whose class they walk into');
+  say(tea.hostsSent, 'to the 5th grade host teachers');
+
+  const total = ['sent', 'advisorsSent', 'teachersSent', 'landingSent', 'hostsSent']
+    .reduce(function (n, k) {
+      return n + (typeof stu[k] === 'number' ? stu[k] : 0) +
+        (typeof tea[k] === 'number' ? tea[k] : 0);
+    }, 0);
+
+  return {
+    combined: true,
+    everyone: true,
+    day: onlyDay || '',
+    testTo: stu.testTo || tea.testTo,
+    testDays: days,
+    total: total,
+    lines: lines,
+    note: stu.note || tea.note || '',
+    skipped: (stu.skipped || []).concat(tea.skipped || []),
+    needsYou: (stu.needsYou || []).concat(tea.needsYou || []),
+    roster: dateVal ? mailTourRoster_(dateVal) : null
+  };
 }
