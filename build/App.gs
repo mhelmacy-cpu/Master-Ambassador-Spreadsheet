@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-27 t';
+var BUILD_ = '2026-09-27 u';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -2584,7 +2584,7 @@ function planTour(dateStr, keepExisting) {
     assignedCount: everyone.length,
     classLoad: landing.byClass,
     classCap: landing.cap,
-    warnings: setupWarnings_(all, visitors)
+    warnings: setupWarnings_(all, visitors).concat(landing.problems || [])
   };
 }
 
@@ -3575,6 +3575,7 @@ function handbackAllocate_(dateVal, entries) {
    * that still belongs to one of the visitor's own guides is honoured
    * either way, because there is nothing stale about it. */
   const chosenBy = {};
+  const problems = [];
   if (optionalCol_(SHEETS.PROSPECTIVE, 'Class Visit To') !== -1) {
     prospectiveFor_(dateVal).forEach(function (v) {
       const raw = trim_(String(v.classVisitTo || ''))
@@ -3591,7 +3592,23 @@ function handbackAllocate_(dateVal, entries) {
       const hers = raw.indexOf(' - ') === -1;
       const theirs = (byVisitor[norm_(v.name)] || { guides: [] }).guides;
       const stillGuiding = theirs.some(function (g) { return norm_(g) === norm_(said); });
-      if (hers || v.passOff || stillGuiding) chosenBy[norm_(v.name)] = said;
+      if (!(hers || v.passOff || stillGuiding)) return;
+      chosenBy[norm_(v.name)] = said;
+      // A name it cannot act on is said out loud rather than dropped.
+      // Being quietly ignored is how an afternoon gets wasted.
+      if (!handedTo[norm_(said)]) {
+        const known = ambassadors_().filter(function (a) {
+          return norm_(a.name) === norm_(said);
+        })[0];
+        problems.push('"' + said + '" is in Class Visit To for ' + v.name + ', but ' +
+          (!known
+            ? 'nobody by that name is on the Ambassadors sheet. Check the spelling.'
+            : (!known.active
+                ? 'they are not marked Active, so they cannot be given anybody.'
+                : 'their class at that time cannot be worked out - they need ' +
+                  'Homeroom, Split and Grade on the Ambassadors sheet.')) +
+          ' The family is staying with their own guide.');
+      }
     });
   }
 
@@ -3682,7 +3699,7 @@ function handbackAllocate_(dateVal, entries) {
     };
   }).sort(function (a, b) { return b.count - a.count; });
 
-  return { cap: cap, byVisitor: out, byClass: byClass };
+  return { cap: cap, byVisitor: out, byClass: byClass, problems: problems };
 }
 function handbackPlan_(page, dateVal) {
   const names = page.guides.map(function (g) { return g.replace(/\s*\(.*$/, ''); });
@@ -3750,13 +3767,12 @@ function handbackFor_(page, name, dateVal) {
     const withWhom = plan.takers.filter(function (n) { return n !== name; });
     const mine = where[name];
     return (withWhom.length ? 'You and ' + withWhom.join(' and ') + ' take ' : 'Take ') +
-      page.visitor.name + ' with you to ' + (mine || 'class') +
-      '. At ' + endsAt + ' walk them down to the cafeteria and wait there with them ' +
-      'until ' + wait + ' comes back. Then you are done.';
+      page.visitor.name + ' to ' + (mine || 'your class') + ' with you. At ' + endsAt +
+      ' take them to the cafeteria and wait there with them until ' + wait + ' comes.';
   }
   const theirs = where[plan.takers[0]];
-  return plan.takers.join(' and ') + ' is taking ' + page.visitor.name +
-    ' to ' + (theirs ? theirs : 'class') + '. Go back to your own class. You are done.';
+  return plan.takers.join(' and ') + ' takes ' + page.visitor.name +
+    ' to ' + (theirs ? theirs : 'class') + '. Go back to your own class. You are finished.';
 }
 
 /** The guides' line on a sheet that ends in a 5th grade class visit. */
@@ -3773,21 +3789,21 @@ function handoffToAmbassador_(page, to, where) {
 }
 
 /** What the guide does once they have handed the family over. */
-var HANDOFF_ACTION_ = 'Give them the tour route, the clock, and YOUR NAME TAG. ' +
-  'Then go back to your own class. You are finished.';
+var HANDOFF_ACTION_ = 'Give them the tour route, the clock and YOUR NAME TAG. ' +
+  'Go back to your own class. You are finished.';
 
 /** What the student receiving them does, whoever they are. */
 function handoffReceive_(page, visitorName) {
   const wait = setting_('Wait For', 'Maren');
   const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
-  return 'At ' + endsAt + ' bring ' + (visitorName || 'them') +
-    ' down to the cafeteria and wait with them until ' + wait + ' gets back.';
+  return 'At ' + endsAt + ' take ' + (visitorName || 'them') +
+    ' to the cafeteria and wait there with them until ' + wait + ' comes.';
 }
 
 /** What the 5th grader does once the sheet reaches them. */
 function handoffForBuddy_(page) {
-  return 'Introduce yourself to ' + page.visitor.name + ' and tell them what you are ' +
-    'working on. ' + handoffReceive_(page);
+  return 'Say hello, and tell ' + page.visitor.name + ' what you are working on. ' +
+    handoffReceive_(page);
 }
 
 /**
@@ -3937,7 +3953,10 @@ function buildRouteSheets(dateStr) {
   });
 
   doc.saveAndClose();
-  return { url: doc.getUrl(), name: title, pages: sheets.length };
+  return {
+    url: doc.getUrl(), name: title, pages: sheets.length,
+    problems: handbackChoices_(dateVal).problems || []
+  };
 }
 
 /* =========================================================
@@ -5716,7 +5735,9 @@ function showRouteSheetDialog() {
     'document.getElementById("go").disabled=false;' +
     'document.getElementById("out").innerHTML="<div class=\'free\'><b>"+r.pages+' +
     '" sheet(s) ready, one per guide.</b><br><a href=\'"+r.url+"\' target=\'_blank\'>Open "+esc(r.name)+' +
-    '"</a><br><span class=\'muted\'>It is in your Drive. File &rsaquo; Print when you are happy with it.</span></div>";})' +
+    '"</a><br><span class=\'muted\'>It is in your Drive. File &rsaquo; Print when you are happy with it.</span></div>"' +
+    '+((r.problems&&r.problems.length)?"<div class=\'warn\'><b>A hand-off did not ' +
+    'take</b><ul><li>"+r.problems.map(esc).join("</li><li>")+"</li></ul></div>":"");})' +
     '.withFailureHandler(function(e){document.getElementById("go").disabled=false;' +
     'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";})' +
     '.api_buildRouteSheets(document.getElementById("d").value);}' +
