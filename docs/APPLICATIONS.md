@@ -38,11 +38,50 @@ of their own and the command reads them from there.
 2. **Paste your Ravenna block straight in**, the ordinary way.
 3. **Admissions > Step 2: sort what I pasted.** The rows appear, sorted
    into your columns with the names worked out.
-4. **Add N to <tab>** writes them, and empties `Paste Here`.
+4. **Add N** writes them, and empties `Paste Here`.
 
 Nothing reaches your sheet until that last button. The `Paste Here` tab
 is only somewhere to land: it is never a destination, and it is not
 offered in the list of tabs to add to.
+
+## Which tab each one goes to
+
+The applications are kept on a tab per grade band, and those names
+already say which grades they hold, so **the tab name is the setting**.
+There is nothing to fill in.
+
+    a tab called 5-8th      takes grades 5, 6, 7 and 8
+    a tab called 1-4th      takes grades 1, 2, 3 and 4
+    a tab called K-4        starts at kindergarten
+    Middle School           the same as 5-8th
+    Lower School            the same as PK-4
+
+Each applicant goes to the tab whose band covers the grade in
+**App. Grade**. A paste holding both 5-8th and LS applicants sorts itself
+between the two in one go, and the preview grows a **Goes to** column so
+you can see which is which before anything is written.
+
+Renaming a tab, or adding one, is all it takes for this to follow. If no
+tab is named after a band, everyone goes to the tab chosen in the dialog
+and it says so.
+
+## Which row it starts at
+
+Under the rows, **Where they go** names each tab and the row its batch
+will start at:
+
+    2 to 5-8th    starting at row 47
+    1 to 1-4th    starting at row 12
+
+That row is the one after the last applicant, worked out from the last
+row carrying a **name** rather than the last row carrying anything. A
+legend, a total or a stray note below the list does not push the batch
+past it.
+
+**Change the row and they start there instead.** Anything already on
+those rows is **pushed down, never written over**, so naming a row can
+never cost you something already on the sheet. Where that happens the
+result says so.
 
 ### The box, when the clipboard behaves
 

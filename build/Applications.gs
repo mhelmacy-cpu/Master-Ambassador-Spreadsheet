@@ -1,7 +1,7 @@
 /**
  * Ravenna paste, formatted into the applications sheet.
  *
- * PASTED IN FULL? This file is 1464 lines. Scroll to the bottom of the
+ * PASTED IN FULL? This file is 1706 lines. Scroll to the bottom of the
  * editor: the last line should read END OF FILE. If it does not, the
  * paste was cut short, and nothing will work until it is pasted again.
  *
@@ -247,7 +247,7 @@ function pasteGrid_(text) {
  * guess. Bump it on every change that goes to her, or it is worse than
  * useless: it says the fix is in when it is not.
  */
-const APP_VERSION_ = 'v9';
+const APP_VERSION_ = 'v10';
 
 const APP_MAP_KEY_ = 'ravennaColumnMap';
 
@@ -880,22 +880,71 @@ function readGrid_(tab, gridRows, overrides) {
       'at Name, or at First Name and Last Name.');
   }
 
-  // Anyone already on the sheet, and anyone listed twice in the paste.
-  const already = {};
-  if (nameCol && sheet.getLastRow() > 1) {
-    sheet.getRange(2, headers.map[nameCol] + 1, sheet.getLastRow() - 1, 1).getValues()
-      .forEach(function (r) {
-        const n = trim_(r[0]);
-        if (n) already[norm_(n)] = true;
-      });
-  }
+  // Each applicant goes to the tab whose band covers their grade. The
+  // tab chosen in the dialog is only the fallback, for anyone whose
+  // grade no tab covers.
+  const bands = gradeTabs_();
+  const gradeColName = appColumnNamed_(headers, 'App. Grade');
+  people.forEach(function (x) {
+    const wanted = tabForGrade_(gradeNumber_(x.row[gradeColName]), bands);
+    x.to = wanted || tab;
+    x.routed = wanted !== '';
+  });
+
+  // Already there, checked on the tab each one is actually going to,
+  // since the same name on a different band is a different applicant.
+  const seenOn = {};
+  const alreadyOn = function (name) {
+    if (seenOn[name]) return seenOn[name];
+    const found = {};
+    const sh = ss_().getSheetByName(name);
+    if (sh) {
+      const hd = appHeaderIndex_(sh);
+      const col = appColumnNamed_(hd, 'Name');
+      if (col && sh.getLastRow() > 1) {
+        sh.getRange(2, hd.map[col] + 1, sh.getLastRow() - 1, 1).getValues()
+          .forEach(function (r) {
+            const n = trim_(r[0]);
+            if (n) found[norm_(n)] = true;
+          });
+      }
+    }
+    seenOn[name] = found;
+    return found;
+  };
   const twice = {};
-  people.forEach(function (p) {
-    const key = norm_(p.name);
-    if (already[key]) p.duplicate = 'already on the sheet';
-    else if (twice[key]) p.duplicate = 'listed twice in this paste';
+  people.forEach(function (x) {
+    const key = norm_(x.name) + ' -> ' + norm_(x.to);
+    if (alreadyOn(x.to)[norm_(x.name)]) x.duplicate = 'already on ' + x.to;
+    else if (twice[key]) x.duplicate = 'listed twice in this paste';
     twice[key] = true;
   });
+
+  // Where each batch lands, and the row it would start at.
+  const perTab = {};
+  const tabOrder = [];
+  people.forEach(function (x) {
+    if (x.duplicate) return;
+    if (!perTab[x.to]) { perTab[x.to] = 0; tabOrder.push(x.to); }
+    perTab[x.to]++;
+  });
+  const destinations = tabOrder.map(function (name) {
+    const sh = ss_().getSheetByName(name);
+    return {
+      tab: name,
+      count: perTab[name],
+      startRow: sh ? nextFreeRow_(sh) : 2,
+      routed: people.some(function (x) { return x.to === name && x.routed; })
+    };
+  });
+  if (bands.length && people.some(function (x) { return !x.routed; })) {
+    warn('Some have no grade this spreadsheet has a tab for, so they are going to ' +
+      tab + '. The tab name is what says which grades it holds, as in "5-8th".');
+  }
+  if (!bands.length) {
+    warn('No tab is named after a grade band, so everyone is going to ' + tab + '. ' +
+      'Name a tab "5-8th" or "1-4th" and applicants sort themselves between them.');
+  }
 
   const wentBy = people.filter(function (x) { return x.preferred; })
     .map(function (x) { return x.preferred + ', not ' + x.given; });
@@ -912,6 +961,7 @@ function readGrid_(tab, gridRows, overrides) {
     byHand: headers.order.filter(isByHand_),
     fields: filling,
     people: people,
+    destinations: destinations,
     wentBy: wentBy,
     adding: people.filter(function (p) { return !p.duplicate; }).length,
     warnings: warnings
@@ -926,53 +976,127 @@ function readGrid_(tab, gridRows, overrides) {
  * sheet is skipped rather than written twice, and the columns she fills
  * in by hand are not in `filling` at all, so they are left as they are.
  */
-function writePaste_(tab, text, overrides) {
-  return writeRead_(tab, readPaste_(tab, text, overrides));
+function writePaste_(tab, text, overrides, starts) {
+  return writeRead_(tab, readPaste_(tab, text, overrides), starts);
 }
 
 /** Writes rows that came from the landing tab rather than from the box. */
-function writeGrid_(tab, gridRows, overrides) {
-  return writeRead_(tab, readGrid_(tab, gridRows, overrides));
+function writeGrid_(tab, gridRows, overrides, starts) {
+  return writeRead_(tab, readGrid_(tab, gridRows, overrides), starts);
 }
 
-function writeRead_(tab, p) {
+/**
+ * Where the next batch should start on a tab.
+ *
+ * Not the last row with anything on it, which is what a sheet reports:
+ * a legend, a total or a stray note below the list would push the batch
+ * past it and leave a gap. This is the row after the last applicant, by
+ * which is the last row carrying a name.
+ */
+function nextFreeRow_(sheet) {
+  const headers = appHeaderIndex_(sheet);
+  const nameCol = appColumnNamed_(headers, 'Name');
+  const last = sheet.getLastRow();
+  if (!nameCol || last < 2) return Math.max(last + 1, 2);
+  const names = sheet.getRange(2, headers.map[nameCol] + 1, last - 1, 1).getValues();
+  for (let i = names.length - 1; i >= 0; i--) {
+    if (trim_(names[i][0])) return i + 3;
+  }
+  return 2;
+}
+
+/** Whether every cell in a block is empty, so writing there destroys nothing. */
+function blockIsEmpty_(sheet, row, count, width) {
+  if (row + count - 1 > sheet.getMaxRows()) return true;
+  const values = sheet.getRange(row, 1, count, width).getValues();
+  return values.every(function (r) {
+    return r.every(function (c) { return c === '' || c === null; });
+  });
+}
+
+/**
+ * Writes the applicants, each to the tab their grade puts them on.
+ *
+ * A paste can hold both bands at once, so this writes a batch per tab
+ * rather than one batch, and reads each tab for its own column order, so
+ * two tabs laid out differently both come out right.
+ *
+ * `starts` is her own answer for where a tab's batch should begin. Where
+ * the rows there are not empty they are pushed down rather than written
+ * over, so naming a row can never cost her anything already on the
+ * sheet.
+ */
+function writeRead_(tab, p, starts) {
   const fresh = p.people.filter(function (x) { return !x.duplicate; });
   if (!fresh.length) {
     throw new Error(p.people.length ?
-      'Every one of them is on the sheet already. Nothing to add.' :
+      'Every one of them is on their sheet already. Nothing to add.' :
       'No applicants were found in the paste. Check the columns below.');
   }
-  const sheet = ss_().getSheetByName(tab);
-  const headers = appHeaderIndex_(sheet);
-  const width = Math.max(sheet.getLastColumn(), APP_COLUMNS_.length);
+  const want = starts || {};
 
-  const out = fresh.map(function (x) {
-    const row = [];
-    for (let i = 0; i < width; i++) row.push('');
-    Object.keys(x.row).forEach(function (h) {
-      if (isByHand_(h)) return;
-      const i = headers.map[h];
-      if (i !== undefined && x.row[h] !== '') row[i] = x.row[h];
+  const byTab = {};
+  const order = [];
+  fresh.forEach(function (x) {
+    const name = x.to || tab;
+    if (!byTab[name]) { byTab[name] = []; order.push(name); }
+    byTab[name].push(x);
+  });
+
+  const done = [];
+  order.forEach(function (name) {
+    const sheet = ss_().getSheetByName(name);
+    if (!sheet) throw new Error('This spreadsheet has no tab called "' + name + '".');
+    const headers = appHeaderIndex_(sheet);
+    const width = Math.max(sheet.getLastColumn(), APP_COLUMNS_.length);
+
+    const out = byTab[name].map(function (x) {
+      const row = [];
+      for (let i = 0; i < width; i++) row.push('');
+      Object.keys(x.row).forEach(function (h) {
+        if (isByHand_(h)) return;
+        const at = headers.map[appColumnNamed_(headers, h) || h];
+        if (at !== undefined && x.row[h] !== '') row[at] = x.row[h];
+      });
+      return row;
     });
-    return row;
-  });
 
-  const startRow = sheet.getLastRow() + 1;
-  if (startRow + out.length - 1 > sheet.getMaxRows()) {
-    sheet.insertRowsAfter(sheet.getMaxRows(), startRow + out.length - 1 - sheet.getMaxRows());
-  }
-  const range = sheet.getRange(startRow, 1, out.length, width);
-  range.setValues(out);
-  plainText_(range);
+    let startRow = Number(want[name]);
+    if (!startRow || startRow < 2) startRow = nextFreeRow_(sheet);
 
-  // A cell holding a real date is formatted as one, so the column reads
-  // and sorts as dates instead of as text. Only the rows just written.
-  const dateAt = {};
-  out.forEach(function (row) {
-    row.forEach(function (cell, i) { if (cell instanceof Date) dateAt[i] = true; });
-  });
-  Object.keys(dateAt).forEach(function (i) {
-    sheet.getRange(startRow, Number(i) + 1, out.length, 1).setNumberFormat('M/d/yyyy');
+    // Room to write at all.
+    if (startRow + out.length - 1 > sheet.getMaxRows()) {
+      sheet.insertRowsAfter(sheet.getMaxRows(),
+        startRow + out.length - 1 - sheet.getMaxRows());
+    }
+    // Something already there: push it down instead of over it.
+    let pushed = false;
+    if (!blockIsEmpty_(sheet, startRow, out.length, width)) {
+      sheet.insertRowsBefore(startRow, out.length);
+      pushed = true;
+    }
+
+    const range = sheet.getRange(startRow, 1, out.length, width);
+    range.setValues(out);
+    plainText_(range);
+
+    // A cell holding a real date is formatted as one, so the column reads
+    // and sorts as dates instead of as text. Only the rows just written.
+    const dateAt = {};
+    out.forEach(function (row) {
+      row.forEach(function (cell, i) { if (cell instanceof Date) dateAt[i] = true; });
+    });
+    Object.keys(dateAt).forEach(function (i) {
+      sheet.getRange(startRow, Number(i) + 1, out.length, 1).setNumberFormat('M/d/yyyy');
+    });
+
+    done.push({
+      tab: name,
+      added: out.length,
+      startRow: startRow,
+      pushed: pushed,
+      names: byTab[name].map(function (x) { return x.name; })
+    });
   });
 
   rememberMap_(p.columns);
@@ -980,9 +1104,10 @@ function writeRead_(tab, p) {
   return {
     added: fresh.length,
     skipped: p.people.length - fresh.length,
+    tab: done.map(function (d) { return d.tab; }).join(', '),
+    startRow: done[0].startRow,
     names: fresh.map(function (x) { return x.name; }),
-    startRow: startRow,
-    tab: tab,
+    landed: done,
     warnings: p.warnings
   };
 }
@@ -1028,6 +1153,77 @@ function tidyFormatting() {
   alert_('Rows 2 to ' + last + ' of "' + sheet.getName() + '" are now ' + APP_FONT_ + ' ' +
     APP_FONT_SIZE_ + ', black, with no underline and no border.\n\n' +
     'The headings in row 1 were left as they are.');
+}
+
+/* =========================================================
+ * Which sheet an applicant belongs on
+ *
+ * The applications are kept on a tab per grade band, "5-8th" and the
+ * rest. Those names already say which grades they hold, so the name is
+ * the setting: there is nothing to fill in, and renaming a tab or adding
+ * one is all it takes for this to follow.
+ *
+ * An applicant goes to the tab whose band covers the grade they are
+ * applying to. Where no tab covers it, or the grade is missing, they go
+ * to the one chosen in the dialog and the dialog says so.
+ * ========================================================= */
+
+/** K is 0 and PreK is below it, so bands can be compared as numbers. */
+function gradeNumber_(v) {
+  const t = norm_(v);
+  if (!t) return null;
+  if (/^(pre-?k|p-?k|t-?k)/.test(t)) return -1;
+  if (/^k(\b|$)/.test(t)) return 0;
+  const m = /(\d{1,2})/.exec(t);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * The grades a tab holds, read out of its own name.
+ *
+ * "5-8th" is five to eight, "1-4" is one to four, "K-4" starts at
+ * kindergarten. A division name is taken too, since a tab called Middle
+ * School means the same thing. A name that says nothing about grades
+ * takes nobody automatically, which is right for a tab like Notes.
+ */
+function tabGradeRange_(name) {
+  const t = norm_(name);
+  const one = '(pre-?k|p-?k|t-?k|k|\\d{1,2})';
+  const m = new RegExp(one + '\\s*(?:st|nd|rd|th)?\\s*(?:-|to|through|thru)\\s*' +
+    one + '\\s*(?:st|nd|rd|th)?').exec(t);
+  if (m) {
+    const lo = gradeNumber_(m[1]);
+    const hi = gradeNumber_(m[2]);
+    if (lo !== null && hi !== null && lo <= hi) return { lo: lo, hi: hi };
+  }
+  if (/\bmiddle\b/.test(t)) return { lo: 5, hi: 8 };
+  if (/\blower\b/.test(t)) return { lo: -1, hi: 4 };
+  if (/\bupper\b|\bhigh\b/.test(t)) return { lo: 9, hi: 12 };
+  return null;
+}
+
+/** Every tab that names a grade band, with the band it names. */
+function gradeTabs_() {
+  const out = [];
+  ss_().getSheets().forEach(function (sh) {
+    const name = sh.getName();
+    if (name === PASTE_TAB_) return;
+    const band = tabGradeRange_(name);
+    if (band) out.push({ name: name, lo: band.lo, hi: band.hi });
+  });
+  return out;
+}
+
+/** The tab a grade belongs on, or '' where no tab covers it. */
+function tabForGrade_(grade, bands) {
+  if (grade === null) return '';
+  let best = '';
+  let span = Infinity;
+  bands.forEach(function (b) {
+    if (grade < b.lo || grade > b.hi) return;
+    if (b.hi - b.lo < span) { span = b.hi - b.lo; best = b.name; }
+  });
+  return best;
 }
 
 /* =========================================================
@@ -1178,6 +1374,13 @@ const PASTE_CSS_ =
   '.guess.check{color:#8a5a12;}' +
   '.ver{font-size:11px;font-weight:normal;color:#fff;background:#a8322a;border-radius:9px;' +
   'padding:2px 8px;vertical-align:middle;margin-left:6px;letter-spacing:.04em;}' +
+  '.dest{background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:10px 12px;' +
+  'margin-top:12px;}' +
+  '.dest .line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:3px 0;}' +
+  '.dest .to{font-weight:bold;}' +
+  '.dest input{width:70px;font:inherit;padding:4px 6px;border:1px solid #bbb;' +
+  'border-radius:4px;text-align:right;}' +
+  '.dest .why{color:#777;font-size:11px;}' +
   '.pasterow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 6px;}' +
   '.hint{margin-top:6px;font-size:12px;color:#8a5a12;min-height:16px;}' +
   'textarea:focus{outline:2px solid #a8322a;outline-offset:1px;}';
@@ -1206,7 +1409,7 @@ function pasteDialog_(fromTab) {
       '<p class="sub">Copy the applicants out of Ravenna and paste them below. The rows ' +
       'appear as soon as you do. If pasting here will not work, close this and use ' +
       'Step 1 and Step 2 on the Admissions menu instead, which pastes onto a tab.</p>') +
-    '<label for="tab">Add them to</label>' +
+    '<label for="tab">When no tab is named for their grade, put them on</label>' +
     '<select id="tab" onchange="read(0)">' + options + '</select>' +
     (fromTab ? '' :
       '<label for="paste">Paste here</label>' +
@@ -1225,7 +1428,9 @@ function pasteDialog_(fromTab) {
     '</div>' +
     '<div id="out"></div>' +
     '<script>' +
-    'var OVER={},SEQ=0,TIMER=null,COLS=false;' +
+    'var OVER={},SEQ=0,TIMER=null,COLS=false,ROWS={};' +
+    'function rowSet(el){var n=parseInt(el.value,10);' +
+    'if(n>1){ROWS[el.getAttribute("data-tab")]=n;}}' +
     'var FROMTAB=' + (fromTab ? 'true' : 'false') + ';' +
     'function boxText(){var b=document.getElementById("paste");return b?b.value:"";}' +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;")' +
@@ -1251,6 +1456,8 @@ function pasteDialog_(fromTab) {
     '.api_readPaste(document.getElementById("tab").value,t,OVER,FROMTAB);}' +
     'function later(){clearTimeout(TIMER);TIMER=setTimeout(function(){read(0);},350);}' +
     'function remap(i,v){OVER[i]=v;COLS=true;read(0);}' +
+    'function keepRows(p){if(!p.destinations){return;}' +
+    'p.destinations.forEach(function(d){if(ROWS[d.tab]){d.startRow=ROWS[d.tab];}});}' +
     'function showCols(){COLS=!COLS;read(0);}' +
 
     // What it worked out, then the rows, then the button. The column
@@ -1258,7 +1465,7 @@ function pasteDialog_(fromTab) {
     'function show(p){if(!p){document.getElementById("out").innerHTML=' +
     '"<div class=\'warn\'><b>The script sent nothing back.</b><br>It read your paste but ' +
     'could not hand the result to this window. Press Sort the rows to try again.</div>";' +
-    'return;}var h="";' +
+    'return;}keepRows(p);var h="";' +
     'var need=p.unplaced>0||p.fromValues>0;' +
     'if(COLS===false&&need){COLS=true;}' +
     'h+="<div class=\'status"+(p.adding?"":" thin")+"\'><b>"+p.people.length+" applicant"+' +
@@ -1271,21 +1478,36 @@ function pasteDialog_(fromTab) {
     'if(p.wentBy&&p.wentBy.length){h+="<div class=\'mine\'><b>Went by the name in ' +
     'brackets:</b> "+esc(p.wentBy.join("; "))+".</div>";}' +
 
+    'var many=p.destinations&&p.destinations.length>1;' +
     'if(p.people.length){h+="<div class=\'scroll\'><table><tr>";' +
+    'if(many){h+="<th>Goes to</th>";}' +
     'p.fields.forEach(function(f){h+="<th>"+esc(f)+"</th>";});' +
     'h+="<th></th></tr>";' +
     'p.people.forEach(function(x){h+="<tr"+(x.duplicate?" class=\'dupe\'":"")+">";' +
+    'if(many){h+="<td><b>"+esc(x.to||"")+"</b></td>";}' +
     'p.fields.forEach(function(f){var v=esc((x.shown&&x.shown[f])||"");' +
     'if(x.preferred&&f.indexOf("First")===0&&!x.duplicate){v="<b class=\'pref\'>"+v+"</b>";}' +
     'h+="<td>"+v+"</td>";});' +
     'h+="<td class=\'muted\'>"+esc(x.duplicate||"")+"</td></tr>";});' +
     'h+="</table></div>";}' +
 
+    'if(p.destinations&&p.destinations.length){' +
+    'h+="<div class=\'dest\'><b>Where they go</b>";' +
+    'p.destinations.forEach(function(d){' +
+    'h+="<div class=\'line\'><span class=\'to\'>"+d.count+" to "+esc(d.tab)+"</span>";' +
+    'h+="<span>starting at row</span>";' +
+    'h+="<input type=\'number\' min=\'2\' id=\'row_"+esc(d.tab)+"\' value=\'"+' +
+    'd.startRow+"\' onchange=\'rowSet(this)\' data-tab=\'"+esc(d.tab)+"\'>";' +
+    'h+="<span class=\'why\'>"+(d.routed?"the tab for that grade":"no tab for that grade, ' +
+    'so the one chosen above")+"</span></div>";});' +
+    'h+="<div class=\'why\' style=\'margin-top:6px;\'>Change a row and they start there ' +
+    'instead. Anything already on those rows is pushed down, never written over.</div>";' +
+    'h+="</div>";}' +
     'if(p.warnings.length){h+="<div class=\'warn\'><b>Worth a look:</b><ul>";' +
     'p.warnings.forEach(function(w){h+="<li>"+esc(w)+"</li>";});h+="</ul></div>";}' +
 
     'if(p.adding){h+="<div style=\'margin-top:14px;\'><button class=\'big\' id=\'add\' ' +
-    'onclick=\'add()\'>Add "+p.adding+" to "+esc(p.tab)+"</button>";' +
+    'onclick=\'add()\'>Add "+p.adding+(many?"":" to "+esc(p.tab))+"</button>";' +
     'if(!FROMTAB){h+="<button class=\'ghost\' onclick=\'clearAll()\'>Clear</button>";}' +
     'h+="</div>";}' +
 
@@ -1317,18 +1539,20 @@ function pasteDialog_(fromTab) {
     'count(FROMTAB?"":"Nothing in the box yet.");}' +
     'function add(){document.getElementById("add").disabled=true;' +
     'google.script.run.withSuccessHandler(function(r){' +
-    'var h="<div class=\'free\'><b>"+r.added+" added to "+esc(r.tab)+"</b>, from row "+' +
-    'r.startRow+".<br>"+esc(r.names.join(", "));' +
+    'var h="<div class=\'free\'><b>"+r.added+" added.</b>";' +
+    'if(r.landed){r.landed.forEach(function(d){' +
+    'h+="<br><b>"+d.added+" to "+esc(d.tab)+"</b>, from row "+d.startRow+' +
+    '(d.pushed?" (the rows below were pushed down)":"")+": "+esc(d.names.join(", "));});}' +
     'if(r.skipped){h+="<br><span class=\'muted\'>"+r.skipped+" skipped as already there.' +
     '</span>";}' +
     'h+="<br><br><span class=\'muted\'>Paste the next lot in above whenever you are ready.' +
     '</span></div>";' +
     'var b2=document.getElementById("paste");if(b2){b2.value="";b2.focus();}' +
-    'OVER={};COLS=false;SEQ++;count("");' +
+    'OVER={};COLS=false;ROWS={};SEQ++;count("");' +
     'document.getElementById("out").innerHTML=h;})' +
     '.withFailureHandler(function(e){var b=document.getElementById("add");' +
     'if(b){b.disabled=false;}fail(e);})' +
-    '.api_writePaste(document.getElementById("tab").value,boxText(),OVER,FROMTAB);}' +
+    '.api_writePaste(document.getElementById("tab").value,boxText(),OVER,FROMTAB,ROWS);}' +
 
     // Pasting is the whole command, so pasting is what sets it going.
     'function say(m){var h=document.getElementById("hint");if(h){h.innerHTML=m||"";}}' +
@@ -1418,7 +1642,16 @@ function api_readPaste(tab, text, overrides, fromTab) {
         name: str(x.name),
         shown: shown,
         duplicate: str(x.duplicate),
-        preferred: str(x.preferred)
+        preferred: str(x.preferred),
+        to: str(x.to)
+      };
+    }),
+    destinations: p.destinations.map(function (d) {
+      return {
+        tab: str(d.tab),
+        count: Number(d.count),
+        startRow: Number(d.startRow),
+        routed: d.routed ? 1 : 0
       };
     }),
     wentBy: p.wentBy.map(str),
@@ -1426,15 +1659,15 @@ function api_readPaste(tab, text, overrides, fromTab) {
   };
 }
 
-function api_writePaste(tab, text, overrides, fromTab) {
+function api_writePaste(tab, text, overrides, fromTab, starts) {
   let r;
   if (fromTab) {
     const rows = pastedRows_();
     if (!rows.length) throw new Error('The "' + PASTE_TAB_ + '" tab is empty.');
-    r = writeGrid_(tab, rows, overrides);
+    r = writeGrid_(tab, rows, overrides, starts);
     clearPasteTab_();
   } else {
-    r = writePaste_(tab, text, overrides);
+    r = writePaste_(tab, text, overrides, starts);
   }
   return {
     added: Number(r.added),
@@ -1442,6 +1675,15 @@ function api_writePaste(tab, text, overrides, fromTab) {
     startRow: Number(r.startRow),
     tab: String(r.tab),
     names: r.names.map(function (n) { return String(n); }),
+    landed: r.landed.map(function (d) {
+      return {
+        tab: String(d.tab),
+        added: Number(d.added),
+        startRow: Number(d.startRow),
+        pushed: d.pushed ? 1 : 0,
+        names: d.names.map(function (n) { return String(n); })
+      };
+    }),
     warnings: r.warnings.map(function (w) { return String(w); })
   };
 }
