@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-27 x';
+var BUILD_ = '2026-09-27 y';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -3192,15 +3192,20 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
   clearReadCache_();                 // the rows just written are what it reads
   if (toCol !== -1) {
     [].concat(handoffs || []).forEach(function (h) {
-      if (!h || !trim_(h.visitor) || !trim_(h.to)) return;
+      if (!h || !trim_(h.visitor)) return;
+      if (!h.clear && !trim_(h.to)) return;
       const v = prospectiveFor_(dateVal).filter(function (x) {
         return norm_(x.name) === norm_(h.visitor);
       })[0];
       if (!v) return;
-      psheet.getRange(v.row, toCol + 1).setValue(trim_(h.to));
-      // Marked in the same breath, because Pass Off is what turns the
-      // cell from a record of what happened into an instruction.
-      if (passCol !== -1) psheet.getRange(v.row, passCol + 1).setValue('Yes');
+      // Called off: the column is emptied so nothing is read back as an
+      // instruction, and the family goes to their own guide again.
+      psheet.getRange(v.row, toCol + 1).setValue(h.clear ? '' : trim_(h.to));
+      // Pass Off is what turns the cell from a record of what happened
+      // into an instruction, so it is set in the same breath.
+      if (passCol !== -1) {
+        psheet.getRange(v.row, passCol + 1).setValue(h.clear ? '' : 'Yes');
+      }
     });
     clearReadCache_();
   }
@@ -4249,7 +4254,7 @@ function api_swapList(dateStr) {
       alongside: withNames.join(', '),
       // Taking this place off leaves the rest of the pair to walk the
       // family alone. Only a guide, and never the last one on a family.
-      canDrop: leftSolo.length > 0,
+      canDrop: leftSolo.length > 0 || entry.job === JOBS.PASSOFF,
       soloIf: leftSolo.join(' and '),
       soloOk: leftSolo.every(function (n) {
         const a = amb[norm_(n)];
@@ -4350,8 +4355,36 @@ function api_dropAmbassador(dateStr, row) {
   const roster = rosterRows_(dateVal);
   const entry = roster.filter(function (r) { return r.row === at; })[0];
   if (!entry) throw new Error('That row is not on this tour any more - reload the list.');
+  /* A Pass Off row is the hand-off itself, so taking it off means
+   * calling the hand-off off: the row goes, the instruction on
+   * Prospective Students goes with it, and the family is back with their
+   * own guide. */
+  if (entry.job === JOBS.PASSOFF) {
+    sheet_(N).deleteRow(at);
+    const P = SHEETS.PROSPECTIVE;
+    const toCol = optionalCol_(P, 'Class Visit To');
+    const passCol = optionalCol_(P, 'Pass Off');
+    let visitorRow = null;
+    prospectiveFor_(dateVal).forEach(function (v) {
+      if (norm_(v.name) === norm_(entry.visitor)) visitorRow = v.row;
+    });
+    if (visitorRow) {
+      if (toCol !== -1) sheet_(P).getRange(visitorRow, toCol + 1).setValue('');
+      if (passCol !== -1) sheet_(P).getRange(visitorRow, passCol + 1).setValue('');
+    }
+    clearReadCache_();
+    refreshCounts_();
+    refreshClassVisits_(dateVal);
+    const back = handbackChoices_(dateVal).byVisitor[norm_(entry.visitor)];
+    return {
+      from: entry.name, to: '', job: entry.job, visitor: entry.visitor,
+      solo: '', calledOff: true,
+      backWith: back && back.takers ? back.takers.join(' and ') : '',
+      problems: []
+    };
+  }
   if (entry.job !== JOBS.GUIDE) {
-    throw new Error('Only a tour guide can be taken off this way. ' +
+    throw new Error('Only a tour guide or a hand-off can be taken off this way. ' +
       'For anything else, clear the row on the Tour Tracker yourself.');
   }
   const beside = alongside_(roster, entry).map(function (r) { return r.name; });
@@ -5495,6 +5528,7 @@ function showStaffDialog() {
     'var o=x.classOptions||[];if(!o.length){return h;}' +
     'h+="<br><select class=\'hsel\' data-pair=\'"+x.order+"\'>";' +
     'h+="<option value=\'\'>"+esc(v.takers.join(" and "))+" takes them (as it is)</option>";' +
+    'if(pass){h+="<option value=\'none\'>No hand-off: back to their own guide</option>";}' +
     'o.forEach(function(c,k){h+="<option value=\'"+k+"\'>"+esc(c.name)+" - "+' +
     'esc(c.where)+(c.teacher?" ("+esc(c.teacher)+")":"")+", "+c.count+" there"+' +
     '(c.full?" - full":"")+(c.job?"":" - not on this tour")+"</option>";});' +
@@ -5504,7 +5538,9 @@ function showStaffDialog() {
     'for(var i=0;i<sels.length;i++){var v=sels[i].value;if(!v){continue;}' +
     'var key=Number(sels[i].getAttribute("data-pair")),x=null;' +
     'for(var j=0;j<pr.length;j++){if(pr[j].order===key){x=pr[j];}}' +
-    'if(!x){continue;}var c=(x.classOptions||[])[Number(v)];if(!c){continue;}' +
+    'if(!x){continue;}' +
+    'if(v==="none"){out.push({visitor:x.visitor.name,to:"",clear:true});continue;}' +
+    'var c=(x.classOptions||[])[Number(v)];if(!c){continue;}' +
     'out.push({visitor:x.visitor.name,to:c.name});}' +
     'return out;}' +
     'function crewPicker(c,ci){var sp=window.__spare||[],h="";' +
@@ -6060,6 +6096,7 @@ function showSwapDialog() {
     '<div id="msg"></div>' +
     '<div id="out"></div>' +
     '<script>' +
+    'var PASSOFF="' + JOBS.PASSOFF + '";' +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function load(){document.getElementById("load").disabled=true;' +
     'document.getElementById("out").innerHTML="<p class=\'muted\'>Loading...</p>";' +
@@ -6077,8 +6114,10 @@ function showSwapDialog() {
     'if(!r.candidates.length&&!r.canDrop){h+="<span class=\'muted\'>nobody else is ' +
     'free that day</span>";}' +
     'else{h+="<select id=\'s"+i+"\'><option value=\'\'>leave as is</option>";' +
-    'if(r.canDrop){h+="<option value=\'-\'>nobody: "+esc(r.soloIf)+' +
-    '" takes this family alone"+(r.soloOk?"":" (not marked Can Solo)")+"</option>";}' +
+    'if(r.canDrop){h+="<option value=\'-\'>"+(r.job===PASSOFF?' +
+    '"no hand-off: back to their own guide":' +
+    '"nobody: "+esc(r.soloIf)+" takes this family alone"+' +
+    '(r.soloOk?"":" (not marked Can Solo)"))+"</option>";}' +
     'r.candidates.forEach(function(c,j){h+="<option value=\'"+j+"\'>"+esc(c.name)+' +
     '" ("+esc(c.note)+")"+(c.yellow?" - check with me first":"")+"</option>";});' +
     'h+="</select> <button onclick=\'swap("+i+")\'>Save</button>";}' +
@@ -6092,7 +6131,12 @@ function showSwapDialog() {
     'var name=r.candidates[Number(sel.value)].name;' +
     'google.script.run.withSuccessHandler(done).withFailureHandler(fail)' +
     '.api_swapAmbassador(document.getElementById("d").value,r.row,name);}' +
-    'function done(res){var h="<div class=\'free\'>"+(res.to?"<b>"+esc(res.to)+' +
+    'function done(res){if(res.calledOff){' +
+    'document.getElementById("msg").innerHTML="<div class=\'free\'><b>Hand-off ' +
+    'called off.</b> "+esc(res.visitor)+" goes with "+' +
+    '(res.backWith?esc(res.backWith):"their own guide")+" again, and "+esc(res.from)+' +
+    '" is off the tour.</div>";load();return;}' +
+    'var h="<div class=\'free\'>"+(res.to?"<b>"+esc(res.to)+' +
     '"</b> is now "+esc(res.job)+(res.visitor?" for "+esc(res.visitor):"")+' +
     '", in place of "+esc(res.from):"<b>"+esc(res.from)+"</b> is off"+' +
     '(res.visitor?" "+esc(res.visitor)+"\'s tour":"")+", and "+esc(res.solo)+' +

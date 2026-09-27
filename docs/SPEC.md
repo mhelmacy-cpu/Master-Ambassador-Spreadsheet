@@ -279,6 +279,15 @@ where it still names one of the visitor's own guides, which is what
 stops a name left over from a swapped-out guide putting them back in
 charge.
 
+**Calling a hand-off off.** Two places do it. In the staffing preview
+the dropdown on that family gains "No hand-off: back to their own
+guide", and saving clears Class Visit To and Pass Off. In "Change Who Is
+Working..." the Pass Off row itself offers "no hand-off: back to their
+own guide", which deletes the row and clears the same two cells at once.
+Either way the family goes back to their own guide, nothing is left on
+the sheet telling it to come back on the next save, and the student who
+was going to receive them stops being emailed about it.
+
 Whoever is handed a family gets a **Pass Off** row on the Tour Tracker,
 so they are on the roster, in the counts and there to tick off
 afterwards. Handing the family on again moves the row; saving twice
