@@ -1,7 +1,7 @@
 /**
  * Ravenna paste, formatted into the applications sheet.
  *
- * PASTED IN FULL? This file is 1316 lines. Scroll to the bottom of the
+ * PASTED IN FULL? This file is 1464 lines. Scroll to the bottom of the
  * editor: the last line should read END OF FILE. If it does not, the
  * paste was cut short, and nothing will work until it is pasted again.
  *
@@ -153,7 +153,10 @@ function isByHand_(header) {
  * ========================================================= */
 
 function appTabs_() {
-  return ss_().getSheets().map(function (s) {
+  // The landing tab is where a paste arrives, never where it goes.
+  return ss_().getSheets().filter(function (s) {
+    return s.getName() !== PASTE_TAB_;
+  }).map(function (s) {
     const headers = appHeaderIndex_(s);
     let hits = 0;
     APP_COLUMNS_.forEach(function (want) {
@@ -239,8 +242,12 @@ function pasteGrid_(text) {
   };
 }
 
-/** Printed in the dialog, so which version she is running is never a guess. */
-const APP_VERSION_ = 'v5';
+/**
+ * Printed in the dialog, large, so which version is running is never a
+ * guess. Bump it on every change that goes to her, or it is worse than
+ * useless: it says the fix is in when it is not.
+ */
+const APP_VERSION_ = 'v9';
 
 const APP_MAP_KEY_ = 'ravennaColumnMap';
 
@@ -326,7 +333,9 @@ function targetFor_(header, headers) {
 const GENDER_WORDS_ = ['m', 'f', 'male', 'female', 'boy', 'girl', 'man', 'woman', 'nb',
   'enby', 'nonbinary', 'non binary', 'non-binary', 'other', 'x'];
 
-function isGenderWord_(v) { return GENDER_WORDS_.indexOf(norm_(v)) !== -1; }
+function isGenderWord_(v) {
+  return !(v instanceof Date) && GENDER_WORDS_.indexOf(norm_(v)) !== -1;
+}
 
 /** One year: 6, 6th, Grade 6, K, PK, PreK, TK. */
 const ONE_GRADE_ = '(pre-?k|p-?k|t-?k|k|\\d{1,2}(st|nd|rd|th)?)';
@@ -338,6 +347,7 @@ const ONE_GRADE_ = '(pre-?k|p-?k|t-?k|k|\\d{1,2}(st|nd|rd|th)?)';
  * applying to, so it is Grades Attended and it is checked first.
  */
 function isGradeRange_(v) {
+  if (v instanceof Date) return false;
   return new RegExp('^' + ONE_GRADE_ + '\\s*(-|to|through|thru)\\s*' + ONE_GRADE_ + '$', 'i')
     .test(trim_(v));
 }
@@ -350,6 +360,7 @@ function isGradeRange_(v) {
  * ruled out rather than swept in here.
  */
 function isAppliedGrade_(v) {
+  if (v instanceof Date) return false;
   const t = trim_(v);
   if (!t || isGradeRange_(t) || isAppType_(t)) return false;
   return new RegExp('^(grade\\s*)?' + ONE_GRADE_ + '(\\s*grade)?$', 'i').test(t);
@@ -365,6 +376,7 @@ function isAppliedGrade_(v) {
 const DIVISION_ = '(lower|middle|upper|high|primary|elementary|senior|junior)\\s+school';
 
 function isAppType_(v) {
+  if (v instanceof Date) return false;
   const t = trim_(v);
   if (!t) return false;
   return new RegExp('^' + DIVISION_ + '\\s*[,:]', 'i').test(t) ||
@@ -392,6 +404,7 @@ const NOT_PEOPLE_ = ['new', 'returning', 'student', 'students', 'applicant', 'tr
  * above is not somebody's name.
  */
 function isPersonName_(v) {
+  if (v instanceof Date) return false;
   const t = trim_(v);
   if (!t || /\d/.test(t) || isSchoolish_(t)) return false;
   if (isFlippedName_(t)) return true;
@@ -405,6 +418,7 @@ function isPersonName_(v) {
 }
 
 function isSchoolish_(v) {
+  if (v instanceof Date) return false;
   return /\b(school|academy|prep|preparatory|collegiate|montessori|friends|lycee|yeshiva)\b/i
     .test(trim_(v)) || /^(ps|is|ms|jhs)\s*\d+/i.test(trim_(v));
 }
@@ -672,14 +686,26 @@ function readNames_(whole, first, last) {
  * and always beats the heading.
  */
 function readPaste_(tab, text, overrides) {
-  const sheet = ss_().getSheetByName(tab);
-  if (!sheet) throw new Error('This spreadsheet has no tab called "' + tab + '".');
-  const headers = appHeaderIndex_(sheet);
   const grid = pasteGrid_(text);
   if (!grid.rows.length) {
     throw new Error('Nothing in the box yet. Copy the applicants out of Ravenna and paste ' +
       'them in.');
   }
+  return readGrid_(tab, grid.rows, overrides);
+}
+
+/**
+ * The same reading, from rows rather than from a block of text.
+ *
+ * Rows come either from a paste into the box or from the cells of the
+ * landing tab. Everything after this point is the same, because by here
+ * a paste is a grid whichever way it arrived.
+ */
+function readGrid_(tab, gridRows, overrides) {
+  const sheet = ss_().getSheetByName(tab);
+  if (!sheet) throw new Error('This spreadsheet has no tab called "' + tab + '".');
+  const headers = appHeaderIndex_(sheet);
+  const grid = { rows: gridRows };
 
   const hasHeaders = looksLikeHeaders_(grid.rows[0], headers);
   const headerRow = hasHeaders ? grid.rows[0] : [];
@@ -691,7 +717,10 @@ function readPaste_(tab, text, overrides) {
   for (let i = 0; i < width; i++) {
     const header = trim_(headerRow[i] || '');
     let sample = '';
-    for (let r = 0; r < dataRows.length && !sample; r++) sample = trim_(dataRows[r][i] || '');
+    for (let r = 0; r < dataRows.length && !sample; r++) {
+      const raw = dataRows[r][i];
+      sample = raw instanceof Date ? dateText_(raw) : trim_(raw || '');
+    }
     const chosen = picked[String(i)];
     const read = targetFor_(header, headers);
     columns.push({
@@ -706,7 +735,9 @@ function readPaste_(tab, text, overrides) {
   const valuesIn = function (i) {
     const out = [];
     dataRows.forEach(function (r) {
-      const v = trim_(r[i] || '');
+      const raw = r[i];
+      if (raw instanceof Date) { out.push(raw); return; }
+      const v = trim_(raw || '');
       if (v) out.push(v);
     });
     return out;
@@ -786,11 +817,22 @@ function readPaste_(tab, text, overrides) {
   });
   filling.sort(function (a, b) { return headers.map[a] - headers.map[b]; });
 
+  /**
+   * The value a column feeds, for one row.
+   *
+   * A cell pasted onto the landing tab can already hold a real date, and
+   * turning that into text here would lose it: what a date prints as is
+   * not a shape anything reads back. So a date is carried through as a
+   * date, and everything else as trimmed text.
+   */
   const at = function (row, target) {
     let v = '';
     if (!target) return v;
     columns.forEach(function (c) {
-      if (c.target === target && trim_(row[c.index] || '')) v = trim_(row[c.index]);
+      if (c.target !== target) return;
+      const raw = row[c.index];
+      if (raw instanceof Date) { v = raw; return; }
+      if (trim_(raw || '')) v = trim_(raw);
     });
     return v;
   };
@@ -885,7 +927,15 @@ function readPaste_(tab, text, overrides) {
  * in by hand are not in `filling` at all, so they are left as they are.
  */
 function writePaste_(tab, text, overrides) {
-  const p = readPaste_(tab, text, overrides);
+  return writeRead_(tab, readPaste_(tab, text, overrides));
+}
+
+/** Writes rows that came from the landing tab rather than from the box. */
+function writeGrid_(tab, gridRows, overrides) {
+  return writeRead_(tab, readGrid_(tab, gridRows, overrides));
+}
+
+function writeRead_(tab, p) {
   const fresh = p.people.filter(function (x) { return !x.duplicate; });
   if (!fresh.length) {
     throw new Error(p.people.length ?
@@ -981,6 +1031,61 @@ function tidyFormatting() {
 }
 
 /* =========================================================
+ * The landing tab
+ *
+ * A dialog is a frame inside the page, and a browser will often not let
+ * anything inside one reach the clipboard. Where it also will not let
+ * the keys through, there is no way to paste into the box at all, and
+ * no amount of work on the dialog changes that.
+ *
+ * A spreadsheet cell has no such trouble: pasting into a grid is the one
+ * thing Google Sheets is certain to allow. So the applicants land on a
+ * tab of their own, and the command reads them from there. No clipboard,
+ * no keystroke into a frame, nothing that can be refused.
+ * ========================================================= */
+
+const PASTE_TAB_ = 'Paste Here';
+
+/** Opens the landing tab, empty, with the cursor in A1. */
+function openPasteTab() {
+  let sheet = ss_().getSheetByName(PASTE_TAB_);
+  if (!sheet) sheet = ss_().insertSheet(PASTE_TAB_);
+  sheet.clear();
+  ss_().setActiveSheet(sheet);
+  try { sheet.setActiveSelection('A1'); } catch (err) { /* selection is a nicety */ }
+  alert_('The "' + PASTE_TAB_ + '" tab is open and empty, with the cursor in A1.\n\n' +
+    'Paste your Ravenna block straight in, the ordinary way.\n\n' +
+    'Then choose Admissions, then "Step 2: sort what I pasted".\n\n' +
+    'This tab is only somewhere to land. Nothing is kept on it, and it is ' +
+    'emptied once the rows are added.');
+}
+
+/**
+ * What is sitting on the landing tab, as rows.
+ *
+ * A date pasted into a cell arrives as a real date and is kept as one,
+ * since that is what Core Submitted wants. Everything else is taken as
+ * the text it shows.
+ */
+function pastedRows_() {
+  const sheet = ss_().getSheetByName(PASTE_TAB_);
+  if (!sheet) return [];
+  const last = sheet.getLastRow();
+  const wide = sheet.getLastColumn();
+  if (last < 1 || wide < 1) return [];
+  return sheet.getRange(1, 1, last, wide).getValues().map(function (r) {
+    return r.map(function (c) { return c instanceof Date ? c : trim_(c); });
+  }).filter(function (r) {
+    return r.some(function (c) { return c !== ''; });
+  });
+}
+
+function clearPasteTab_() {
+  const sheet = ss_().getSheetByName(PASTE_TAB_);
+  if (sheet) sheet.clear();
+}
+
+/* =========================================================
  * Building the sheet, for a spreadsheet that has no tab yet
  * ========================================================= */
 
@@ -1020,7 +1125,10 @@ function forgetColumnMemory() {
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('Admissions')
-    .addItem('Paste from Ravenna...', 'showPasteDialog')
+    .addItem('Step 1: open the paste tab', 'openPasteTab')
+    .addItem('Step 2: sort what I pasted...', 'showSortPastedDialog')
+    .addSeparator()
+    .addItem('Paste into a box instead...', 'showPasteDialog')
     .addSeparator()
     .addItem('Tidy the formatting on this tab', 'tidyFormatting')
     .addSeparator()
@@ -1068,11 +1176,16 @@ const PASTE_CSS_ =
   '.muted{color:#777;}' +
   '.guess{color:#777;font-size:11px;}' +
   '.guess.check{color:#8a5a12;}' +
+  '.ver{font-size:11px;font-weight:normal;color:#fff;background:#a8322a;border-radius:9px;' +
+  'padding:2px 8px;vertical-align:middle;margin-left:6px;letter-spacing:.04em;}' +
   '.pasterow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 6px;}' +
   '.hint{margin-top:6px;font-size:12px;color:#8a5a12;min-height:16px;}' +
   'textarea:focus{outline:2px solid #a8322a;outline-offset:1px;}';
 
-function showPasteDialog() {
+function showPasteDialog() { pasteDialog_(false); }
+function showSortPastedDialog() { pasteDialog_(true); }
+
+function pasteDialog_(fromTab) {
   const tabs = appTabs_();
   const best = bestAppTab_();
   const options = tabs.map(function (t) {
@@ -1083,46 +1196,59 @@ function showPasteDialog() {
 
   const html =
     '<style>' + PASTE_CSS_ + '</style>' +
-    '<h2>Paste from Ravenna</h2>' +
-    '<p class="sub">Copy the applicants out of Ravenna and paste them below. The rows ' +
-    'appear as soon as you do, sorted into your columns, with the names worked out. ' +
-    'Read them over and press Add. Nothing reaches the sheet until you do.</p>' +
+    '<h2>' + (fromTab ? 'Sort what you pasted' : 'Paste from Ravenna') +
+    ' <span class="ver">' + APP_VERSION_ + '</span></h2>' +
+    (fromTab ?
+      '<p class="sub">Reading the <b>' + PASTE_TAB_ + '</b> tab. The rows below are what ' +
+      'would go onto your sheet, sorted into your columns with the names worked out. Read ' +
+      'them over and press Add. Nothing is written until you do, and the ' + PASTE_TAB_ +
+      ' tab is emptied once it is.</p>' :
+      '<p class="sub">Copy the applicants out of Ravenna and paste them below. The rows ' +
+      'appear as soon as you do. If pasting here will not work, close this and use ' +
+      'Step 1 and Step 2 on the Admissions menu instead, which pastes onto a tab.</p>') +
     '<label for="tab">Add them to</label>' +
-    '<select id="tab" onchange="read()">' + options + '</select>' +
-    '<label for="paste">Paste here</label>' +
+    '<select id="tab" onchange="read(0)">' + options + '</select>' +
+    (fromTab ? '' :
+      '<label for="paste">Paste here</label>' +
+      '<div class="pasterow">' +
+      '<button class="ghost" onclick="pasteIn()">Paste from the clipboard</button>' +
+      '<span class="muted">or click the box and press Cmd+V (Ctrl+V on Windows)</span>' +
+      '</div>' +
+      '<textarea id="paste" rows="5" placeholder="Click here, then press Cmd+V"></textarea>' +
+      '<div id="hint" class="hint"></div>') +
     '<div class="pasterow">' +
-    '<button class="ghost" onclick="pasteIn()">Paste from the clipboard</button>' +
-    '<span class="muted">or click the box and press Cmd+V (Ctrl+V on Windows)</span>' +
-    '</div>' +
-    '<textarea id="paste" rows="5" placeholder="Click here, then press Cmd+V"></textarea>' +
-    '<div id="hint" class="hint"></div>' +
-    '<div class="pasterow">' +
-    '<button onclick="read(1)">Sort the rows</button>' +
-    '<span class="muted" id="count">Nothing in the box yet.</span>' +
-    '<span class="muted" style="margin-left:auto;">' + APP_VERSION_ + '</span>' +
+    '<button onclick="read(1)">' +
+    (fromTab ? 'Read the ' + PASTE_TAB_ + ' tab again' : 'Sort the rows') + '</button>' +
+    '<span class="muted" id="count">' +
+    (fromTab ? 'Reading the ' + PASTE_TAB_ + ' tab...' : 'Nothing in the box yet.') +
+    '</span>' +
     '</div>' +
     '<div id="out"></div>' +
     '<script>' +
     'var OVER={},SEQ=0,TIMER=null,COLS=false;' +
+    'var FROMTAB=' + (fromTab ? 'true' : 'false') + ';' +
+    'function boxText(){var b=document.getElementById("paste");return b?b.value:"";}' +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;")' +
     '.replace(/>/g,"&gt;").replace(/"/g,"&quot;");}' +
     'function fail(e){document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+' +
     'esc(e.message)+"</b></div>";}' +
     'function count(m){document.getElementById("count").innerHTML=m;}' +
-    'function read(pressed){var t=document.getElementById("paste").value;' +
-    'if(!t.replace(/\\s/g,"")){document.getElementById("out").innerHTML="";' +
+    'function read(pressed){var t=boxText();' +
+    'if(!FROMTAB&&!t.replace(/\\s/g,"")){document.getElementById("out").innerHTML="";' +
     'count(pressed?"Nothing in the box to sort yet. Paste the applicants in first.":' +
     '"Nothing in the box yet.");return;}' +
     'var lines=t.replace(/\\s+$/,"").split("\\n").length;' +
-    'count(t.length+" characters, "+lines+" line"+(lines===1?"":"s")+". Reading...");' +
+    'var size=FROMTAB?"Reading the tab...":' +
+    't.length+" characters, "+lines+" line"+(lines===1?"":"s")+".";' +
+    'count(FROMTAB?"Reading the tab...":size+" Reading...");' +
     'var mine=++SEQ;' +
     'google.script.run.withSuccessHandler(function(p){if(mine!==SEQ){return;}' +
-    'try{show(p);count(t.length+" characters, "+lines+" line"+(lines===1?"":"s")+".");}' +
+    'try{show(p);count(FROMTAB?"Read from the tab.":size);}' +
     'catch(err){count("");document.getElementById("out").innerHTML=' +
     '"<div class=\'warn\'><b>The rows could not be drawn.</b><br>"+esc(err.message)+' +
     '"<br><span class=\'muted\'>Tell Claude this message and it can be fixed.</span></div>";}})' +
     '.withFailureHandler(function(e){if(mine===SEQ){count("");fail(e);}})' +
-    '.api_readPaste(document.getElementById("tab").value,t,OVER);}' +
+    '.api_readPaste(document.getElementById("tab").value,t,OVER,FROMTAB);}' +
     'function later(){clearTimeout(TIMER);TIMER=setTimeout(function(){read(0);},350);}' +
     'function remap(i,v){OVER[i]=v;COLS=true;read(0);}' +
     'function showCols(){COLS=!COLS;read(0);}' +
@@ -1160,7 +1286,8 @@ function showPasteDialog() {
 
     'if(p.adding){h+="<div style=\'margin-top:14px;\'><button class=\'big\' id=\'add\' ' +
     'onclick=\'add()\'>Add "+p.adding+" to "+esc(p.tab)+"</button>";' +
-    'h+="<button class=\'ghost\' onclick=\'clearAll()\'>Clear</button></div>";}' +
+    'if(!FROMTAB){h+="<button class=\'ghost\' onclick=\'clearAll()\'>Clear</button>";}' +
+    'h+="</div>";}' +
 
     'if(COLS){h+="<label>Where each column went</label>";' +
     'h+="<div class=\'scroll\'><table><tr><th>Your paste</th><th>First value</th>' +
@@ -1185,8 +1312,9 @@ function showPasteDialog() {
 
     'document.getElementById("out").innerHTML=h;}' +
 
-    'function clearAll(){document.getElementById("paste").value="";OVER={};COLS=false;' +
-    'document.getElementById("out").innerHTML="";count("Nothing in the box yet.");}' +
+    'function clearAll(){var b=document.getElementById("paste");if(b){b.value="";}' +
+    'OVER={};COLS=false;document.getElementById("out").innerHTML="";' +
+    'count(FROMTAB?"":"Nothing in the box yet.");}' +
     'function add(){document.getElementById("add").disabled=true;' +
     'google.script.run.withSuccessHandler(function(r){' +
     'var h="<div class=\'free\'><b>"+r.added+" added to "+esc(r.tab)+"</b>, from row "+' +
@@ -1195,19 +1323,18 @@ function showPasteDialog() {
     '</span>";}' +
     'h+="<br><br><span class=\'muted\'>Paste the next lot in above whenever you are ready.' +
     '</span></div>";' +
-    'document.getElementById("paste").value="";OVER={};COLS=false;SEQ++;' +
-    'document.getElementById("out").innerHTML=h;' +
-    'var b2=document.getElementById("paste");b2.focus();})' +
+    'var b2=document.getElementById("paste");if(b2){b2.value="";b2.focus();}' +
+    'OVER={};COLS=false;SEQ++;count("");' +
+    'document.getElementById("out").innerHTML=h;})' +
     '.withFailureHandler(function(e){var b=document.getElementById("add");' +
     'if(b){b.disabled=false;}fail(e);})' +
-    '.api_writePaste(document.getElementById("tab").value,' +
-    'document.getElementById("paste").value,OVER);}' +
+    '.api_writePaste(document.getElementById("tab").value,boxText(),OVER,FROMTAB);}' +
 
     // Pasting is the whole command, so pasting is what sets it going.
-    'function say(m){document.getElementById("hint").innerHTML=m||"";}' +
+    'function say(m){var h=document.getElementById("hint");if(h){h.innerHTML=m||"";}}' +
     'function takeIt(t){if(!t||!t.replace(/\\s/g,"")){' +
     'say("There was nothing on the clipboard. Copy the applicants out of Ravenna first.");' +
-    'return;}var b=document.getElementById("paste");b.value=t;say("");read(0);}' +
+    'return;}var b=document.getElementById("paste");if(!b){return;}b.value=t;say("");read(0);}' +
 
     // A button can only reach the clipboard where the browser allows it,
     // which inside a Sheets dialog it often does not. When it cannot, the
@@ -1215,7 +1342,8 @@ function showPasteDialog() {
     'function pasteIn(){' +
     'if(navigator.clipboard&&navigator.clipboard.readText){' +
     'navigator.clipboard.readText().then(takeIt,byHand);return;}byHand();}' +
-    'function byHand(){var b=document.getElementById("paste");b.focus();b.select();' +
+    'function byHand(){var b=document.getElementById("paste");if(!b){return;}' +
+    'b.focus();b.select();' +
     'say("Your browser will not let a button read the clipboard. The box below is ready ' +
     'and the cursor is in it, so press Cmd+V (or Ctrl+V) now.");}' +
 
@@ -1228,12 +1356,13 @@ function showPasteDialog() {
     'e.preventDefault();takeIt(t);});' +
 
     'var box=document.getElementById("paste");' +
-    'box.addEventListener("input",later);' +
-    'box.addEventListener("focus",function(){say("");});' +
-    'box.focus();' +
+    'if(box){box.addEventListener("input",later);' +
+    'box.addEventListener("focus",function(){say("");});box.focus();}' +
+    'if(FROMTAB){read(0);}' +
     '<\/script>';
   SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutput(html).setWidth(820).setHeight(720), 'Paste from Ravenna');
+    HtmlService.createHtmlOutput(html).setWidth(820).setHeight(720),
+    fromTab ? 'Sort what you pasted' : 'Paste from Ravenna');
 }
 
 /**
@@ -1250,8 +1379,19 @@ function showPasteDialog() {
  * is a string, a number or an array of them, on purpose: it is the only
  * way to be sure the answer arrives.
  */
-function api_readPaste(tab, text, overrides) {
-  const p = readPaste_(tab, text, overrides);
+/** Rows from the landing tab when `fromTab`, otherwise from the box. */
+function api_readPaste(tab, text, overrides, fromTab) {
+  let p;
+  if (fromTab) {
+    const rows = pastedRows_();
+    if (!rows.length) {
+      throw new Error('The "' + PASTE_TAB_ + '" tab is empty. Choose "Step 1: open the ' +
+        'paste tab", paste your applicants onto it, then come back here.');
+    }
+    p = readGrid_(tab, rows, overrides);
+  } else {
+    p = readPaste_(tab, text, overrides);
+  }
   const str = function (v) { return String(v == null ? '' : v); };
   return {
     tab: str(p.tab),
@@ -1286,8 +1426,16 @@ function api_readPaste(tab, text, overrides) {
   };
 }
 
-function api_writePaste(tab, text, overrides) {
-  const r = writePaste_(tab, text, overrides);
+function api_writePaste(tab, text, overrides, fromTab) {
+  let r;
+  if (fromTab) {
+    const rows = pastedRows_();
+    if (!rows.length) throw new Error('The "' + PASTE_TAB_ + '" tab is empty.');
+    r = writeGrid_(tab, rows, overrides);
+    clearPasteTab_();
+  } else {
+    r = writePaste_(tab, text, overrides);
+  }
   return {
     added: Number(r.added),
     skipped: Number(r.skipped),

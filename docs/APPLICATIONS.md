@@ -22,7 +22,31 @@ nothing in the tour spreadsheet touches it.
 
 ## Using it
 
-**Admissions > Paste from Ravenna...**
+### The way that always works
+
+A dialog is a frame inside the page, and a browser will often not let
+anything inside one reach the clipboard. Where it will not let the keys
+through either, there is no way to paste into a box at all, and no amount
+of work on the dialog changes that.
+
+A spreadsheet cell has no such trouble. Pasting into a grid is the one
+thing Google Sheets is certain to allow, so the applicants land on a tab
+of their own and the command reads them from there.
+
+1. **Admissions > Step 1: open the paste tab.** A tab called
+   `Paste Here` opens, empty, with the cursor in A1.
+2. **Paste your Ravenna block straight in**, the ordinary way.
+3. **Admissions > Step 2: sort what I pasted.** The rows appear, sorted
+   into your columns with the names worked out.
+4. **Add N to <tab>** writes them, and empties `Paste Here`.
+
+Nothing reaches your sheet until that last button. The `Paste Here` tab
+is only somewhere to land: it is never a destination, and it is not
+offered in the list of tabs to add to.
+
+### The box, when the clipboard behaves
+
+**Admissions > Paste into a box instead...**
 
 1. Copy the applicants out of Ravenna.
 2. Get it into the box, whichever way works:
