@@ -224,6 +224,41 @@ period they are missing. A greeter is back before the bell.
     Tour Guide      8:25 AM - 9:05 AM
     Class Buddy     9:05 AM - 9:25 AM
 
+## Class visits at the end
+
+At 9:06 every family is walked into a class. Most weeks that is one of
+their own guides' classes; where she has handed them off it is somebody
+else's.
+
+The script counts how many families land in each teacher's room and
+reports it, and **it never moves anybody to even them out**. A class
+over `Max Visitors Per Class` on Settings (3) is flagged in the
+staffing dialog, on that family's own row and in a summary of every
+class taking visitors. Fixing it is hers.
+
+Every family gets a hand-off dropdown listing everybody else who could
+take them, each with the room they would be in and how many are there
+already, ordered emptiest first and with the people working the tour
+before the rest. Whatever she picks is written to **Class Visit To** on
+Prospective Students, and **Pass Off** on the same sheet says Yes where
+the family is handed to somebody who was not guiding them.
+
+Class Visit To is also the override: type any ambassador's name in it
+and they take the family, whatever the script worked out.
+
+Three things follow from it:
+
+- **The route sheet.** The guide's page ends, in large type, with
+  "Robin Visitor is going to Science in M307 with Jane Moss." and "Give
+  them the tour route, the clock, and YOUR NAME TAG. Then go back to
+  your own class. You are finished." Underneath, a block headed FOR
+  JANE MOSS tells the receiving student to take them to class and bring
+  them down to the cafeteria at 9:25.
+- **The teacher whose room it is** gets their own email, naming the
+  visiting student, who is bringing them up and who they will be
+  sitting with.
+- **The test** shows that email too, on both days.
+
 Where the two guides go to different rooms, only one of them walks the
 family to class, and that is the one in an academic class: Humanities,
 Maths, Science, English, History or a world language. Anything else,
