@@ -451,12 +451,17 @@ click shows everything that will really arrive:
     [TEST - Students, Tuesday 12:00 PM] Your Tour Job - Tomorrow
     [TEST - Students, Wednesday 7:45 AM] Your Tour Job - Today
 
-A test sends **one copy per kind**, not one per person - one of each job
-for the students, and one advisor, one class teacher and one host
-teacher - twice over for the two days. Who would have been skipped for
-want of an address is still worked out for everybody and still reported,
-so the test says what a real send would do without filling her inbox
-with the same message thirty times.
+A test sends **one example of every job**, not one per person, and it
+does so for each kind of reader: the student, their advisor and their
+class teacher, plus one host teacher. That is repeated for both days,
+so the Tuesday and the Wednesday wording of each can be read side by
+side. An email goes out only where it carries a job not shown yet, so a
+Lobby Greeter's teacher hears once and a Tour Guide's teacher hears
+once, rather than every teacher in the school hearing.
+
+Who would have been skipped for want of an address is still worked out
+for everybody and still reported, so the test says what a real send
+would do without filling her inbox with the same message thirty times.
 
 ### The roster
 

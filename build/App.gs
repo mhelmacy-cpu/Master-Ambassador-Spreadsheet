@@ -35,7 +35,7 @@ const SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-const BUILD_ = '2026-09-27 m';
+const BUILD_ = '2026-09-27 n';
 
 const HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -3482,7 +3482,13 @@ function lockerSlipData_(dateVal) {
       jobs: grouped[name].map(function (j) {
         // Same as the email: the route is on the sheet they are handed.
         return j.job + (j.visitor ? ' for ' + j.visitor : '');
-      })
+      }),
+      // When this one is actually finished, which is their own job's
+      // hours and not the end of the tour. A greeter is back at 8:55.
+      backBy: (function () {
+        const w = awayMinutes_(grouped[name].map(function (j) { return j.job; }));
+        return w ? timeLabel_(w.to) : '';
+      })()
     };
   });
 }
@@ -3522,7 +3528,7 @@ function buildLockerSlips(dateStr) {
     cell.appendParagraph(longDate_(dateVal));
     slip.jobs.forEach(function (j) { cell.appendParagraph(j); });
     cell.appendParagraph(capitalize_(reportTo) + ' ' + reportAt + '. Back in class by ' +
-      endTime + '.');
+      (slip.backBy || endTime) + '.');
 
     body.appendParagraph('');
   });
@@ -4176,6 +4182,26 @@ function sampleAllows_(kind) {
   return true;
 }
 
+/**
+ * The same, but for an email whose wording depends on the job.
+ *
+ * One example of each job rather than one email in total, so a test
+ * shows what the Lobby Greeter's teacher gets as well as the Tour
+ * Guide's. An email carrying a job not shown yet goes; one carrying
+ * only jobs already shown does not.
+ */
+function sampleAllowsJobs_(kind, jobNames) {
+  if (!SAMPLE_SEEN_) return true;
+  const jobs = [].concat(jobNames || []).map(norm_).filter(Boolean);
+  if (!jobs.length) return sampleAllows_(kind);
+  let fresh = false;
+  jobs.forEach(function (j) {
+    const key = kind + ':' + j;
+    if (!SAMPLE_SEEN_[key]) { SAMPLE_SEEN_[key] = true; fresh = true; }
+  });
+  return fresh;
+}
+
 /** Where test copies go: the Settings address if there is one, else whoever is running this. */
 function previewAddress_() {
   const set = setting_('Preview Email To', '');
@@ -4277,7 +4303,7 @@ function sendStudentEmails(dateStr) {
       '<p>Thank you for doing this.<br>' +
       escapeHtml_(setting_('Sender Display Name', 'LREI Middle School Tours')) + '</p></div>';
 
-    if (!sampleAllows_('student:' + jobs.map(function (j) { return j.job; }).sort().join('+'))) return;
+    if (!sampleAllowsJobs_('student', jobs.map(function (j) { return j.job; }))) return;
     MailApp.sendEmail(mailOptions_(who.email, 'Your Tour Job - ' + when.subject, html));
     sent++;
   });
@@ -4429,7 +4455,7 @@ function sendTeacherEmails(dateStr) {
       '<table style="' + TABLE_STYLE_ + '"><tr><th style="' + TH_ + '">Advisee</th>' +
       '<th style="' + TH_ + '">Job</th></tr>' + body + '</table>' +
       '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p></div>';
-    if (!sampleAllows_('advisor')) return;
+    if (!sampleAllowsJobs_('advisor', e.rows.map(function (r) { return r.job; }))) return;
     MailApp.sendEmail(mailOptions_(email, 'Advisee on Tour Duty - ' + when.subject, html));
     advisorsSent++;
   });
@@ -4469,7 +4495,7 @@ function sendTeacherEmails(dateStr) {
           ' back to class before the end of the period.</p>'
         : '') +
       '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p></div>';
-    if (!sampleAllows_('class teacher')) return;
+    if (!sampleAllowsJobs_('class teacher', e.rows.map(function (r) { return r.job; }))) return;
     MailApp.sendEmail(mailOptions_(email, 'Student Out of Your Class - ' + when.subject, html));
     teachersSent++;
   });
