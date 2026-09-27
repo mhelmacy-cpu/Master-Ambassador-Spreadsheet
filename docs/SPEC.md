@@ -518,6 +518,35 @@ always hear well before the students. The Wednesday send is the tight
 one: at the late end it arrives 8:00 AM, still twenty-five minutes before
 ambassadors are due in the cafeteria at 8:25.
 
+### One email per teacher
+
+A teacher hears once, however many ways the tour touches their class.
+A double period is the ordinary case: the same teacher loses a student
+at 8:25 and gains a visiting family at 9:06, and hearing about it twice,
+under two subject lines, is how a teacher stops reading these.
+
+One email carries whichever of three sections apply: students walking
+out, a visiting family walking in with an ambassador, and a visiting
+family joining a 5th grade language class. The subject follows suit:
+
+    out only    Student Out of Your Class - Wednesday, October 7
+    in only     Student Visitor in Your Class - Wednesday, October 7
+    both        Your Class and the Middle School Tour - Wednesday, October 7
+
+The out-of-class email no longer says "please expect a visitor as
+well". It was telling the wrong teacher: the guide is pulled out of the
+8:25 class and walks the family into the 9:06 one, which is usually a
+different room. Only the teacher who actually receives them is told.
+
+The advisor email stays separate. It is about an advisee being on duty,
+not about that teacher's own class.
+
+**A pass off is not an absence.** Being handed a family does not take
+that student out of anything: they are sitting in their own class and
+the family comes to them. So Pass Off carries no out-of-class hours, no
+teacher is told they are missing, and they appear only as the student
+sitting with the visitor.
+
 ### Two commands, not one
 
 **Test Emails...** and **Send Emails Now...** are separate menu items.

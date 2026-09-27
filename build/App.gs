@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-27 w';
+var BUILD_ = '2026-09-27 x';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -98,7 +98,9 @@ JOB_HOURS_[JOBS.LOBBY] = ['8:25 AM', '8:55 AM'];
 JOB_HOURS_[JOBS.TABLE] = ['8:25 AM', '8:55 AM'];
 JOB_HOURS_[JOBS.GUIDE] = ['8:25 AM', '9:05 AM'];
 JOB_HOURS_[JOBS.BUDDY] = ['9:05 AM', '9:25 AM'];
-JOB_HOURS_[JOBS.PASSOFF] = ['9:05 AM', '9:25 AM'];
+/* Nothing for Pass Off on purpose. Being handed a family does not take
+ * that student out of anything: they are sitting in their own class and
+ * the family comes to them. So no teacher is told they are missing. */
 
 var YES_NO = ['Yes', 'No'];
 var SPLITS = ['A', 'B', 'C'];
@@ -5035,7 +5037,12 @@ function sendTeacherEmails(dateStr) {
   });
 
   Object.keys(seen).forEach(function (key) {
-    const jobs = seen[key].jobs.filter(function (j) { return j.job !== JOBS.BUDDY; });
+    // A pass off is not an absence: they stay where they are and the
+    // family comes to them. Their own teacher hears about the visitor
+    // through the arriving section below, not as a student walking out.
+    const jobs = seen[key].jobs.filter(function (j) {
+      return j.job !== JOBS.BUDDY && j.job !== JOBS.PASSOFF;
+    });
     if (!jobs.length) return;
     const name = jobs[0].name;
     const who = byName[key];
@@ -5127,109 +5134,120 @@ function sendTeacherEmails(dateStr) {
   });
 
   let teachersSent = 0;
-  Object.keys(byTeacher).forEach(function (email) {
-    const e = byTeacher[email];
-    const anyGuiding = e.rows.some(function (r) { return r.guiding; });
-    const guests = [];
-    e.rows.forEach(function (r) {
-      (r.visiting || []).forEach(function (v) {
-        if (guests.indexOf(v) === -1) guests.push(v);
-      });
-    });
-    const guestNames = guests.length > 1
-      ? guests.slice(0, -1).join(', ') + ' and ' + guests[guests.length - 1]
-      : guests.join('');
-    const guideCount = e.rows.filter(function (r) { return r.guiding; }).length;
-    const body = e.rows.map(function (r) {
-      return '<tr><td style="' + TD_ + '">' + escapeHtml_(r.student) + '</td>' +
-        '<td style="' + TD_ + '">' + escapeHtml_(r.away) + '</td>' +
-        '<td style="' + TD_ + '">' + escapeHtml_(r.what) + '</td>' +
-        '<td style="' + TD_ + '">' + escapeHtml_(r.job) + '</td></tr>';
-    }).join('');
-    const html = '<div style="' + MAIL_STYLE_ + '">' +
-      '<p>Hi ' + escapeHtml_(e.name) + ',</p>' +
-      '<p>The student(s) below will be out of your class ' + escapeHtml_(when.body) +
-      ' for a Middle School tour:</p>' +
-      '<table style="' + TABLE_STYLE_ + '">' +
-      '<tr><th style="' + TH_ + '">Student</th><th style="' + TH_ + '">Out of class</th>' +
-      '<th style="' + TH_ + '">Class</th><th style="' + TH_ + '">Tour job</th></tr>' +
-      body + '</table>' +
-      (anyGuiding
-        ? '<p><b>Please expect a visitor in your class as well' +
-          (guestNames ? ': ' + escapeHtml_(guestNames) : '') + '.</b> ' +
-          (guideCount === 1 ? 'Your student brings them' : 'The tour guides bring them') +
-          ' back to class before the end of the period.</p>'
-        : '') +
-      '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p></div>';
-    if (!sampleAllowsJobs_('class teacher', e.rows.map(function (r) { return r.job; }))) return;
-    sendMail_(email, 'Student Out of Your Class - ' + when.subject, html);
-    teachersSent++;
-  });
-
-  let hostsSent = 0;
   let landingSent = 0;
+  let hostsSent = 0;
   const handoff = timeLabelOrRaw_(setting_('Class Visit Handoff Time', '9:06'));
   const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
-  /* The teacher of the class a family is walked into at the end. That is
-   * the guide's own class most weeks, and somebody else's where she has
-   * handed the family off. Either way the room is about to gain a
-   * visitor, so its teacher is told by name who is bringing whom. */
-  Object.keys(byLanding).forEach(function (email) {
-    const e = byLanding[email];
-    const body = e.rows.map(function (r) {
-      return '<tr><td style="' + TD_ + '">' + escapeHtml_(r.visitor) + '</td>' +
-        '<td style="' + TD_ + '">' + escapeHtml_(r.from) + '</td>' +
-        '<td style="' + TD_ + '">' + escapeHtml_(r.to) + '</td></tr>';
-    }).join('');
-    const many = e.rows.length > 1;
-    const handedOn = e.rows.filter(function (r) { return r.passed; });
-    const html = '<div style="' + MAIL_STYLE_ + '">' +
-      '<p>Hi ' + escapeHtml_(e.name) + ',</p>' +
-      '<p><b>' + (many ? 'Prospective students are' : 'A prospective student is') +
-      ' coming into your class ' + escapeHtml_(when.body) + '.</b> They are at the ' +
-      'end of a Middle School tour. They arrive at about ' + escapeHtml_(handoff) +
-      ', and are taken down to the cafeteria at ' + escapeHtml_(endsAt) + '.</p>' +
-      (handedOn.length
-        ? '<p>The tour guide hands them over at your door and goes back to their own ' +
-          'class, so the student in the third column is the one looking after them.</p>'
-        : '') +
-      '<table style="' + TABLE_STYLE_ + '">' +
-      '<tr><th style="' + TH_ + '">Visiting student</th>' +
-      '<th style="' + TH_ + '">Brought up by</th>' +
-      '<th style="' + TH_ + '">Sitting with</th></tr>' +
-      body + '</table>' +
-      '<p>Nothing is needed from you beyond a seat.<br>' +
-      escapeHtml_(senderName) + '</p></div>';
-    if (!sampleAllows_('landing teacher')) return;
-    sendMail_(email,
-      'Student Visitor in Your Class - ' + when.subject, html);
-    landingSent++;
-  });
 
-  Object.keys(byHost).forEach(function (email) {
-    const e = byHost[email];
-    const body = e.rows.map(function (r) {
-      return '<tr><td style="' + TD_ + '">' + escapeHtml_(r.visitor) + '</td>' +
-        '<td style="' + TD_ + '">' + escapeHtml_(r.student) + '</td>' +
-        '<td style="' + TD_ + '">' + escapeHtml_(r.room) + '</td></tr>';
-    }).join('');
-    const many = e.rows.length > 1;
+  /* One email per teacher, however many ways the tour touches their
+   * class. A double period is the ordinary case: the same teacher loses
+   * a student at 8:25 and gains a visiting family at 9:06, and hearing
+   * about it twice, from two different subject lines, is how a teacher
+   * stops reading these.
+   *
+   * Three things can be in it: students walking out, a visiting family
+   * walking in with an ambassador, and a visiting family joining a 5th
+   * grade language class. A teacher gets whichever of the three apply. */
+  const every = {};
+  const bucket = function (holder, key) {
+    Object.keys(holder).forEach(function (email) {
+      if (!every[email]) every[email] = { name: holder[email].name };
+      every[email][key] = holder[email].rows;
+    });
+  };
+  bucket(byTeacher, 'out');
+  bucket(byLanding, 'arriving');
+  bucket(byHost, 'hosting');
+
+  Object.keys(every).forEach(function (email) {
+    const e = every[email];
+    const out = e.out || [];
+    const arriving = e.arriving || [];
+    const hosting = e.hosting || [];
+    const parts = [];
+
+    if (out.length) {
+      parts.push('<p>The student(s) below will be out of your class ' +
+        escapeHtml_(when.body) + ' for a Middle School tour:</p>' +
+        '<table style="' + TABLE_STYLE_ + '">' +
+        '<tr><th style="' + TH_ + '">Student</th><th style="' + TH_ + '">Out of class</th>' +
+        '<th style="' + TH_ + '">Class</th><th style="' + TH_ + '">Tour job</th></tr>' +
+        out.map(function (r) {
+          return '<tr><td style="' + TD_ + '">' + escapeHtml_(r.student) + '</td>' +
+            '<td style="' + TD_ + '">' + escapeHtml_(r.away) + '</td>' +
+            '<td style="' + TD_ + '">' + escapeHtml_(r.what) + '</td>' +
+            '<td style="' + TD_ + '">' + escapeHtml_(r.job) + '</td></tr>';
+        }).join('') + '</table>');
+    }
+
+    if (arriving.length) {
+      const many = arriving.length > 1;
+      const handedOn = arriving.filter(function (r) { return r.passed; });
+      parts.push('<p><b>' + (many ? 'Prospective students are' : 'A prospective student is') +
+        ' coming into your class ' + escapeHtml_(when.body) + '.</b> They are at the ' +
+        'end of a Middle School tour. They arrive at about ' + escapeHtml_(handoff) +
+        ', and are taken down to the cafeteria at ' + escapeHtml_(endsAt) + '.</p>' +
+        (handedOn.length
+          ? '<p>The tour guide hands them over at your door and goes back to their own ' +
+            'class, so the student in the third column is the one looking after them.</p>'
+          : '') +
+        '<table style="' + TABLE_STYLE_ + '">' +
+        '<tr><th style="' + TH_ + '">Visiting student</th>' +
+        '<th style="' + TH_ + '">Brought up by</th>' +
+        '<th style="' + TH_ + '">Sitting with</th></tr>' +
+        arriving.map(function (r) {
+          // Where nobody was handed anything, the guides who walk them up
+          // are the ones who stay with them, so the second column would
+          // only repeat the first.
+          return '<tr><td style="' + TD_ + '">' + escapeHtml_(r.visitor) + '</td>' +
+            '<td style="' + TD_ + '">' + escapeHtml_(r.from) + '</td>' +
+            '<td style="' + TD_ + '">' +
+            (r.passed ? escapeHtml_(r.to) : 'the same') + '</td></tr>';
+        }).join('') + '</table>');
+    }
+
+    if (hosting.length) {
+      const many = hosting.length > 1;
+      parts.push('<p><b>' + (many ? 'Prospective students are' : 'A prospective student is') +
+        ' joining your class ' + escapeHtml_(when.body) + '</b>, at the end of a Middle ' +
+        'School tour. Their tour guides bring them up at about ' + escapeHtml_(handoff) +
+        ', and the 5th grader below walks them down to the cafeteria at ' +
+        escapeHtml_(endsAt) + '.</p>' +
+        '<table style="' + TABLE_STYLE_ + '">' +
+        '<tr><th style="' + TH_ + '">Visiting student</th>' +
+        '<th style="' + TH_ + '">Sitting with</th><th style="' + TH_ + '">Room</th></tr>' +
+        hosting.map(function (r) {
+          return '<tr><td style="' + TD_ + '">' + escapeHtml_(r.visitor) + '</td>' +
+            '<td style="' + TD_ + '">' + escapeHtml_(r.student) + '</td>' +
+            '<td style="' + TD_ + '">' + escapeHtml_(r.room) + '</td></tr>';
+        }).join('') + '</table>');
+    }
+    if (!parts.length) return;
+
+    const visitorsToo = arriving.length || hosting.length;
     const html = '<div style="' + MAIL_STYLE_ + '">' +
-      '<p>Hi ' + escapeHtml_(e.name) + ',</p>' +
-      '<p>' + (many ? 'Prospective students are' : 'A prospective student is') +
-      ' joining your class ' + escapeHtml_(when.body) + ', at the end of a Middle School tour. ' +
-      'Their tour guides bring them up at about ' + escapeHtml_(handoff) +
-      ', and the 5th grader below walks them down to the cafeteria at ' +
-      escapeHtml_(endsAt) + '.</p>' +
-      '<table style="' + TABLE_STYLE_ + '">' +
-      '<tr><th style="' + TH_ + '">Visiting student</th>' +
-      '<th style="' + TH_ + '">Sitting with</th><th style="' + TH_ + '">Room</th></tr>' +
-      body + '</table>' +
-      '<p>Nothing is needed from you beyond a seat.<br>' + escapeHtml_(senderName) + '</p></div>';
-    if (!sampleAllows_('host teacher')) return;
-    sendMail_(email,
-      'Student Visitor in Your Class - ' + when.subject, html);
-    hostsSent++;
+      '<p>Hi ' + escapeHtml_(e.name) + ',</p>' + parts.join('') +
+      (visitorsToo && !out.length
+        ? '<p>Nothing is needed from you beyond a seat.<br>'
+        : '<p>Thank you!<br>') +
+      escapeHtml_(senderName) + '</p></div>';
+
+    const subject = (out.length && visitorsToo)
+      ? 'Your Class and the Middle School Tour - ' + when.subject
+      : (out.length
+          ? 'Student Out of Your Class - ' + when.subject
+          : 'Student Visitor in Your Class - ' + when.subject);
+
+    // A test shows one of each shape rather than one in total: a class
+    // losing a student, a class gaining a visitor, and one doing both.
+    const shape = (out.length ? 'out' : '') + (arriving.length ? '+in' : '') +
+      (hosting.length ? '+host' : '');
+    if (!sampleAllowsJobs_('class teacher',
+      out.map(function (r) { return r.job; }).concat([shape]))) return;
+    sendMail_(email, subject, html);
+    teachersSent++;
+    if (arriving.length) landingSent++;
+    if (hosting.length) hostsSent++;
   });
 
   return {
@@ -6534,15 +6552,22 @@ function api_sendEveryEmail(dateStr, onlyDay) {
   };
   say(stu.sent, 'to ambassadors');
   say(tea.advisorsSent, 'to advisors');
-  say(tea.teachersSent, 'to the teachers whose class they walk out of');
-  say(tea.landingSent, 'to the teachers whose class they walk into');
-  say(tea.hostsSent, 'to the 5th grade host teachers');
+  say(tea.teachersSent, 'to class teachers');
+  // These two are not messages of their own: a teacher hears once, and
+  // these say how many of those emails also covered a visitor arriving.
+  if (tea.landingSent) {
+    lines.push('(' + tea.landingSent + ' of those also cover a visitor coming in)');
+  }
+  if (tea.hostsSent) {
+    lines.push('(' + tea.hostsSent + ' of those are a 5th grade class visit)');
+  }
 
-  const total = ['sent', 'advisorsSent', 'teachersSent', 'landingSent', 'hostsSent']
-    .reduce(function (n, k) {
-      return n + (typeof stu[k] === 'number' ? stu[k] : 0) +
-        (typeof tea[k] === 'number' ? tea[k] : 0);
-    }, 0);
+  // Only the three that are one email each, or the count double-counts a
+  // merged email and stops matching what really went.
+  const total = ['sent', 'advisorsSent', 'teachersSent'].reduce(function (n, k) {
+    return n + (typeof stu[k] === 'number' ? stu[k] : 0) +
+      (typeof tea[k] === 'number' ? tea[k] : 0);
+  }, 0);
 
   return {
     combined: true,
