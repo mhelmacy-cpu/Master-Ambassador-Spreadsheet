@@ -50,11 +50,21 @@ The applications are kept on a tab per grade band, and those names
 already say which grades they hold, so **the tab name is the setting**.
 There is nothing to fill in.
 
-    a tab called 5-8th      takes grades 5, 6, 7 and 8
-    a tab called 1-4th      takes grades 1, 2, 3 and 4
-    a tab called K-4        starts at kindergarten
-    Middle School           the same as 5-8th
-    Lower School            the same as PK-4
+    Pre-K       takes pre-kindergarten and nothing else
+    K           takes kindergarten and nothing else
+    1-4th       takes grades 1, 2, 3 and 4
+    5-8th       takes grades 5, 6, 7 and 8
+
+A tab for a single year is a band of one, so `Pre-K` and `K` sit beside
+the ranges and each take only their own. `PreK`, `PK` and the spelled out
+`Pre-Kindergarten` all read the same, and so do `K` and `Kindergarten`.
+
+Where bands overlap, the narrower one wins: with both a `K` tab and a
+`Lower School` tab, a kindergarten applicant goes to `K`.
+
+A tab whose name says nothing about grades takes nobody automatically,
+which is what keeps a `Notes` tab out of it. A year in a title is not a
+band either, so `Archive 2025-2026` is left alone.
 
 Each applicant goes to the tab whose band covers the grade in
 **App. Grade**. A paste holding both 5-8th and LS applicants sorts itself

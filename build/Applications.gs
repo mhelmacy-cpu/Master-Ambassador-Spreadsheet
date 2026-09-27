@@ -1,7 +1,7 @@
 /**
  * Ravenna paste, formatted into the applications sheet.
  *
- * PASTED IN FULL? This file is 1706 lines. Scroll to the bottom of the
+ * PASTED IN FULL? This file is 1727 lines. Scroll to the bottom of the
  * editor: the last line should read END OF FILE. If it does not, the
  * paste was cut short, and nothing will work until it is pasted again.
  *
@@ -247,7 +247,7 @@ function pasteGrid_(text) {
  * guess. Bump it on every change that goes to her, or it is worse than
  * useless: it says the fix is in when it is not.
  */
-const APP_VERSION_ = 'v10';
+const APP_VERSION_ = 'v11';
 
 const APP_MAP_KEY_ = 'ravennaColumnMap';
 
@@ -1168,12 +1168,18 @@ function tidyFormatting() {
  * to the one chosen in the dialog and the dialog says so.
  * ========================================================= */
 
-/** K is 0 and PreK is below it, so bands can be compared as numbers. */
+/**
+ * A grade as a number, so bands can be compared.
+ *
+ * K is 0 and everything before it is below that, which keeps the order
+ * right without a special case anywhere else. Spelled out or
+ * abbreviated, both are read.
+ */
 function gradeNumber_(v) {
   const t = norm_(v);
   if (!t) return null;
-  if (/^(pre-?k|p-?k|t-?k)/.test(t)) return -1;
-  if (/^k(\b|$)/.test(t)) return 0;
+  if (/^(pre[-\s]?k|p-?k|t-?k|transitional)/.test(t)) return -1;
+  if (/^(k(\b|$)|kindergarten)/.test(t)) return 0;
   const m = /(\d{1,2})/.exec(t);
   return m ? Number(m[1]) : null;
 }
@@ -1189,13 +1195,28 @@ function gradeNumber_(v) {
 function tabGradeRange_(name) {
   const t = norm_(name);
   const one = '(pre-?k|p-?k|t-?k|k|\\d{1,2})';
-  const m = new RegExp(one + '\\s*(?:st|nd|rd|th)?\\s*(?:-|to|through|thru)\\s*' +
-    one + '\\s*(?:st|nd|rd|th)?').exec(t);
+  const ord = '\\s*(?:st|nd|rd|th)?';
+
+  // A band of several years: "5-8th", "1-4", "K-4", "PK through 4". The
+  // guards either side keep a year in a title, like "2025-2026", out.
+  const m = new RegExp('(?:^|[^0-9a-z])' + one + ord +
+    '\\s*(?:-|to|through|thru)\\s*' + one + ord + '(?:[^0-9a-z]|$)').exec(t);
   if (m) {
     const lo = gradeNumber_(m[1]);
     const hi = gradeNumber_(m[2]);
     if (lo !== null && hi !== null && lo <= hi) return { lo: lo, hi: hi };
   }
+
+  // A tab for one year only, which is a band of one: a K tab and a
+  // Pre-K tab sit beside 1-4th and 5-8th and take only their own.
+  if (/^pre[-\s]?k(indergarten)?$/.test(t)) return { lo: -1, hi: -1 };
+  if (/^(k|kindergarten)$/.test(t)) return { lo: 0, hi: 0 };
+  const single = new RegExp('^' + one + ord + '(?:\\s*grade(?:rs)?)?$').exec(t);
+  if (single) {
+    const g = gradeNumber_(single[1]);
+    if (g !== null) return { lo: g, hi: g };
+  }
+
   if (/\bmiddle\b/.test(t)) return { lo: 5, hi: 8 };
   if (/\blower\b/.test(t)) return { lo: -1, hi: 4 };
   if (/\bupper\b|\bhigh\b/.test(t)) return { lo: 9, hi: 12 };
