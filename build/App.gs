@@ -55,6 +55,16 @@ HEADERS[SHEETS.ELIGIBILITY] = ['Ambassador', 'Panelist', 'Lobby Greeter', 'Table
 HEADERS[SHEETS.TEACHERS] = ['Teacher Name', 'Initials', 'Teacher Email', 'Room / Notes'];
 HEADERS[SHEETS.BELL] = ['Day', 'Grade', 'Homeroom', 'Split', 'Start', 'End',
   'What / Teacher / Room'];
+
+/* One schedule sheet per grade, because one sheet for all four is too long
+ * to read. Every row is one split group at one block, so 6B's day reads
+ * straight down with nothing left blank to work out. */
+const BELL_GRADES_ = ['5', '6', '7', '8'];
+function bellSheet_(grade) { return SHEETS.BELL + ' ' + grade; }
+BELL_GRADES_.forEach(function (g) {
+  HEADERS[bellSheet_(g)] = ['Day', 'Grade', 'Homeroom', 'Split', 'Start', 'End',
+    'What / Teacher / Room'];
+});
 HEADERS[SHEETS.ROUTES] = ['Route', 'Direction', 'Humanities Teacher', 'Language', 'Itinerary'];
 HEADERS[SHEETS.BUDDIES] = ['Student', 'Gender', 'Language', 'Teacher', 'Room', 'Can Host a Visitor'];
 HEADERS[SHEETS.SETTINGS] = ['Setting', 'Value'];
@@ -439,15 +449,20 @@ function setupSpreadsheet() {
   // has gone missing - otherwise every lookup below falls back to the
   // order this script expects, which may not be hers.
   const repaired = [];
-  Object.keys(SHEETS).forEach(function (k) {
-    repairHeaders_(SHEETS[k]).forEach(function (h) {
-      repaired.push(h + ' on ' + SHEETS[k]);
+  Object.keys(SHEETS).map(function (k) { return SHEETS[k]; })
+    .concat(BELL_GRADES_.map(bellSheet_))
+    .forEach(function (name) {
+      repairHeaders_(name).forEach(function (h) { repaired.push(h + ' on ' + name); });
     });
-  });
 
   const before = ss_().getSheetByName(SHEETS.AMBASSADORS);
   const firstRun = !before || before.getLastRow() < 2;
-  Object.keys(SHEETS).forEach(function (k) { sheet_(SHEETS[k]); });
+  // Every sheet but the old single Bell Schedule, which the four
+  // per-grade ones replace. Hers is left alone where she still has it,
+  // and an empty one is never made.
+  Object.keys(SHEETS).forEach(function (k) {
+    if (SHEETS[k] !== SHEETS.BELL) sheet_(SHEETS[k]);
+  });
 
   // These are added to a sheet however old it is, because they are new
   // columns rather than formatting. Nothing else about the sheet changes.
@@ -505,14 +520,15 @@ function setupSpreadsheet() {
   setupTeachers_();
   const toppedUp = topUpTeachers_();
   if (toppedUp) added.push(toppedUp + ' teacher initials filled in');
-  setupBellSchedule_();
+  const bells = setupBellSchedules_();
+  if (bells.length) added.push(bells.join(', '));
   setupRoutes_();
   setupSettings_();
 
   if (firstRun) {
     const order = [SHEETS.PROSPECTIVE, SHEETS.TRACKER, SHEETS.AMBASSADORS, SHEETS.ELIGIBILITY,
         SHEETS.JOBS, SHEETS.APART, SHEETS.BUDDIES, SHEETS.TEACHERS, SHEETS.ROUTES,
-        SHEETS.BELL, SHEETS.SETTINGS];
+        SHEETS.SETTINGS].concat(BELL_GRADES_.map(bellSheet_));
     order.forEach(function (name, i) {
       const s = ss_().getSheetByName(name);
       if (s) ss_().setActiveSheet(s).moveActiveSheet(i + 1);
@@ -1025,34 +1041,142 @@ function setupTeachers_() {
   s.autoResizeColumns(1, h.length);
 }
 
-function setupBellSchedule_() {
-  const s = sheet_(SHEETS.BELL);
-  const fresh = s.getLastRow() < 2;
-  if (fresh) {
-    const rows = [];
-    SCHEDULE_DAYS_.forEach(function (day) {
-      PODS.forEach(function (pod) {
-        (BELL_SCHEDULE_[day][pod] || []).forEach(function (e) {
-          rows.push([day, POD_GRADE_[pod] || '', pod, splitLetterOf_(e[2]),
-            e[0], e[1], e[2]]);
+/** A time cell, however it is stored, written back as 8:15. */
+function clockText_(v) {
+  if (v instanceof Date) {
+    return v.getHours() + ':' + ('0' + v.getMinutes()).slice(-2);
+  }
+  return trim_(v);
+}
+
+/**
+ * Every block on the timetable before it is split into groups:
+ * day -> homeroom -> [{split, start, end, what}], the split letter blank
+ * where the whole homeroom goes together.
+ *
+ * Her own Bell Schedule sheet is read first where she still has one, so
+ * corrections made there are carried into the per-grade sheets. Failing
+ * that it comes from the copy in Data.gs.
+ */
+function bellSource_() {
+  const out = {};
+  const add = function (day, pod, split, start, end, what) {
+    if (!day || !pod || !trim_(what)) return;
+    if (!out[day]) out[day] = {};
+    if (!out[day][pod]) out[day][pod] = [];
+    out[day][pod].push({ split: split, start: start, end: end, what: what });
+  };
+  const old = ss_().getSheetByName(SHEETS.BELL);
+  if (old && old.getLastRow() > 1) {
+    const N = SHEETS.BELL;
+    rows_(N).forEach(function (r) {
+      const what = trim_(r[col_(N, 'What / Teacher / Room')]);
+      add(trim_(r[col_(N, 'Day')]), trim_(r[col_(N, 'Homeroom')]).toUpperCase(),
+        splitLetter_(r[col_(N, 'Split')]) || splitLetterOf_(what),
+        clockText_(r[col_(N, 'Start')]), clockText_(r[col_(N, 'End')]), what);
+    });
+    return out;
+  }
+  SCHEDULE_DAYS_.forEach(function (day) {
+    PODS.forEach(function (pod) {
+      (BELL_SCHEDULE_[day][pod] || []).forEach(function (e) {
+        add(day, pod, splitLetterOf_(e[2]), e[0], e[1], e[2]);
+      });
+    });
+  });
+  return out;
+}
+
+/** The split letters a grade actually runs, off its own blocks. */
+function bellLetters_(grade, src) {
+  const pods = GRADE_PODS_[grade] || [];
+  const letters = [];
+  SCHEDULE_DAYS_.forEach(function (day) {
+    pods.forEach(function (pod) {
+      (((src[day] || {})[pod]) || []).forEach(function (b) {
+        const L = splitLetter_(b.split);
+        if (L && letters.indexOf(L) === -1) letters.push(L);
+      });
+    });
+  });
+  return letters.sort();
+}
+
+/**
+ * One grade's sheet: a row for every split group at every block, so a
+ * student's day reads straight down with nothing left blank.
+ *
+ * A student's day is the blocks their own homeroom attends together plus
+ * the blocks their split letter attends. The lettered ones are printed
+ * under whichever homeroom column the school chose, but they belong to
+ * the whole grade, so they are repeated under each homeroom here: 6A in
+ * AOS does the same Math A as 6A in DJM.
+ */
+function bellRowsFor_(grade, src) {
+  const pods = GRADE_PODS_[grade] || [];
+  if (!pods.length) return [];
+  const letters = bellLetters_(grade, src);
+  const groups = letters.length ? letters : [''];
+
+  const rows = [];
+  pods.forEach(function (pod) {
+    groups.forEach(function (letter) {
+      SCHEDULE_DAYS_.forEach(function (day) {
+        const mine = [];
+        (((src[day] || {})[pod]) || []).forEach(function (b) {
+          if (!splitLetter_(b.split)) mine.push(b);
+        });
+        if (letter) {
+          pods.forEach(function (other) {
+            (((src[day] || {})[other]) || []).forEach(function (b) {
+              if (splitLetter_(b.split) === letter) mine.push(b);
+            });
+          });
+        }
+        mine.sort(function (a, b) {
+          const x = toMinutes_(a.start), y = toMinutes_(b.start);
+          return (x == null ? 0 : x) - (y == null ? 0 : y);
+        });
+        mine.forEach(function (b) {
+          rows.push([day, grade, pod, letter, b.start, b.end, b.what]);
         });
       });
     });
-    s.getRange(2, 1, rows.length, HEADERS[SHEETS.BELL].length).setValues(rows);
-  }
-  if (!fresh) return;
-  note_(s, SHEETS.BELL, 'Split',
-    'Filled in where the block belongs to a split group rather than the whole ' +
-    'homeroom - that is what the section letter in "Math A" or "Science C" means. ' +
-    'Blank means the whole homeroom attends together.');
-  note_(s, SHEETS.BELL, 'What / Teacher / Room',
-    'Read off the 2026-27 schedule. Correct anything here and the lookups ' +
-    'follow this sheet, not the code.');
-  note_(s, SHEETS.BELL, 'Grade',
-    'Which grade that homeroom belongs to, filled in from the homeroom so the ' +
-    'two can never disagree.');
-  s.setColumnWidth(col_(SHEETS.BELL, 'What / Teacher / Room') + 1, 420);
-  s.autoResizeColumns(1, 6);
+  });
+  return rows;
+}
+
+/** Builds any per-grade schedule sheet that is not there yet. */
+function setupBellSchedules_() {
+  const src = bellSource_();
+  const made = [];
+  BELL_GRADES_.forEach(function (g) {
+    const name = bellSheet_(g);
+    const s = sheet_(name);
+    if (s.getLastRow() > 1) return;              // hers already: left alone
+    const rows = bellRowsFor_(g, src);
+    if (!rows.length) return;
+    const width = HEADERS[name].length;
+    // Plain text, so 8:15 stays 8:15 instead of becoming a date.
+    s.getRange(2, col_(name, 'Start') + 1, rows.length, 2).setNumberFormat('@');
+    s.getRange(2, 1, rows.length, width).setValues(rows);
+    note_(s, name, 'Split',
+      'Which split group this row is for. Filter Homeroom and Split to one ' +
+      'student\'s pair of letters and the whole week reads down the sheet in order.\n\n' +
+      'A block the whole homeroom attends together is written out once for each ' +
+      'group, so nothing is ever blank. Correcting one of those means correcting ' +
+      'the same row under each letter.');
+    note_(s, name, 'Homeroom',
+      'The student\'s own homeroom. Blocks taught in split groups run across the ' +
+      'whole grade, so they appear under every homeroom in it.');
+    note_(s, name, 'What / Teacher / Room',
+      'Read off the 2026-27 schedule. Correct anything here and the lookups ' +
+      'follow this sheet, not the code.');
+    s.setColumnWidth(col_(name, 'What / Teacher / Room') + 1, 420);
+    s.autoResizeColumns(1, 6);
+    made.push(name);
+  });
+  return made;
 }
 
 function setupRoutes_() {
@@ -1164,6 +1288,10 @@ function refreshCounts_() {
 /** The Grade column on a Bell Schedule made before it existed. */
 function ensureBellGrade_() {
   const N = SHEETS.BELL;
+  // Only where she still has that sheet. A fresh spreadsheet gets the
+  // per-grade sheets instead, and no empty one of these.
+  const had = ss_().getSheetByName(N);
+  if (!had || had.getLastRow() < 2) return false;
   if (!ensureColumn_(N, 'Grade')) return false;
   const s = sheet_(N);
   const at = col_(N, 'Grade');
@@ -1378,8 +1506,15 @@ function teachersByName_() {
 }
 
 /**
- * The bell schedule, preferring the sheet so hand corrections stick and
- * falling back to Data.gs before setup has run.
+ * The bell schedule: the per-grade sheets first, so hand corrections
+ * stick, then the single Bell Schedule sheet if she still has one, then
+ * the copy in Data.gs before setup has ever run.
+ *
+ * `expanded` says which shape came back. The per-grade sheets hold a row
+ * per split group, already tied to the student's own homeroom. The two
+ * older sources hold a row per block, where a lettered block belongs to
+ * the whole grade whichever homeroom column it was printed under, so it
+ * has to be matched across all of them.
  */
 function bellSchedule_() {
   return cached_('bell', function () {
@@ -1390,17 +1525,32 @@ function bellSchedule_() {
       if (!out[day][pod]) out[day][pod] = [];
       out[day][pod].push({ split: split, start: start, end: end, what: what });
     };
+
+    // By header name throughout, so a column added to the left of these
+    // moves nothing that reads them.
+    let expanded = false;
+    BELL_GRADES_.forEach(function (g) {
+      const N = bellSheet_(g);
+      const sheet = ss_().getSheetByName(N);
+      if (!sheet || sheet.getLastRow() < 2) return;
+      expanded = true;
+      rows_(N).forEach(function (r) {
+        add(trim_(r[col_(N, 'Day')]), trim_(r[col_(N, 'Homeroom')]).toUpperCase(),
+          splitLetter_(r[col_(N, 'Split')]), r[col_(N, 'Start')], r[col_(N, 'End')],
+          trim_(r[col_(N, 'What / Teacher / Room')]));
+      });
+    });
+    if (expanded) return { byDay: out, expanded: true };
+
     const sheet = ss_().getSheetByName(SHEETS.BELL);
     if (sheet && sheet.getLastRow() > 1) {
-      // By header name, so a column added to the left of these moves
-      // nothing that reads them.
       const N = SHEETS.BELL;
       rows_(N).forEach(function (r) {
         add(trim_(r[col_(N, 'Day')]), trim_(r[col_(N, 'Homeroom')]),
           splitLetter_(r[col_(N, 'Split')]), r[col_(N, 'Start')], r[col_(N, 'End')],
           trim_(r[col_(N, 'What / Teacher / Room')]));
       });
-      return out;
+      return { byDay: out, expanded: false };
     }
     SCHEDULE_DAYS_.forEach(function (day) {
       PODS.forEach(function (pod) {
@@ -1409,7 +1559,7 @@ function bellSchedule_() {
         });
       });
     });
-    return out;
+    return { byDay: out, expanded: false };
   });
 }
 
@@ -1424,16 +1574,38 @@ function bellSchedule_() {
 function classesMissed_(pod, split, grade, dateVal, startMin, endMin) {
   const day = WEEKDAYS_[dateVal.getDay()];
   const schedule = bellSchedule_();
-  if (!schedule[day]) return [];
+  const byDay = schedule.byDay;
+  if (!byDay[day]) return [];
 
   const myGrade = grade || POD_GRADE_[pod] || '';
-  const columns = GRADE_PODS_[myGrade] || (pod ? [pod] : []);
+  // A row on the per-grade sheets is already this student's own homeroom.
+  // On the older single sheet a lettered block has to be looked for in
+  // every homeroom column of the grade.
+  const columns = schedule.expanded ? (pod ? [pod] : [])
+    : (GRADE_PODS_[myGrade] || (pod ? [pod] : []));
   const mySplit = splitLetter_(split);
+
+  // No Split on file, against sheets that hold a row per group: every
+  // group's rows are sitting there and there is no telling which is
+  // theirs. The ones all the groups share are identical, so they collapse
+  // to one; what is left differs by group and comes back needing her.
+  const oneOfEach = function (list) {
+    const seen = {}, kept = [];
+    list.forEach(function (b) {
+      const key = String(b.start) + '|' + String(b.end) + '|' + norm_(b.what);
+      if (seen[key]) return;
+      seen[key] = true;
+      kept.push(b);
+    });
+    return kept;
+  };
   const byInitials = teachersByInitials_();
   const found = [];
 
   columns.forEach(function (column) {
-    (schedule[day][column] || []).forEach(function (b) {
+    let blocks = byDay[day][column] || [];
+    if (schedule.expanded && !mySplit) blocks = oneOfEach(blocks);
+    blocks.forEach(function (b) {
       const s = toMinutes_(b.start);
       const e = toMinutes_(b.end);
       if (s == null || e == null || !(s < endMin && startMin < e)) return;
@@ -1443,7 +1615,7 @@ function classesMissed_(pod, split, grade, dateVal, startMin, endMin) {
       if (letter) {
         // A split-group block. Only this student's own letter counts.
         if (!mySplit) {
-          if (column !== pod) return;            // no split on file: fall back to their column
+          if (!schedule.expanded && column !== pod) return;
         } else if (letter !== mySplit) {
           return;
         }
@@ -2478,6 +2650,21 @@ function setupWarnings_(all, visitors) {
   missing('pod', 'Homeroom');
   missing('email', 'Student Email - they will not be told they are on duty');
   missing('advisor', 'Advisor - their advisor will not be told');
+
+  // The single Bell Schedule sheet, still sitting there after the
+  // per-grade ones have taken over. Nothing reads it any more, and a
+  // correction made on it would look like it had worked.
+  const oldBell = ss_().getSheetByName(SHEETS.BELL);
+  const newBell = BELL_GRADES_.filter(function (g) {
+    const sh = ss_().getSheetByName(bellSheet_(g));
+    return sh && sh.getLastRow() > 1;
+  });
+  if (oldBell && oldBell.getLastRow() > 1 && newBell.length) {
+    w.push('The old "' + SHEETS.BELL + '" sheet is still there, and nothing reads it now - ' +
+      newBell.join(', ') + ' took over, and anything you have corrected on the old one was ' +
+      'carried across when they were built. Correcting it again would change nothing, so ' +
+      'delete it once you are happy with the new ones.');
+  }
 
   // A blank Race cell reads as neither, so that ambassador can never
   // satisfy the student of color rule and never trips the two-of-them

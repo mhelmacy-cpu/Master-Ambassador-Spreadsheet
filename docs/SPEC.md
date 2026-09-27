@@ -197,7 +197,8 @@ wrong year. It swaps anyway. The decision is hers; the note is so she
 sees what she has done.
 
 ### Reference sheets
-Bell Schedule, Teachers, Tour Routes, Settings.
+Bell Schedule 5, Bell Schedule 6, Bell Schedule 7, Bell Schedule 8,
+Teachers, Tour Routes, Settings.
 
 Jobs also carries `Out of Class From` and `Out of Class To` - how long
 each job really keeps somebody away, which is not the length of the
@@ -229,6 +230,36 @@ Each pod column carries exactly one letter all week (DJM=A, AOS=B, CCM=C,
 EEL=A, MSB=B, CJM=A, RSS=B), which is what makes the column look like the
 pod until you check a student whose split differs from it. Sixteen of the
 thirty rostered ambassadors are that case.
+
+### The schedule sheets
+
+One sheet per grade: **Bell Schedule 5** through **Bell Schedule 8**,
+columns `Day | Grade | Homeroom | Split | Start | End | What / Teacher /
+Room`. Grade holds the number (`6`), Split the letter (`B`).
+
+A row is one split group at one block, and nothing is left blank. So
+filtering Homeroom to AOS and Split to B gives 6B-in-AOS's whole week,
+in order, about fifty rows, with nothing to work out. Two consequences:
+
+- A block taught in split groups belongs to the whole grade, so it is
+  repeated under each homeroom in that grade. 6A in AOS does the same
+  `Math A` as 6A in DJM, even though the school prints it under DJM.
+- A block the whole homeroom attends together is written out once per
+  group, so correcting one means correcting it under each letter.
+
+Total rows are higher than the single sheet was (104 / 441 / 200 / 200
+against 403), because of that repetition. The point is that no one sheet
+holds another grade, and any one student's week is a filter away.
+
+First-Time Setup builds a grade's sheet only when it is not there or is
+empty, so nothing she has typed is ever overwritten. Where the old single
+`Bell Schedule` sheet still exists, its rows are the source it builds
+from, so corrections made there carry across. After that nothing reads
+the old sheet, and the staffing dialog says so until she deletes it.
+
+A student with no Split on file cannot be placed in a group, so every
+version of the block comes back marked as needing her rather than one of
+them being guessed at.
 
 ### Staffing again after a late sign-up
 
