@@ -536,7 +536,9 @@ function setupSpreadsheet() {
     ss_().setActiveSheet(ss_().getSheetByName(SHEETS.PROSPECTIVE));
   }
 
-  alert_((added.length ? 'Added: ' + added.join(', ') + '.\n\n' : '') +
+  alert_((bells.length ? 'New tabs, at the right-hand end of the row: ' +
+      bells.join(', ') + '.\n\n' : '') +
+    (added.length ? 'Added: ' + added.join(', ') + '.\n\n' : '') +
     (firstRun ? 'Setup complete.' :
     'Setup checked over. Everything already there was left exactly as it was - ' +
     'no columns resized, no formatting changed.') + '\n\n' +
@@ -1150,6 +1152,7 @@ function bellRowsFor_(grade, src) {
 function setupBellSchedules_() {
   const src = bellSource_();
   const made = [];
+  const built = [];
   BELL_GRADES_.forEach(function (g) {
     const name = bellSheet_(g);
     const s = sheet_(name);
@@ -1175,7 +1178,20 @@ function setupBellSchedules_() {
     s.setColumnWidth(col_(name, 'What / Teacher / Room') + 1, 420);
     s.autoResizeColumns(1, 6);
     made.push(name);
+    built.push(s);
   });
+
+  // Google puts a new tab at the end of the strip, which on a workbook
+  // with a dozen of them is off the right-hand edge and looks like
+  // nothing happened. Put them together in grade order and leave her
+  // looking at the first one.
+  if (built.length) {
+    const total = ss_().getSheets().length;
+    built.forEach(function (s, i) {
+      ss_().setActiveSheet(s).moveActiveSheet(total - built.length + i + 1);
+    });
+    ss_().setActiveSheet(built[0]);
+  }
   return made;
 }
 
