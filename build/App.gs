@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-27 q';
+var BUILD_ = '2026-09-27 r';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -54,7 +54,7 @@ HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'School', 'Grade', 'Gender',
   'Class Visit To', 'Pass Off', 'Notes'];
 HEADERS[SHEETS.APART] = ['Ambassador', 'And', 'Notes'];
 HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route',
-  'Showed Up', 'Notes'];
+  'Class Visit', 'Showed Up', 'Notes'];
 var CLASS_VISIT_WITH_GUIDE = 'With tour guide';
 HEADERS[SHEETS.JOBS] = ['Job Name', 'Description', 'Active', 'Out of Class From', 'Out of Class To'];
 HEADERS[SHEETS.ELIGIBILITY] = ['Ambassador', 'Panelist', 'Lobby Greeter', 'Table Greeter', 'Tour Guide'];
@@ -513,6 +513,9 @@ function setupSpreadsheet() {
   COUNT_COLUMNS_.forEach(function (h) {
     if (ensureColumn_(SHEETS.AMBASSADORS, h)) added.push(h + ' on Ambassadors');
   });
+  if (ensureColumn_(SHEETS.TRACKER, 'Class Visit')) {
+    added.push('Class Visit on Tour Tracker');
+  }
   if (ensureColumn_(SHEETS.TRACKER, 'Showed Up', YES_NO)) {
     added.push('Showed Up on Tour Tracker');
   }
@@ -691,6 +694,11 @@ function setupTracker_() {
     .setNumberFormat('yyyy-mm-dd');
   note_(s, SHEETS.TRACKER, 'Prospective Student(s)',
     'Who this ambassador guided. Blank for greeters and panelists.');
+  note_(s, SHEETS.TRACKER, 'Class Visit',
+    'Where this row\'s family goes at the end, written by the script.\n\n' +
+    'A guide reads "Takes them to Math in M311" or, where the family is ' +
+    'handed to somebody else, "PASS OFF to Jane Moss". That student has a ' +
+    'row of their own saying "Given Robin Visitor in Math in M311".');
   note_(s, SHEETS.TRACKER, 'Job',
     'Staffing writes the guides and greeters. Add panelists here yourself - ' +
     'type the row and they are counted like any other job.');
@@ -3170,6 +3178,62 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
   }
   clearReadCache_();
   refreshCounts_();
+
+  /* Where each row's family ends up, written onto the row itself, so the
+   * tracker says what is happening without her having to hold the
+   * Prospective Students sheet beside it. Only the rows it means
+   * anything for: a greeter is not taking anybody anywhere. */
+  const cvCol = optionalCol_(N, 'Class Visit');
+  if (cvCol !== -1) {
+    const buddyOf = {};
+    plan.pairs.forEach(function (p) {
+      if (p.buddy) buddyOf[norm_(p.visitor.name)] = p.buddy;
+    });
+    // Who is guiding each family, so a guide who is not the one walking
+    // them in is told that rather than being read as the one who is.
+    const guidesOf = {};
+    rows_(N).forEach(function (r) {
+      if (!sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal)) return;
+      if (trim_(r[col_(N, 'Job')]) !== JOBS.GUIDE) return;
+      const k = norm_(r[col_(N, 'Prospective Student(s)')]);
+      (guidesOf[k] = guidesOf[k] || []).push(trim_(r[col_(N, 'Ambassador')]));
+    });
+    rows_(N).forEach(function (r, i) {
+      if (!sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal)) return;
+      const job = trim_(r[col_(N, 'Job')]);
+      const who = trim_(r[col_(N, 'Ambassador')]);
+      const visitor = trim_(r[col_(N, 'Prospective Student(s)')]);
+      const b = buddyOf[norm_(visitor)];
+      const c = landing[norm_(visitor)];
+      let say = '';
+      if (job === JOBS.BUDDY && b) {
+        say = b.language + ' with ' + b.teacher + ' in ' + b.room;
+      } else if (job === JOBS.PASSOFF && c && c.where) {
+        say = 'Given ' + visitor + ' in ' + c.where.label;
+      } else if (job === JOBS.GUIDE) {
+        if (b) {
+          say = 'Hands over to ' + b.name + ' - ' + b.language + ' in ' + b.room;
+        } else if (c && c.where) {
+          const mine = c.takers.some(function (n) { return norm_(n) === norm_(who); });
+          const pair = guidesOf[norm_(visitor)] || [];
+          const passed = !c.takers.some(function (n) {
+            return pair.some(function (g) { return norm_(g) === norm_(n); });
+          });
+          if (mine) {
+            say = 'Takes them to ' + c.where.label +
+              (c.where.teacher ? ' (' + c.where.teacher + ')' : '');
+          } else if (passed) {
+            say = 'PASS OFF to ' + c.takers.join(' and ') + ' - ' + c.where.label;
+          } else {
+            say = 'Goes back to class - ' + c.takers.join(' and ') + ' takes them to ' +
+              c.where.label;
+          }
+        }
+      }
+      if (say) sheet_(N).getRange(i + 2, cvCol + 1).setValue(say);
+    });
+    clearReadCache_();
+  }
 
   plan.pairs.forEach(function (p) {
     psheet.getRange(p.visitor.row, col_(P, 'Route') + 1).setValue(p.route);

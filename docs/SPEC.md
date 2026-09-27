@@ -252,6 +252,18 @@ needs Pass Off set to Yes. That is what stops a name left over from a
 guide she has since swapped out on the tracker quietly putting them back
 in charge.
 
+The Tour Tracker carries a **Class Visit** column, next to Route, saying
+on each row where that row's family goes at the end:
+
+    Tour Guide     Takes them to Math in M311 (Chantilly)
+    Tour Guide     PASS OFF to Jane Moss - Science in M307
+    Tour Guide     Goes back to class - Jane Moss takes them to Math in M311
+    Tour Guide     Hands over to Alexander Rogoff - Spanish in M209
+    Pass Off       Given Robin Visitor in Science in M307
+    Class Buddy    Spanish with Mary Katherine in M209
+
+A greeter's row is left blank, because they take nobody anywhere.
+
 Whoever is handed a family gets a **Pass Off** row on the Tour Tracker,
 so they are on the roster, in the counts and there to tick off
 afterwards. Handing the family on again moves the row; saving twice
