@@ -32,6 +32,11 @@ const SHEETS = {
   SETTINGS: 'Settings'
 };
 
+/* Bumped every time these two files change, so "Check This Script" can say
+ * which copy is in the editor. If the number it reports is not the one you
+ * were told to paste, the paste did not land. */
+const BUILD_ = '2026-09-27 h';
+
 const HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
   'Borough', 'Gender', 'Race (Presenting)', 'Light', 'Strength', 'Can Solo', 'Active',
@@ -4345,6 +4350,7 @@ function onOpen() {
     .addItem('Write an Email...', 'showWriteDialog')
     .addItem('Send Emails Now...', 'showEmailDialog')
     .addSeparator()
+    .addItem('Check This Script...', 'showCheckDialog')
     .addSubMenu(SpreadsheetApp.getUi().createMenu('Automation')
       .addItem('Turn ON reminder emails', 'enableReminders')
       .addItem('Turn OFF reminder emails', 'disableReminders'))
@@ -4880,6 +4886,73 @@ function showSwapDialog() {
     'h+="</div>";document.getElementById("msg").innerHTML=h;load();}' +
     '<\/script>';
   dialog_(html, 'Change Who Is Working', 640, 640);
+}
+
+/**
+ * What this copy of the script is and what it can see.
+ *
+ * Pasting two files by hand goes wrong quietly: a paste into the wrong
+ * file, a page left open from before, a save that did not happen. This
+ * says which build is in the editor and which tabs it found, so there is
+ * nothing to guess at.
+ */
+function api_checkScript() {
+  clearReadCache_();
+  const want = Object.keys(SHEETS).map(function (k) { return SHEETS[k]; })
+    .filter(function (n) { return n !== SHEETS.BELL; })
+    .concat(BELL_GRADES_.map(bellSheet_));
+  const tabs = ss_().getSheets().map(function (s) { return s.getName(); });
+  const rowsIn = function (name) {
+    const s = ss_().getSheetByName(name);
+    return s ? Math.max(0, s.getLastRow() - 1) : -1;
+  };
+  const sched = bellSchedule_();
+  const days = Object.keys(sched.byDay || {});
+  return {
+    build: BUILD_,
+    dataBuild: typeof DATA_BUILD_ === 'string' ? DATA_BUILD_ : 'not found',
+    tabs: tabs,
+    expected: want.map(function (n) {
+      return { name: n, rows: rowsIn(n), there: tabs.indexOf(n) !== -1 };
+    }),
+    oldBell: rowsIn(SHEETS.BELL),
+    reading: sched.expanded ? 'the per-grade sheets' :
+      (rowsIn(SHEETS.BELL) > 0 ? 'the old single Bell Schedule sheet' :
+        'the copy inside Data.gs'),
+    days: days.length
+  };
+}
+
+function showCheckDialog() {
+  const html =
+    '<style>' + DIALOG_CSS_ + '</style>' +
+    '<h2>Check this script</h2>' +
+    '<p class="sub">What is actually in the editor, and which tabs it can see. ' +
+    'Read the build against the one you were told to paste.</p>' +
+    '<div id="out"><p class="muted">Looking...</p></div>' +
+    '<script>' +
+    'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
+    'function show(p){var h="<div class=\'free\'><b>App.gs build "+esc(p.build)+"</b>' +
+    '<br>Data.gs build "+esc(p.dataBuild)+"<br>Reading the schedule from "+esc(p.reading)+' +
+    '" ("+p.days+" day(s) found).</div>";' +
+    'var miss=p.expected.filter(function(x){return !x.there;});' +
+    'if(miss.length){h+="<div class=\'warn\'><b>Tab(s) not there:</b> "+' +
+    'esc(miss.map(function(x){return x.name;}).join(", "))+"<br>Run First-Time Setup. If they ' +
+    'still do not appear, the build above is not the one you meant to paste.</div>";}' +
+    'else{h+="<div class=\'free\'>Every tab this script expects is there.</div>";}' +
+    'h+="<div class=\'panel\'>";' +
+    'p.expected.forEach(function(x){h+="<div>"+esc(x.name)+" <span class=\'muted\'>"+' +
+    '(x.there?x.rows+" row(s)":"<b>missing</b>")+"</span></div>";});' +
+    'if(p.oldBell>0){h+="<div class=\'muted\' style=\'margin-top:6px;\'>Bell Schedule ' +
+    '(the old single sheet): "+p.oldBell+" row(s), no longer read</div>";}' +
+    'h+="</div>";' +
+    'document.getElementById("out").innerHTML=h;}' +
+    'google.script.run.withSuccessHandler(show).withFailureHandler(function(e){' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+' +
+    '"</b><br>That is the error itself. Send it to me and I will trace it.</div>";})' +
+    '.api_checkScript();' +
+    '<\/script>';
+  dialog_(html, 'Check This Script', 600, 560);
 }
 
 function api_buildLockerSlips(dateStr) { return buildLockerSlips(dateStr); }

@@ -1,3 +1,7 @@
+/* Bumped when this file changes, so "Check This Script" can say which
+ * copy is in the editor. */
+const DATA_BUILD_ = '2026-09-24 a';
+
 /**
  * All the school data the scheduler runs on. Nothing in this file makes
  * a decision - it is only what the other file reads.
