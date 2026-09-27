@@ -1,6 +1,6 @@
 /* Bumped when this file changes, so "Check This Script" can say which
  * copy is in the editor. */
-const DATA_BUILD_ = '2026-09-24 a';
+var DATA_BUILD_ = '2026-09-24 a';
 
 /**
  * All the school data the scheduler runs on. Nothing in this file makes
@@ -13,7 +13,7 @@ const DATA_BUILD_ = '2026-09-24 a';
 
 /* ---------- Ambassadors: names only. Everything else is typed in. ---------- */
 
-const AMBASSADOR_NAMES_ = [
+var AMBASSADOR_NAMES_ = [
   'Aurelia Walker',
   'Lev David',
   'Laura Sandoval',
@@ -66,18 +66,18 @@ const AMBASSADOR_NAMES_ = [
  *
  */
 
-const POD_LETTER_ = {'DJM':  'A',  'AOS':  'B',  'CCM':  'C',  'EEL':  'A',  'MSB':  'B',  'CJM':  'A',  'RSS':  'B'};
-const GRADE_PODS_ = {'5':  ['MMS'],  '6':  ['DJM',  'AOS',  'CCM'],  '7':  ['EEL',  'MSB'],  '8':  ['CJM',  'RSS']};
-const POD_GRADE_ = {};
+var POD_LETTER_ = {'DJM':  'A',  'AOS':  'B',  'CCM':  'C',  'EEL':  'A',  'MSB':  'B',  'CJM':  'A',  'RSS':  'B'};
+var GRADE_PODS_ = {'5':  ['MMS'],  '6':  ['DJM',  'AOS',  'CCM'],  '7':  ['EEL',  'MSB'],  '8':  ['CJM',  'RSS']};
+var POD_GRADE_ = {};
 Object.keys(GRADE_PODS_).forEach(function (g) {
   GRADE_PODS_[g].forEach(function (p) { POD_GRADE_[p] = g; });
 });
 
-const LANGUAGE_ROOMS_ = { M207: 'French', M208: 'Mandarin', M209: 'Spanish' };
+var LANGUAGE_ROOMS_ = { M207: 'French', M208: 'Mandarin', M209: 'Spanish' };
 
 /* ---------- Teachers ---------- */
 
-const TEACHER_INITIALS_ = {
+var TEACHER_INITIALS_ = {
   'Chris': 'CK',
   'Molly': 'MD',
   'Amanda': 'AG',
@@ -102,7 +102,7 @@ const TEACHER_INITIALS_ = {
   'Mala': 'MB'
 };
 
-const EXTRA_TEACHERS_ = [
+var EXTRA_TEACHERS_ = [
   { name: 'Layla Alter', initials: 'LA', note: 'Choices.' },
   { name: 'Brian', initials: 'BR', note: 'PE.' },
   { name: 'Lila', initials: 'LL', note: 'Subbing for Eliza (EZ) through the first half of the year; the schedule lists them together, so both are emailed.' }
@@ -110,7 +110,7 @@ const EXTRA_TEACHERS_ = [
 
 /* ---------- The 2026-27 roster: 143 students ---------- */
 
-const MS_ROSTER_ = [
+var MS_ROSTER_ = [
   { name: 'Banks Bauer', email: '31BanksB@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'B' },
   { name: 'Damien Sandelowsky Weinryt', email: '31DamienS@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'B' },
   { name: 'Elias Cuaron', email: '31EliasC@lrei.org', grade: '8', pod: 'CJM', advisor: 'Chris', split: 'A' },
@@ -258,7 +258,7 @@ const MS_ROSTER_ = [
 
 /* ---------- The seven walking tour routes ---------- */
 
-const TOUR_ROUTES_ = [
+var TOUR_ROUTES_ = [
   { route: '1', direction: 'Bottom-Up', humanities: 'Elizabeth (M107)', language: 'Mandarin',
     itinerary: '8:30 Leave cafeteria to start tour\n8:32 Library\n8:34 Sports Bulletin Board (next to front desk, talk about sports)\n8:38 Co-Lab\n8:42 7th Grade Humanities - Elizabeth (M107)\n8:46 Mandarin (M208) - talk about world languages\n8:49 Art (M306)\n8:53 Main Science Lab (M307) - talk about robotics\n8:55 Learning Center\n8:59 8th Grade Math (M308)\n9:03 6th Grade Science (M310)\n9:06 Bring visitors to class - Bring the clock and tour route with you to class.\n9:25 Bring visitor down to cafeteria (wait with them for Maren and parents to get back downstairs)' },
   { route: '2', direction: 'Top-Down', humanities: 'Sabrina (M108)', language: 'Spanish',
@@ -277,9 +277,9 @@ const TOUR_ROUTES_ = [
 
 /* ---------- The bell schedule: 5 days, 8 pods, 403 blocks ---------- */
 
-const SCHEDULE_DAYS_ = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+var SCHEDULE_DAYS_ = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-const BELL_SCHEDULE_ = {
+var BELL_SCHEDULE_ = {
   'Monday': {
     'MMS': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'MS Meeting'], ['9:30', '10:15', 'French - M207 Mandarin - M208 Spanish - M209'], ['10:15', '11:00', 'Hum MN M212'], ['11:00', '11:30', 'Lunch JL, SA'], ['11:30', '12:00', 'Recess MB, CB'], ['12:00', '12:45', 'PE LH TSAC'], ['12:45', '13:30', 'Science SA M310'], ['13:30', '14:15', 'Math A MD M311 (split A)'], ['13:30', '14:15', 'Hum B MN M212 (split B)'], ['14:15', '15:00', 'Hum A MN M212 (split A)'], ['14:15', '15:00', 'Math B MD M311 (split B)'], ['15:00', '15:10', 'IWP']],
     'DJM': [['8:15', '8:45', 'Morning Homeroom'], ['8:45', '9:30', 'MS Meeting'], ['9:30', '10:15', 'Math A CB M311'], ['10:15', '11:00', 'Music A CN M103'], ['11:00', '11:30', 'Lunch JL, SA'], ['11:30', '12:00', 'Recess MB, CB'], ['12:00', '13:30', 'Hum DR M211'], ['13:30', '14:15', 'French - M207 Mandarin - M208 Spanish - M209'], ['14:15', '15:00', 'PE A LH TSAC'], ['15:00', '15:10', 'IWP']],
@@ -341,13 +341,13 @@ const BELL_SCHEDULE_ = {
  * le on the 5th Grade Buddies sheet.
  */
 
-const FIFTH_LANGUAGE_CLASSES_ = {
+var FIFTH_LANGUAGE_CLASSES_ = {
   'F': { language: 'French', teacher: 'Sharyn', room: 'M207' },
   'M': { language: 'Mandarin', teacher: 'Janet', room: 'M208' },
   'S': { language: 'Spanish', teacher: 'Mary Katherine', room: 'M209' }
 };
 
-const FIFTH_LANGUAGE_STUDENTS_ = [
+var FIFTH_LANGUAGE_STUDENTS_ = [
   { name: 'Aeon Anjargolian', lang: 'F', canHost: false },
   { name: 'Archimedes Gutmann', lang: 'F', canHost: false },
   { name: 'Ezra Fisher', lang: 'F', canHost: false },

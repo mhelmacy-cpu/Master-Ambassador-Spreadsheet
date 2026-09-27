@@ -244,7 +244,26 @@ Prospective Students, and **Pass Off** on the same sheet says Yes where
 the family is handed to somebody who was not guiding them.
 
 Class Visit To is also the override: type any ambassador's name in it
-and they take the family, whatever the script worked out.
+and they take the family, whatever the script worked out. **Pass Off**
+is what makes it an instruction rather than a record, since the script
+fills Class Visit To in on every family. A name that still belongs to
+one of the visitor's own guides is honoured either way; anything else
+needs Pass Off set to Yes. That is what stops a name left over from a
+guide she has since swapped out on the tracker quietly putting them back
+in charge.
+
+Whoever is handed a family gets a **Pass Off** row on the Tour Tracker,
+so they are on the roster, in the counts and there to tick off
+afterwards. Handing the family on again moves the row; saving twice
+does not duplicate it.
+
+They also get their own **email and locker slip**, whether or not they
+had a job that morning. Someone with no other job is told to stay in
+class until 9:06 rather than to report to the cafeteria at 8:25.
+
+The hand-off list puts the people working the tour first, since they are
+out of class anyway and know how the morning runs, and within that the
+emptiest room first.
 
 Three things follow from it:
 

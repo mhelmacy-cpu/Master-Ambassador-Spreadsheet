@@ -18,7 +18,7 @@
  * Configuration
  * ========================================================= */
 
-const SHEETS = {
+var SHEETS = {
   AMBASSADORS: 'Ambassadors',
   PROSPECTIVE: 'Prospective Students',
   TRACKER: 'Tour Tracker',
@@ -35,27 +35,27 @@ const SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-const BUILD_ = '2026-09-27 p';
+var BUILD_ = '2026-09-27 q';
 
-const HEADERS = {};
+var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
   'Borough', 'Gender', 'Race (Presenting)', 'Light', 'Strength', 'Can Solo', 'Active',
   'Signed Up', 'Confirmed', 'Jobs Done',
   'Student Email', 'Parent 1 Name', 'Parent 1 Email', 'Parent 2 Name', 'Parent 2 Email'];
 
 /** Everything about reaching a family rather than about a tour. Kept to the right. */
-const CONTACT_COLUMNS_ = ['Student Email', 'Parent 1 Name', 'Parent 1 Email',
+var CONTACT_COLUMNS_ = ['Student Email', 'Parent 1 Name', 'Parent 1 Email',
   'Parent 2 Name', 'Parent 2 Email'];
 
 /** Written by the script after a tour is staffed or confirmed. */
-const COUNT_COLUMNS_ = ['Signed Up', 'Confirmed', 'Jobs Done'];
+var COUNT_COLUMNS_ = ['Signed Up', 'Confirmed', 'Jobs Done'];
 HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'School', 'Grade', 'Gender', 'Race', 'Borough',
   'Full Pay', 'Well Connected', 'Class Visit', 'Route', 'Tour Guides', 'Class Buddy',
   'Class Visit To', 'Pass Off', 'Notes'];
 HEADERS[SHEETS.APART] = ['Ambassador', 'And', 'Notes'];
 HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route',
   'Showed Up', 'Notes'];
-const CLASS_VISIT_WITH_GUIDE = 'With tour guide';
+var CLASS_VISIT_WITH_GUIDE = 'With tour guide';
 HEADERS[SHEETS.JOBS] = ['Job Name', 'Description', 'Active', 'Out of Class From', 'Out of Class To'];
 HEADERS[SHEETS.ELIGIBILITY] = ['Ambassador', 'Panelist', 'Lobby Greeter', 'Table Greeter', 'Tour Guide'];
 HEADERS[SHEETS.TEACHERS] = ['Teacher Name', 'Initials', 'Teacher Email', 'Room / Notes'];
@@ -65,7 +65,7 @@ HEADERS[SHEETS.BELL] = ['Day', 'Grade', 'Homeroom', 'Split', 'Start', 'End',
 /* One schedule sheet per grade, because one sheet for all four is too long
  * to read. Every row is one split group at one block, so 6B's day reads
  * straight down with nothing left blank to work out. */
-const BELL_GRADES_ = ['5', '6', '7', '8'];
+var BELL_GRADES_ = ['5', '6', '7', '8'];
 function bellSheet_(grade) { return SHEETS.BELL + ' ' + grade; }
 BELL_GRADES_.forEach(function (g) {
   HEADERS[bellSheet_(g)] = ['Day', 'Grade', 'Homeroom', 'Split', 'Start', 'End',
@@ -75,12 +75,13 @@ HEADERS[SHEETS.ROUTES] = ['Route', 'Direction', 'Humanities Teacher', 'Language'
 HEADERS[SHEETS.BUDDIES] = ['Student', 'Gender', 'Language', 'Teacher', 'Room', 'Can Host a Visitor'];
 HEADERS[SHEETS.SETTINGS] = ['Setting', 'Value'];
 
-const JOBS = {
+var JOBS = {
   PANELIST: 'Panelist',
   LOBBY: 'Lobby Greeter',
   TABLE: 'Table Greeter',
   GUIDE: 'Tour Guide',
-  BUDDY: 'Class Buddy'
+  BUDDY: 'Class Buddy',
+  PASSOFF: 'Pass Off'
 };
 
 /**
@@ -91,31 +92,32 @@ const JOBS = {
  * Jobs sheet holds the real values and can be edited there; these are
  * only what a new sheet starts with.
  */
-const JOB_HOURS_ = {};
+var JOB_HOURS_ = {};
 JOB_HOURS_[JOBS.PANELIST] = ['8:25 AM', '9:05 AM'];
 JOB_HOURS_[JOBS.LOBBY] = ['8:25 AM', '8:55 AM'];
 JOB_HOURS_[JOBS.TABLE] = ['8:25 AM', '8:55 AM'];
 JOB_HOURS_[JOBS.GUIDE] = ['8:25 AM', '9:05 AM'];
 JOB_HOURS_[JOBS.BUDDY] = ['9:05 AM', '9:25 AM'];
+JOB_HOURS_[JOBS.PASSOFF] = ['9:05 AM', '9:25 AM'];
 
-const YES_NO = ['Yes', 'No'];
-const SPLITS = ['A', 'B', 'C'];
-const PODS = ['MMS', 'DJM', 'AOS', 'CCM', 'EEL', 'MSB', 'CJM', 'RSS'];
-const GRADES = ['5', '6', '7', '8'];
+var YES_NO = ['Yes', 'No'];
+var SPLITS = ['A', 'B', 'C'];
+var PODS = ['MMS', 'DJM', 'AOS', 'CCM', 'EEL', 'MSB', 'CJM', 'RSS'];
+var GRADES = ['5', '6', '7', '8'];
 // The Middle School starts at fifth. A rising fifth grader is in fourth,
 // and there is no fourth grade here, so nobody below this can ever guide.
-const LOWEST_GRADE_ = 5;
-const HIGHEST_GRADE_ = 8;
-const GENDERS = ['Female', 'Male', 'Non-binary', 'Other'];
+var LOWEST_GRADE_ = 5;
+var HIGHEST_GRADE_ = 8;
+var GENDERS = ['Female', 'Male', 'Non-binary', 'Other'];
 
 /* Both of these are dropdowns that allow anything, so the list is a
  * starting point rather than a limit - type a value that is not on it
  * and it is kept, not rejected. */
-const PRESENTING_OPTIONS = ['White presenting', 'Student of color'];
+var PRESENTING_OPTIONS = ['White presenting', 'Student of color'];
 
 /* Green goes on a tour without asking. Yellow is offered the same way but
  * held back at the point of saving, for a second look first. */
-const LIGHT_OPTIONS = ['Green', 'Yellow'];
+var LIGHT_OPTIONS = ['Green', 'Yellow'];
 /**
  * How much of a showing an ambassador gives a family.
  *
@@ -123,10 +125,10 @@ const LIGHT_OPTIONS = ['Green', 'Yellow'];
  * trusted with the job at all. This is who she would put in front of a
  * family she especially wants to land.
  */
-const STRENGTH_OPTIONS = ['High', 'Medium', 'Low'];
-const RACE_OPTIONS = ['White', 'African American', 'Asian'];
-const BOROUGHS = ['M', 'B', 'Q', 'X', 'S', 'J'];
-const BOROUGH_NAMES = { M: 'Manhattan', B: 'Brooklyn', Q: 'Queens', X: 'Bronx', S: 'Staten Island', J: 'New Jersey' };
+var STRENGTH_OPTIONS = ['High', 'Medium', 'Low'];
+var RACE_OPTIONS = ['White', 'African American', 'Asian'];
+var BOROUGHS = ['M', 'B', 'Q', 'X', 'S', 'J'];
+var BOROUGH_NAMES = { M: 'Manhattan', B: 'Brooklyn', Q: 'Queens', X: 'Bronx', S: 'Staten Island', J: 'New Jersey' };
 
 /** The class-visit choices offered for a rising 5th grader. */
 function classVisitOptions_() {
@@ -137,7 +139,7 @@ function classVisitOptions_() {
   return out;
 }
 
-const DEFAULT_SETTINGS = [
+var DEFAULT_SETTINGS = [
   ['Sender Display Name', 'LREI Middle School Tours'],
   ['Reply-To Email', ''],
   ['Tour Start Time', '8:30'],
@@ -157,8 +159,8 @@ const DEFAULT_SETTINGS = [
   ['Wait For', 'Maren']
 ];
 
-const HANDLER_TEACHER_EMAILS = 'sendTeacherEmailsForNextTour';
-const HANDLER_STUDENT_EMAILS = 'sendStudentEmailsForNextTour';
+var HANDLER_TEACHER_EMAILS = 'sendTeacherEmailsForNextTour';
+var HANDLER_STUDENT_EMAILS = 'sendStudentEmailsForNextTour';
 
 /* =========================================================
  * Small helpers
@@ -185,11 +187,11 @@ function sheet_(name) {
  * renamed then shifts nothing: the values still come from the right
  * place. Falls back to the expected order only when row 1 is empty.
  */
-const HEADER_CACHE_ = {};
+var HEADER_CACHE_ = {};
 
 /* Other names the same column goes by, so a sheet that says "Homeroom Pod"
  * or "Email" still lines up. */
-const HEADER_ALIASES_ = {
+var HEADER_ALIASES_ = {
   'Grade': ['Applying For', 'Applying For Grade', 'Entry Grade', 'Apply Grade'],
   'Homeroom': ['Homeroom Pod', 'Pod', 'HR', 'Homeroom/Advisory'],
   'Student Email': ['Email', 'Student email address', 'LREI Email'],
@@ -250,7 +252,7 @@ function headerIndex_(name) {
  * are all pure reads within a single run, so the first one pays and the
  * rest are free. Anything that writes calls clearReadCache_().
  */
-let READ_CACHE_ = {};
+var READ_CACHE_ = {};
 
 function cached_(key, make) {
   if (READ_CACHE_[key] === undefined) READ_CACHE_[key] = make();
@@ -406,8 +408,8 @@ function dateKey_(d) {
     String(d.getDate()).padStart(2, '0');
 }
 
-const WEEKDAYS_ = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const MONTHS_ = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+var WEEKDAYS_ = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+var MONTHS_ = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
   'August', 'September', 'October', 'November', 'December'];
 
 function longDate_(d) {
@@ -743,7 +745,9 @@ function setupJobs_() {
     [JOBS.LOBBY, 'Greets visiting families as they arrive in the lobby.', 'Yes'],
     [JOBS.TABLE, 'Staffs the welcome and sign-in table.', 'Yes'],
     [JOBS.GUIDE, 'Walks a prospective student round the building on a set route.', 'Yes'],
-    [JOBS.BUDDY, 'A 5th grader hosting a visiting student in their own class after the tour.', 'Yes']
+    [JOBS.BUDDY, 'A 5th grader hosting a visiting student in their own class after the tour.', 'Yes'],
+    [JOBS.PASSOFF, 'Given a visiting student at the end of a tour they did not guide, ' +
+      'and takes them down to the cafeteria at the end.', 'Yes']
   ].map(function (r) {
     const hours = JOB_HOURS_[r[0]] || ['', ''];
     return r.concat([hours[0], hours[1]]);
@@ -828,7 +832,7 @@ function awayWindow_(jobNames) {
  *
  * Panelists are exempt: she picks those herself.
  */
-const KEEP_APART_SEED_ = [
+var KEEP_APART_SEED_ = [
   ['Laura', 'Oscar'],
   ['Mika', 'Emma'],
   ['Logan', 'Kayla'],
@@ -1463,19 +1467,19 @@ function note_(sheet, sheetName, header, text) {
  * not their column's letter - which is more than half of them.
  * ========================================================= */
 
-const ROOM_RE_ = /^(M\d{3}|L\d{3}|TSAC|PAPAS|Charlton|Thompson|Auditorium)$/;
+var ROOM_RE_ = /^(M\d{3}|L\d{3}|TSAC|PAPAS|Charlton|Thompson|Auditorium)$/;
 
 /* Words in a block that are never a teacher's initials. "MS" is absent on
  * purpose - it is Marco Sanchez, not "MS Meeting", which is skipped by
  * phrase where blocks are read. */
-const NOT_INITIALS_ = ['Hum', 'Math', 'Science', 'PE', 'Art', 'Music', 'Choices', 'Lunch', 'Recess',
+var NOT_INITIALS_ = ['Hum', 'Math', 'Science', 'PE', 'Art', 'Music', 'Choices', 'Lunch', 'Recess',
   'Morning', 'Homeroom', 'Meeting', 'IWP', 'Majors', 'Electives', 'Affinity', 'Groups', 'Olympic',
   'Teams', 'Dance', 'Drama', 'Instrumental', 'Portfolio', 'Vocal', 'Room', 'Modern', 'Band',
   'Animation', 'Ensemble', 'Movement', 'Lab', 'Storytelling', 'Mix', 'Up', 'Ceramics', 'Photography',
   'Production', 'French', 'Mandarin', 'Spanish', 'A', 'B', 'C', 'As', 'Bs', 'Cs', 'CAP', 'Period',
   'Activity', 'Bring', 'the', 'and', 'to', 'with'];
 
-const NON_CLASS_RE_ = /Morning Homeroom|MS Meeting|Lunch|Recess|IWP/;
+var NON_CLASS_RE_ = /Morning Homeroom|MS Meeting|Lunch|Recess|IWP/;
 
 /** The split letter a block belongs to, or '' when the whole homeroom attends. */
 function splitLetterOf_(text) {
@@ -1821,7 +1825,7 @@ function activeJobs_() {
  * to bend: the first place is a 6th grader, and the second is another
  * 6th grader where there is one and an 8th grader where there is not.
  */
-const BUILT_IN_GUIDE_GRADES_ = {
+var BUILT_IN_GUIDE_GRADES_ = {
   '5': [['6'], ['6']],
   '6': [['6'], ['6', '8']],
   '7': [['6'], ['7']],
@@ -1954,6 +1958,7 @@ function prospectiveFor_(dateVal) {
       race: trim_(cell_(r, N, 'Race')),
       classVisit: trim_(cell_(r, N, 'Class Visit')),
       classVisitTo: trim_(cell_(r, N, 'Class Visit To')),
+      passOff: isYes_(cell_(r, N, 'Pass Off')),
       fullPay: isYes_(cell_(r, N, 'Full Pay')),
       wellConnected: isYes_(cell_(r, N, 'Well Connected')),
       borough: trim_(r[col_(N, 'Borough')]).toUpperCase()
@@ -2590,9 +2595,9 @@ function needsSoCGuide_(visitorRace) {
 
 /* The Race (Presenting) column gets written all sorts of ways - the full
  * words, or WP and SOC, or just W. All of these read the same. */
-const WHITE_PRESENTING_ = ['wp', 'w', 'white', 'white presenting', 'whitepresenting',
+var WHITE_PRESENTING_ = ['wp', 'w', 'white', 'white presenting', 'whitepresenting',
   'white-presenting', 'white present', 'caucasian'];
-const STUDENT_OF_COLOR_ = ['soc', 'poc', 's of c', 'student of color', 'student of colour',
+var STUDENT_OF_COLOR_ = ['soc', 'poc', 's of c', 'student of color', 'student of colour',
   'students of color', 'of color', 'of colour', 'color', 'colour', 'studentofcolor'];
 
 function isWhitePresenting_(presenting) {
@@ -2983,7 +2988,8 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
   // when she is topping up, nothing is cleared at all.
   if (!keepExisting) {
     const mine = {};
-    [JOBS.GUIDE, JOBS.BUDDY, JOBS.LOBBY, JOBS.TABLE].forEach(function (j) { mine[j] = true; });
+    [JOBS.GUIDE, JOBS.BUDDY, JOBS.LOBBY, JOBS.TABLE, JOBS.PASSOFF]
+      .forEach(function (j) { mine[j] = true; });
     const existing = rows_(N);
     for (let i = existing.length - 1; i >= 0; i--) {
       if (!sameDay_(toDate_(existing[i][col_(N, 'Tour Date')]), dateVal)) continue;
@@ -3079,6 +3085,12 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
       .setNumberFormat('yyyy-mm-dd');
   }
 
+  /* A row for whoever is handed a family at the end. They have a real
+   * duty that morning, so they belong on the tracker like anyone else:
+   * on the roster, in the counts, and there to tick off afterwards.
+   * The landing is worked out below, after the guides are written, so
+   * these rows go in there rather than here. */
+
   const panel = savePanel_(dateVal, panelists, plan);
   refreshCounts_();
 
@@ -3099,10 +3111,65 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
       })[0];
       if (!v) return;
       psheet.getRange(v.row, toCol + 1).setValue(trim_(h.to));
+      // Marked in the same breath, because Pass Off is what turns the
+      // cell from a record of what happened into an instruction.
+      if (passCol !== -1) psheet.getRange(v.row, passCol + 1).setValue('Yes');
     });
     clearReadCache_();
   }
   const landing = handbackChoices_(dateVal).byVisitor;
+
+  /* A row on the tracker for whoever is handed a family at the end. They
+   * have a real duty that morning, so they belong on it like anyone
+   * else: on the roster, in the counts, and there to tick off
+   * afterwards. Anyone already on the tracker for that family keeps
+   * their own row instead. */
+  const passRows = [];
+  const already = {};
+  rows_(N).forEach(function (r) {
+    if (!sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal)) return;
+    already[norm_(r[col_(N, 'Ambassador')]) + '|' + norm_(r[col_(N, 'Job')]) + '|' +
+      norm_(r[col_(N, 'Prospective Student(s)')])] = true;
+  });
+  const receivers = passOffReceivers_(dateVal);
+  Object.keys(receivers).forEach(function (name) {
+    receivers[name].forEach(function (r) {
+      const key = norm_(name) + '|' + norm_(JOBS.PASSOFF) + '|' + norm_(r.visitor);
+      if (already[key]) return;
+      already[key] = true;
+      const row = blankRow_(N);
+      row[col_(N, 'Tour Date')] = dateVal;
+      row[col_(N, 'Ambassador')] = name;
+      row[col_(N, 'Job')] = JOBS.PASSOFF;
+      row[col_(N, 'Prospective Student(s)')] = r.visitor;
+      row[col_(N, 'Notes')] = (r.from ? 'From ' + r.from + '. ' : '') +
+        'Takes them to ' + r.where + '.';
+      passRows.push(row);
+    });
+  });
+  // Any earlier hand-off row that is no longer the answer comes off.
+  const wanted = {};
+  Object.keys(receivers).forEach(function (name) {
+    receivers[name].forEach(function (r) {
+      wanted[norm_(name) + '|' + norm_(r.visitor)] = true;
+    });
+  });
+  const had = rows_(N);
+  for (let i = had.length - 1; i >= 0; i--) {
+    if (!sameDay_(toDate_(had[i][col_(N, 'Tour Date')]), dateVal)) continue;
+    if (trim_(had[i][col_(N, 'Job')]) !== JOBS.PASSOFF) continue;
+    const key = norm_(had[i][col_(N, 'Ambassador')]) + '|' +
+      norm_(had[i][col_(N, 'Prospective Student(s)')]);
+    if (!wanted[key]) tracker.deleteRow(i + 2);
+  }
+  if (passRows.length) {
+    tracker.getRange(tracker.getLastRow() + 1, 1, passRows.length, passRows[0].length)
+      .setValues(passRows);
+    tracker.getRange(2, col_(N, 'Tour Date') + 1, tracker.getLastRow() - 1, 1)
+      .setNumberFormat('yyyy-mm-dd');
+  }
+  clearReadCache_();
+  refreshCounts_();
 
   plan.pairs.forEach(function (p) {
     psheet.getRange(p.visitor.row, col_(P, 'Route') + 1).setValue(p.route);
@@ -3272,13 +3339,13 @@ function readCell_(name, row, header) {
  */
 /* Words for a subject that is written short on the schedule. Anything
  * not here is printed as the schedule has it. */
-const SUBJECT_WORDS_ = { 'hum': 'Humanities', 'sci': 'Science' };
+var SUBJECT_WORDS_ = { 'hum': 'Humanities', 'sci': 'Science' };
 
 /* A visiting family sees more of the school in a Humanities or a Maths
  * room than in Art or PE, so where there is a choice of which guide walks
  * them to class, the academic one wins. Anything not on this list counts
  * as the other kind. */
-const ACADEMIC_SUBJECTS_ = ['hum', 'humanities', 'math', 'maths', 'science', 'sci',
+var ACADEMIC_SUBJECTS_ = ['hum', 'humanities', 'math', 'maths', 'science', 'sci',
   'english', 'history', 'social studies', 'french', 'mandarin', 'spanish',
   'world language', 'world languages'];
 
@@ -3408,13 +3475,23 @@ function handbackAllocate_(dateVal, entries) {
     elsewhere.push(one);
   });
 
-  // What she has already said, by name, in Class Visit To.
+  /* What she has already said, by name, in Class Visit To.
+   *
+   * Pass Off is what makes it an instruction rather than a record. The
+   * script fills Class Visit To in on every family, so without that flag
+   * a name left over from a guide she has since swapped out on the Tour
+   * Tracker would quietly put them back in charge of the family. A name
+   * that still belongs to one of the visitor's own guides is honoured
+   * either way, because there is nothing stale about it. */
   const chosenBy = {};
   if (optionalCol_(SHEETS.PROSPECTIVE, 'Class Visit To') !== -1) {
     prospectiveFor_(dateVal).forEach(function (v) {
       const said = trim_(String(v.classVisitTo || '')
         .replace(/^\s*pass\s*off\s*:?\s*/i, '')).split(' - ')[0];
-      if (said) chosenBy[norm_(v.name)] = trim_(said);
+      if (!said) return;
+      const theirs = (byVisitor[norm_(v.name)] || { guides: [] }).guides;
+      const stillGuiding = theirs.some(function (g) { return norm_(g) === norm_(said); });
+      if (v.passOff || stillGuiding) chosenBy[norm_(v.name)] = trim_(said);
     });
   }
 
@@ -3474,12 +3551,15 @@ function handbackAllocate_(dateVal, entries) {
     mine.options = elsewhere.filter(function (o) {
       return o.where.key !== hereKey;
     }).sort(function (a, b) {
-      const la = load[a.where.key] || 0;
-      const lb = load[b.where.key] || 0;
-      if (la !== lb) return la - lb;
+      // Whoever is already working the tour comes first: they are out of
+      // class anyway and know what the morning is. Then the emptiest
+      // room, so a class that is already full is not the easy pick.
       const ja = a.job ? 0 : 1;
       const jb = b.job ? 0 : 1;
       if (ja !== jb) return ja - jb;
+      const la = load[a.where.key] || 0;
+      const lb = load[b.where.key] || 0;
+      if (la !== lb) return la - lb;
       return a.name < b.name ? -1 : 1;
     }).map(function (o) {
       return {
@@ -3593,7 +3673,7 @@ function handoffToAmbassador_(page, to, where) {
 }
 
 /** What the guide does once they have handed the family over. */
-const HANDOFF_ACTION_ = 'Give them the tour route, the clock, and YOUR NAME TAG. ' +
+var HANDOFF_ACTION_ = 'Give them the tour route, the clock, and YOUR NAME TAG. ' +
   'Then go back to your own class. You are finished.';
 
 /** What the student receiving them does, whoever they are. */
@@ -3777,6 +3857,42 @@ function buildRouteSheets(dateStr) {
  * already printed on the visitor's route sheet.
  * ========================================================= */
 
+/**
+ * Students who are handed a visiting family at the end without having
+ * guided them.
+ *
+ * They may be working the tour, or they may have been sitting in class
+ * all morning. Either way somebody is about to arrive at their desk, so
+ * they are told, by email and on a locker slip, like anybody else.
+ *
+ * name -> [{visitor, where, teacher, from}]
+ */
+function passOffReceivers_(dateVal) {
+  const out = {};
+  const guidesOf = {};
+  assignmentsOn_(dateVal).forEach(function (a) {
+    if (a.job !== JOBS.GUIDE || !trim_(a.visitor)) return;
+    const k = norm_(a.visitor);
+    (guidesOf[k] = guidesOf[k] || []).push(a.name);
+  });
+  const landed = handbackChoices_(dateVal);
+  Object.keys(landed.byVisitor).forEach(function (k) {
+    const c = landed.byVisitor[k];
+    if (!c.where) return;
+    const mine = guidesOf[k] || [];
+    c.takers.forEach(function (n) {
+      if (mine.some(function (g) { return norm_(g) === norm_(n); })) return;
+      (out[n] = out[n] || []).push({
+        visitor: c.visitor,
+        where: c.where.label,
+        teacher: c.where.teacher,
+        from: mine.join(' and ')
+      });
+    });
+  });
+  return out;
+}
+
 function lockerSlipData_(dateVal) {
   const assignments = assignmentsOn_(dateVal);
   const amb = {};
@@ -3788,9 +3904,28 @@ function lockerSlipData_(dateVal) {
     (grouped[a.name] = grouped[a.name] || []).push(a);
   });
 
+  // Somebody handed a family at the end gets a slip of their own, even
+  // where they had no job on the tour at all.
+  const receiving = passOffReceivers_(dateVal);
+  Object.keys(receiving).forEach(function (name) {
+    if (!grouped[name]) grouped[name] = [];
+  });
+
+  const handoffAt = timeLabelOrRaw_(setting_('Class Visit Handoff Time', '9:06'));
+  const tourEnd = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
+
   return Object.keys(grouped).sort().map(function (name) {
     const who = amb[norm_(name)];
+    const mine = receiving[name] || [];
     return {
+      passOff: mine.map(function (r) {
+        return (r.from
+          ? r.from + (r.from.indexOf(' and ') === -1 ? ' brings ' : ' bring ')
+          : 'You are given ') + r.visitor +
+          ' to you in ' + r.where + ' at ' + handoffAt +
+          '. Take them down to the cafeteria at ' + tourEnd + '.';
+      }),
+      working: grouped[name].length > 0,
       name: name,
       // Homeroom and advisor go on the slip because that is how a pile
       // of them gets sorted before it reaches the lockers.
@@ -3802,6 +3937,7 @@ function lockerSlipData_(dateVal) {
       // When this one is actually finished, which is their own job's
       // hours and not the end of the tour. A greeter is back at 8:55.
       backBy: (function () {
+        if (!grouped[name].length) return tourEnd;
         const w = awayMinutes_(grouped[name].map(function (j) { return j.job; }));
         return w ? timeLabel_(w.to) : '';
       })()
@@ -3843,8 +3979,16 @@ function buildLockerSlips(dateStr) {
 
     cell.appendParagraph(longDate_(dateVal));
     slip.jobs.forEach(function (j) { cell.appendParagraph(j); });
-    cell.appendParagraph(capitalize_(reportTo) + ' ' + reportAt + '. Back in class by ' +
-      (slip.backBy || endTime) + '.');
+    if (slip.working) {
+      cell.appendParagraph(capitalize_(reportTo) + ' ' + reportAt + '. Back in class by ' +
+        (slip.backBy || endTime) + '.');
+    } else {
+      cell.appendParagraph('Stay in your class until the time below.');
+    }
+    (slip.passOff || []).forEach(function (line) {
+      const p = cell.appendParagraph(line);
+      p.editAsText().setBold(true);
+    });
 
     body.appendParagraph('');
   });
@@ -4181,7 +4325,7 @@ function api_saveConfirm(dateStr, showedRows, happened) {
  * herself. Nothing here ever sends on its own.
  * ========================================================= */
 
-const AUDIENCES_ = {
+var AUDIENCES_ = {
   teachers: 'Teachers',
   students: 'Ambassadors',
   both: 'Ambassadors and their parents',
@@ -4429,7 +4573,7 @@ function mailTourRoster_(dateVal) {
  * The day a test run is pretending it is, so she can read the Tuesday
  * wording and the Wednesday wording without waiting for either.
  */
-let PRETEND_TODAY_ = null;
+var PRETEND_TODAY_ = null;
 
 function whenLabel_(tourDate) {
   const today = PRETEND_TODAY_ ? new Date(PRETEND_TODAY_.getTime()) : new Date();
@@ -4478,8 +4622,8 @@ function assignmentsOn_(dateVal) {
  * have read. It works through mailOptions_, which every message passes
  * through, so no send can get past it by accident.
  */
-let PREVIEW_TO_ = '';
-let TEST_LABEL_ = '';
+var PREVIEW_TO_ = '';
+var TEST_LABEL_ = '';
 
 /**
  * While testing, one copy per kind rather than one per person.
@@ -4489,7 +4633,7 @@ let TEST_LABEL_ = '';
  * run is unchanged - who would be skipped for want of an address is
  * still worked out for all of them, and still reported.
  */
-let SAMPLE_SEEN_ = null;
+var SAMPLE_SEEN_ = null;
 
 function sampleAllows_(kind) {
   if (!SAMPLE_SEEN_) return true;
@@ -4555,10 +4699,10 @@ function mailOptions_(to, subject, html) {
   return opts;
 }
 
-const MAIL_STYLE_ = 'font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#222;';
-const TABLE_STYLE_ = 'border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:13px;';
-const TH_ = 'padding:6px 10px;background:#a8322a;color:#fff;text-align:left;';
-const TD_ = 'padding:6px 10px;border:1px solid #ddd;';
+var MAIL_STYLE_ = 'font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#222;';
+var TABLE_STYLE_ = 'border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:13px;';
+var TH_ = 'padding:6px 10px;background:#a8322a;color:#fff;text-align:left;';
+var TD_ = 'padding:6px 10px;border:1px solid #ddd;';
 
 /* ---------- students ---------- */
 
@@ -4586,12 +4730,22 @@ function sendStudentEmails(dateStr) {
     (grouped[a.name] = grouped[a.name] || []).push(a);
   });
 
+  // Anybody handed a family at the end hears too, whether or not they
+  // had a job on the tour.
+  const receiving = passOffReceivers_(dateVal);
+  Object.keys(receiving).forEach(function (name) {
+    if (!grouped[name]) grouped[name] = [];
+  });
+  const handoffAt = timeLabelOrRaw_(setting_('Class Visit Handoff Time', '9:06'));
+  const waitFor = setting_('Wait For', 'Maren');
+
   let sent = 0;
   const skipped = [];
   Object.keys(grouped).forEach(function (name) {
     const who = byName[norm_(name)];
     if (!who || !who.email) { skipped.push(name); return; }
     const jobs = grouped[name];
+    const handed = receiving[name] || [];
     // Back in class when their own last job ends, not when the tour does.
     let backAt = null;
     jobs.forEach(function (j) {
@@ -4609,17 +4763,32 @@ function sendStudentEmails(dateStr) {
       return '<li>' + line + '</li>';
     }).join('');
 
+    const passOff = handed.map(function (r) {
+      return '<p><b>' + (r.from ? escapeHtml_(r.from) + ' will bring ' : 'You are being given ') +
+        escapeHtml_(r.visitor) + ', a visiting student, to you in ' + escapeHtml_(r.where) +
+        ' at ' + escapeHtml_(handoffAt) + '.</b> Look after them for the rest of the ' +
+        'period, and at ' + escapeHtml_(timeLabelOrRaw_(endTime)) + ' take them down to ' +
+        'the cafeteria and wait with them until ' + escapeHtml_(waitFor) + ' gets back.</p>';
+    }).join('');
+
     const html = '<div style="' + MAIL_STYLE_ + '">' +
       '<p>Hi ' + escapeHtml_(name.split(' ')[0]) + ',</p>' +
-      '<p>You are on the tour schedule for ' + escapeHtml_(when.body) + ':</p>' +
-      '<ul>' + items + '</ul>' +
-      '<p><b>Please come to ' + escapeHtml_(reportTo) + ' at ' + escapeHtml_(reportAt) + '.</b></p>' +
-      '<p>You will be back in class by ' + escapeHtml_(backBy) + '. ' +
-      'Your teachers already know you are out.</p>' +
+      (jobs.length
+        ? '<p>You are on the tour schedule for ' + escapeHtml_(when.body) + ':</p>' +
+          '<ul>' + items + '</ul>' +
+          '<p><b>Please come to ' + escapeHtml_(reportTo) + ' at ' +
+          escapeHtml_(reportAt) + '.</b></p>' +
+          '<p>You will be back in class by ' + escapeHtml_(backBy) + '. ' +
+          'Your teachers already know you are out.</p>'
+        : '<p>You are not on the tour ' + escapeHtml_(when.body) +
+          ', but you are being asked to do one thing at the end of it. ' +
+          'Stay in your class as normal until then.</p>') +
+      passOff +
       '<p>Thank you for doing this.<br>' +
       escapeHtml_(setting_('Sender Display Name', 'LREI Middle School Tours')) + '</p></div>';
 
-    if (!sampleAllowsJobs_('student', jobs.map(function (j) { return j.job; }))) return;
+    if (!sampleAllowsJobs_('student',
+      jobs.map(function (j) { return j.job; }).concat(handed.length ? ['pass off'] : []))) return;
     MailApp.sendEmail(mailOptions_(who.email, 'Your Tour Job - ' + when.subject, html));
     sent++;
   });
@@ -4944,7 +5113,7 @@ function sendTeacherEmailsForNextTour() {
  * Automatic sends
  * ========================================================= */
 
-const REMINDER_SLOTS_ = [
+var REMINDER_SLOTS_ = [
   { handler: HANDLER_TEACHER_EMAILS, day: 'TUESDAY', hour: 8, minute: 30, label: 'Teachers, Tuesday 8:30 AM' },
   { handler: HANDLER_TEACHER_EMAILS, day: 'WEDNESDAY', hour: 7, minute: 45, label: 'Teachers, Wednesday 7:45 AM' },
   { handler: HANDLER_STUDENT_EMAILS, day: 'TUESDAY', hour: 12, minute: 0, label: 'Students, Tuesday 12:00 PM' },
@@ -5029,7 +5198,7 @@ function nextWednesday() {
   return dateKey_(d);
 }
 
-const DIALOG_CSS_ =
+var DIALOG_CSS_ =
   'body{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#222;margin:0;padding:16px;}' +
   'h2{font-size:15px;margin:0 0 4px;}' +
   'p.sub{color:#666;margin:0 0 14px;}' +
@@ -5973,7 +6142,7 @@ function api_commitTour(dateStr, keep, panelists, swaps, handoffs) {
  * returns - comparing the two is always false, and the search for the
  * day walks backwards for ever.
  */
-const WEEKDAY_NUMBER_ = {
+var WEEKDAY_NUMBER_ = {
   SUNDAY: 0, MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3,
   THURSDAY: 4, FRIDAY: 5, SATURDAY: 6
 };
