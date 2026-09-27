@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-27 u';
+var BUILD_ = '2026-09-27 v';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -5658,8 +5658,8 @@ function showEmailDialog() {
     '<p class="sub" style="margin:4px 0 8px;">Every email that day would send, ' +
     'students and teachers together, one per person. Always a test: nothing reaches ' +
     'a child or a teacher whatever the boxes above say.</p>' +
-    '<button onclick="all(\'Tuesday\')">Every Tuesday email</button>' +
-    '<button onclick="all(\'Wednesday\')">Every Wednesday email</button>' +
+    '<button onclick="wholeDay(\'Tuesday\')">Every Tuesday email</button>' +
+    '<button onclick="wholeDay(\'Wednesday\')">Every Wednesday email</button>' +
     '</div><div id="out"></div>' +
     '<script>' +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
@@ -5669,7 +5669,7 @@ function showEmailDialog() {
     '.api_sendEmails(which,document.getElementById("d").value,' +
     'document.getElementById("test").checked,' +
     'document.getElementById("everyone").checked);}' +
-    'function all(day){document.getElementById("out").innerHTML=' +
+    'function wholeDay(day){document.getElementById("out").innerHTML=' +
     '"<p class=\'muted\'>Sending every "+esc(day)+" email to you. This takes a ' +
     'moment...</p>";' +
     'google.script.run.withSuccessHandler(done).withFailureHandler(function(e){' +
@@ -5772,8 +5772,8 @@ function showWriteDialog() {
     'google.script.run.withSuccessHandler(show).withFailureHandler(fail).api_emailPeople(k);}' +
     'function show(p){window.__kind=p.kind;' +
     'var h="<label>"+esc(p.label)+" <span class=\'muted\'>("+p.people.length+")</span></label>";' +
-    'h+="<div style=\'margin-bottom:6px;\'><button class=\'ghost\' onclick=\'all(true)\'>Tick all</button>' +
-    '<button class=\'ghost\' onclick=\'all(false)\'>Untick all</button>' +
+    'h+="<div style=\'margin-bottom:6px;\'><button class=\'ghost\' onclick=\'tickAll(true)\'>Tick all</button>' +
+    '<button class=\'ghost\' onclick=\'tickAll(false)\'>Untick all</button>' +
     '<button class=\'ghost\' onclick=\'onlyActive()\'>Active only</button></div>";' +
     'h+="<div class=\'panel\' style=\'max-height:220px;overflow:auto;\'>";' +
     'p.people.forEach(function(x){' +
@@ -5790,7 +5790,7 @@ function showWriteDialog() {
     'all in the To line.</span></label>";' +
     'h+="<div style=\'margin-top:12px;\'><button onclick=\'make()\'>Open it in Gmail</button></div>";' +
     'document.getElementById("who").innerHTML=h;}' +
-    'function all(on){var b=document.querySelectorAll("input.who");' +
+    'function tickAll(on){var b=document.querySelectorAll("input.who");' +
     'for(var i=0;i<b.length;i++){b[i].checked=on;}}' +
     'function onlyActive(){var b=document.querySelectorAll("input.who");' +
     'for(var i=0;i<b.length;i++){b[i].checked=!b[i].getAttribute("data-idle");}}' +
@@ -5848,10 +5848,10 @@ function showConfirmDialog() {
     '<span><b>The tour did not happen.</b> Everyone is recorded as not having worked, ' +
     'whatever is ticked above.</span></label>";' +
     'h+="<div style=\'margin-top:12px;\'><button onclick=\'save()\'>Save</button>' +
-    '<button class=\'ghost\' onclick=\'all(true)\'>Tick all</button>' +
-    '<button class=\'ghost\' onclick=\'all(false)\'>Untick all</button></div>";' +
+    '<button class=\'ghost\' onclick=\'tickAll(true)\'>Tick all</button>' +
+    '<button class=\'ghost\' onclick=\'tickAll(false)\'>Untick all</button></div>";' +
     'document.getElementById("out").innerHTML=h;}' +
-    'function all(on){var b=document.querySelectorAll("input.did");' +
+    'function tickAll(on){var b=document.querySelectorAll("input.did");' +
     'for(var i=0;i<b.length;i++){b[i].checked=on;}}' +
     'function save(){var out=[],b=document.querySelectorAll("input.did");' +
     'for(var i=0;i<b.length;i++){if(b[i].checked){out.push(window.__rows[Number(b[i].value)].row);}}' +
@@ -6098,8 +6098,8 @@ function showMeetingDialog() {
     '<div id="who"><p class="muted">Loading the names...</p></div>' +
     '<div style="margin-top:12px;">' +
     '<button id="go" onclick="look()">Show me</button>' +
-    '<button class="ghost" onclick="all(true)">Tick all</button>' +
-    '<button class="ghost" onclick="all(false)">Untick all</button>' +
+    '<button class="ghost" onclick="tickAll(true)">Tick all</button>' +
+    '<button class="ghost" onclick="tickAll(false)">Untick all</button>' +
     '</div><div id="out"></div>' +
     '<script>' +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
@@ -6114,7 +6114,7 @@ function showMeetingDialog() {
     '(r.ready?"":" <b class=\'yel\'>needs Homeroom, Split and Grade</b>")+"</label>";});' +
     'h+="</div><span class=\'muted\'>Tick nobody and it shows everyone.</span>";' +
     'document.getElementById("who").innerHTML=h;}' +
-    'function all(on){var b=document.querySelectorAll("input.mp");' +
+    'function tickAll(on){var b=document.querySelectorAll("input.mp");' +
     'for(var i=0;i<b.length;i++){b[i].checked=on;}}' +
     'function picked(){var out=[],w=window.__who||[];' +
     'var b=document.querySelectorAll("input.mp");' +
