@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-27 v';
+var BUILD_ = '2026-09-27 w';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -4800,6 +4800,26 @@ function asTest_(address, fn) {
   }
 }
 
+/* While this holds a list, nothing is sent: every message is recorded on
+ * it instead, so she can be shown exactly who would hear from a real
+ * send before any of it leaves. */
+var DRY_RUN_ = null;
+
+/**
+ * The one place a message actually goes out.
+ *
+ * Everything that sends goes through here, so a dry run has a single
+ * thing to stop and a preview cannot drift from the real send.
+ */
+function sendMail_(to, subject, html) {
+  const opts = mailOptions_(to, subject, html);
+  if (DRY_RUN_) {
+    DRY_RUN_.push({ to: opts.to, subject: opts.subject });
+    return;
+  }
+  MailApp.sendEmail(opts);
+}
+
 function mailOptions_(to, subject, html) {
   if (PREVIEW_TO_) {
     html = '<div style="' + MAIL_STYLE_ + 'background:#fbf0ee;border:1px solid #a8322a;' +
@@ -4910,7 +4930,7 @@ function sendStudentEmails(dateStr) {
 
     if (!sampleAllowsJobs_('student',
       jobs.map(function (j) { return j.job; }).concat(handed.length ? ['pass off'] : []))) return;
-    MailApp.sendEmail(mailOptions_(who.email, 'Your Tour Job - ' + when.subject, html));
+    sendMail_(who.email, 'Your Tour Job - ' + when.subject, html);
     sent++;
   });
   return { sent: sent, skipped: skipped, date: longDate_(dateVal) };
@@ -5102,7 +5122,7 @@ function sendTeacherEmails(dateStr) {
       '<th style="' + TH_ + '">Job</th></tr>' + body + '</table>' +
       '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p></div>';
     if (!sampleAllowsJobs_('advisor', e.rows.map(function (r) { return r.job; }))) return;
-    MailApp.sendEmail(mailOptions_(email, 'Advisee on Tour Duty - ' + when.subject, html));
+    sendMail_(email, 'Advisee on Tour Duty - ' + when.subject, html);
     advisorsSent++;
   });
 
@@ -5142,7 +5162,7 @@ function sendTeacherEmails(dateStr) {
         : '') +
       '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p></div>';
     if (!sampleAllowsJobs_('class teacher', e.rows.map(function (r) { return r.job; }))) return;
-    MailApp.sendEmail(mailOptions_(email, 'Student Out of Your Class - ' + when.subject, html));
+    sendMail_(email, 'Student Out of Your Class - ' + when.subject, html);
     teachersSent++;
   });
 
@@ -5181,8 +5201,8 @@ function sendTeacherEmails(dateStr) {
       '<p>Nothing is needed from you beyond a seat.<br>' +
       escapeHtml_(senderName) + '</p></div>';
     if (!sampleAllows_('landing teacher')) return;
-    MailApp.sendEmail(mailOptions_(email,
-      'Student Visitor in Your Class - ' + when.subject, html));
+    sendMail_(email,
+      'Student Visitor in Your Class - ' + when.subject, html);
     landingSent++;
   });
 
@@ -5207,8 +5227,8 @@ function sendTeacherEmails(dateStr) {
       body + '</table>' +
       '<p>Nothing is needed from you beyond a seat.<br>' + escapeHtml_(senderName) + '</p></div>';
     if (!sampleAllows_('host teacher')) return;
-    MailApp.sendEmail(mailOptions_(email,
-      'Student Visitor in Your Class - ' + when.subject, html));
+    sendMail_(email,
+      'Student Visitor in Your Class - ' + when.subject, html);
     hostsSent++;
   });
 
@@ -5295,6 +5315,7 @@ function onOpen() {
     .addItem('Confirm a Tour Afterwards...', 'showConfirmDialog')
     .addSeparator()
     .addItem('Write an Email...', 'showWriteDialog')
+    .addItem('Test Emails...', 'showTestEmailDialog')
     .addItem('Send Emails Now...', 'showEmailDialog')
     .addSeparator()
     .addSeparator()
@@ -5631,57 +5652,98 @@ function showStaffDialog() {
   dialog_(html, 'Staff This Wednesday Tour', 640, 620);
 }
 
-function showEmailDialog() {
+/**
+ * Exactly who a real send would write to, without writing to any of them.
+ *
+ * The same code that sends, run with nothing allowed out, so the list
+ * cannot drift from what would really happen.
+ */
+function api_whoWouldGet(dateStr) {
+  clearReadCache_();
+  const dateVal = dateStr ? toDate_(dateStr) : nextTourDate_();
+  if (!dateVal) return { students: [], teachers: [], note: 'No tour on the Tour Tracker yet.' };
+
+  const grab = function (fn) {
+    const before = DRY_RUN_;
+    DRY_RUN_ = [];
+    try {
+      fn();
+      return DRY_RUN_.slice();
+    } finally {
+      DRY_RUN_ = before;
+    }
+  };
+  const students = grab(function () { sendStudentEmails(dateKey_(dateVal)); });
+  const teachers = grab(function () { sendTeacherEmails(dateKey_(dateVal)); });
+  const tidy = function (list) {
+    const seen = {};
+    return list.filter(function (x) {
+      const k = norm_(x.to) + '|' + norm_(x.subject);
+      if (seen[k]) return false;
+      seen[k] = true;
+      return true;
+    }).sort(function (a, b) { return a.to < b.to ? -1 : 1; });
+  };
+  return {
+    date: dateKey_(dateVal),
+    dateLabel: longDate_(dateVal),
+    students: tidy(students),
+    teachers: tidy(teachers)
+  };
+}
+
+/**
+ * Everything to do with testing, on its own, where nothing can reach a
+ * child by accident. Send Emails Now is the real thing and only the real
+ * thing; this is where she reads what it would say.
+ */
+function showTestEmailDialog() {
   const next = nextTourDate_();
   const html =
     '<style>' + DIALOG_CSS_ + '</style>' +
-    '<h2>Send emails now</h2>' +
-    '<p class="sub">These go out on their own on the schedule. Use this to send early, ' +
-    'or to check what would go.</p>' +
+    '<h2>Test emails</h2>' +
+    '<p class="sub"><b>Nothing here can reach a student or a teacher.</b> Every ' +
+    'message goes to you and nowhere else, whichever button you press.</p>' +
     '<label for="d">Tour date</label>' +
     '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
-    '<label class="opt"><input type="checkbox" id="test" checked>' +
-    '<span><b>Test.</b> Nothing goes to students or teachers. One copy of each kind ' +
-    'comes to you instead - one per job, one advisor, one class teacher - for the ' +
-    'Tuesday send and the Wednesday send, so you can read each as it will arrive.' +
-    '</span></label>' +
-    '<label class="opt"><input type="checkbox" id="everyone">' +
-    '<span><b>Every one of them.</b> Still a test, still only to you, but one email ' +
-    'per person rather than one per job. Use it to read what one particular student ' +
-    'or teacher gets. It is a lot of email.</span></label>' +
-    '<div style="margin-top:12px;">' +
-    '<button onclick="go(\'students\')">Send to students</button>' +
-    '<button onclick="go(\'teachers\')">Send to teachers and advisors</button>' +
-    '</div>' +
     '<div class="panel" style="margin-top:14px;">' +
-    '<b>The whole postbag, to you</b>' +
+    '<b>The whole postbag</b>' +
     '<p class="sub" style="margin:4px 0 8px;">Every email that day would send, ' +
-    'students and teachers together, one per person. Always a test: nothing reaches ' +
-    'a child or a teacher whatever the boxes above say.</p>' +
+    'students and teachers together, one per person.</p>' +
     '<button onclick="wholeDay(\'Tuesday\')">Every Tuesday email</button>' +
     '<button onclick="wholeDay(\'Wednesday\')">Every Wednesday email</button>' +
+    '</div>' +
+    '<div class="panel" style="margin-top:10px;">' +
+    '<b>One of each kind</b>' +
+    '<p class="sub" style="margin:4px 0 8px;">An example of every job rather than ' +
+    'one per person, for both days at once. Fewer to read.</p>' +
+    '<button class="ghost" onclick="sample(\'students\')">Students</button>' +
+    '<button class="ghost" onclick="sample(\'teachers\')">Teachers and advisors</button>' +
     '</div><div id="out"></div>' +
     '<script>' +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
-    'function go(which){document.getElementById("out").innerHTML="<p class=\'muted\'>Sending...</p>";' +
-    'google.script.run.withSuccessHandler(done).withFailureHandler(function(e){' +
-    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";})' +
-    '.api_sendEmails(which,document.getElementById("d").value,' +
-    'document.getElementById("test").checked,' +
-    'document.getElementById("everyone").checked);}' +
-    'function wholeDay(day){document.getElementById("out").innerHTML=' +
-    '"<p class=\'muted\'>Sending every "+esc(day)+" email to you. This takes a ' +
-    'moment...</p>";' +
-    'google.script.run.withSuccessHandler(done).withFailureHandler(function(e){' +
-    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+' +
-    '"</b></div>";}).api_sendEveryEmail(document.getElementById("d").value,day);}' +
+    'function busy(m){document.getElementById("out").innerHTML="<p class=\'muted\'>"+m+"</p>";}' +
+    'function fail(e){document.getElementById("out").innerHTML=' +
+    '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    'function wholeDay(day){busy("Sending every "+esc(day)+" email to you...");' +
+    'google.script.run.withSuccessHandler(done).withFailureHandler(fail)' +
+    '.api_sendEveryEmail(document.getElementById("d").value,day);}' +
+    'function sample(which){busy("Sending you one of each...");' +
+    'google.script.run.withSuccessHandler(done).withFailureHandler(fail)' +
+    '.api_sendEmails(which,document.getElementById("d").value,true);}' +
     'function done(r){var h="<div class=\'free\'>";' +
     'if(r.combined){h+="<b>"+(r.day?esc(r.day)+"\'s":"The")+" whole postbag.</b> "+' +
-    'r.total+" email(s) went to "+esc(r.testTo)+" and nowhere else"+' +
+    'r.total+" email(s) came to you and nowhere else"+' +
     '(r.testDays&&r.testDays.length?", covering "+esc(r.testDays.join(" and ")):"")+".";' +
-    'if(r.lines&&r.lines.length){h+="<ul><li>"+r.lines.map(esc).join("</li><li>")+' +
-    '"</li></ul>";}' +
-    'if(!r.total){h+="<br>Nothing was staffed for that date.";}' +
+    'if(r.lines&&r.lines.length){h+="<ul><li>"+r.lines.map(esc).join("</li><li>")+"</li></ul>";}' +
+    'if(!r.total){h+="<br>Nothing was staffed for that date.";}}' +
+    'else{h+="<b>One of each kind</b>, to you"+(r.testDays&&r.testDays.length?' +
+    '", for "+esc(r.testDays.join(" and ")):"")+".";' +
+    'if(r.note){h+="<br>"+esc(r.note);}' +
+    'else if(r.sent!=null){h+="<br>"+r.sent+" student email(s).";}' +
+    'else{h+="<br>"+r.advisorsSent+" advisor, "+r.teachersSent+" class teacher"+' +
+    '(r.landingSent?", "+r.landingSent+" receiving class":"")+' +
+    '(r.hostsSent?", "+r.hostsSent+" host teacher":"")+".";}}' +
     'h+="</div>";' +
     'if(r.skipped&&r.skipped.length){h+="<div class=\'warn\'><b>No Student Email on ' +
     'file, so nothing was written for:</b><br>"+esc(r.skipped.join(", "))+"</div>";}' +
@@ -5689,28 +5751,90 @@ function showEmailDialog() {
     'r.needsYou.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>";}' +
     'if(r.roster){h+="<div class=\'free\'><b>Who is on duty</b><br><a href=\'"+' +
     'r.roster.url+"\' target=\'_blank\'>"+esc(r.roster.name)+"</a></div>";}' +
-    'document.getElementById("out").innerHTML=h;return;}' +
-    'if(r.testTo){h+="<b>Test only.</b> Everything below went to "+esc(r.testTo)+' +
-    '" and nowhere else"+(r.testDays&&r.testDays.length>1?", once for each send: "+' +
-    'esc(r.testDays.join(" and ")):"")+". "+' +
-    '(r.everyone?"Every single one, not a sample.":"One of each kind, not one per person.")+' +
-    '"<br>";}' +
-    'if(r.note){h+=esc(r.note);}else{' +
-    'if(r.sent!=null){h+="<b>"+r.sent+"</b> student email(s) sent for "+esc(r.date)+".";}' +
-    'else{h+="<b>"+r.advisorsSent+"</b> advisor email(s), <b>"+r.teachersSent+' +
-    '"</b> class-teacher email(s)"+(r.hostsSent?" and <b>"+r.hostsSent+"</b> host-teacher email(s)":"")+' +
-    '" sent for "+esc(r.date)+".";}}' +
-    'h+="</div>";' +
-    'if(r.skipped&&r.skipped.length){h+="<div class=\'warn\'><b>No Student Email on file, so not sent:</b><br>"+' +
-    'esc(r.skipped.join(", "))+"</div>";}' +
-    'if(r.roster){h+="<div class=\'free\'><b>Who is on duty</b><br><a href=\'"+r.roster.url+' +
-    '"\' target=\'_blank\'>"+esc(r.roster.name)+"</a> - "+r.roster.rows+' +
-    '" ambassador(s), with their teacher and advisor. A copy is in your inbox.</div>";}' +
-    'if(r.needsYou&&r.needsYou.length){h+="<div class=\'warn\'><b>Needs you - nobody was emailed for these</b><ul>"+' +
-    'r.needsYou.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>";}' +
     'document.getElementById("out").innerHTML=h;}' +
     '<\/script>';
-  dialog_(html, 'Send Emails Now', 620, 680);
+  dialog_(html, 'Test Emails', 620, 620);
+}
+
+/**
+ * The real send, and nothing else.
+ *
+ * She sent a tour's emails to thirty children by accident, off a tick
+ * box that was ticked by default and easy to miss. So this one does not
+ * send anything until it has shown her, by name and address, exactly who
+ * is about to hear from it and she has said yes to that list. Testing
+ * lives in its own command where nothing can escape.
+ */
+function showEmailDialog() {
+  const next = nextTourDate_();
+  const html =
+    '<style>' + DIALOG_CSS_ + '</style>' +
+    '<h2>Send emails now</h2>' +
+    '<div class="warn" style="margin-bottom:10px;"><b>These go to real students and ' +
+    'real teachers.</b> They also go out on their own on the schedule, so this is ' +
+    'only for sending early. To read what they say, use <b>Test Emails</b> instead.</div>' +
+    '<label for="d">Tour date</label>' +
+    '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
+    '<div style="margin-top:12px;"><button id="look" onclick="look()">' +
+    'Show me who would get these</button></div>' +
+    '<div id="who"></div><div id="out"></div>' +
+    '<script>' +
+    'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
+    'function fail(e){document.getElementById("look").disabled=false;' +
+    'document.getElementById("out").innerHTML=' +
+    '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    'function look(){document.getElementById("look").disabled=true;' +
+    'document.getElementById("out").innerHTML="";' +
+    'document.getElementById("who").innerHTML="<p class=\'muted\'>Working it out. ' +
+    'Nothing is being sent.</p>";' +
+    'google.script.run.withSuccessHandler(show).withFailureHandler(fail)' +
+    '.api_whoWouldGet(document.getElementById("d").value);}' +
+    'function listOf(rows){return "<div class=\'panel\' style=\'max-height:150px;' +
+    'overflow:auto;\'>"+rows.map(function(r){return "<div>"+esc(r.to)+' +
+    '" <span class=\'muted\'>"+esc(r.subject)+"</span></div>";}).join("")+"</div>";}' +
+    'function show(p){document.getElementById("look").disabled=false;' +
+    'window.__p=p;' +
+    'if(p.note){document.getElementById("who").innerHTML=' +
+    '"<div class=\'warn\'><b>"+esc(p.note)+"</b></div>";return;}' +
+    'var h="<div class=\'out\'><h3>"+esc(p.dateLabel)+"</h3>";' +
+    'h+="<h4>"+p.students.length+" to students</h4>"+listOf(p.students);' +
+    'h+="<h4>"+p.teachers.length+" to teachers and advisors</h4>"+listOf(p.teachers);' +
+    'h+="</div>";' +
+    'h+="<label class=\'opt\'><input type=\'checkbox\' id=\'sure\' onchange=\'gate()\'>' +
+    '<span><b>Yes. Send these now, to the people listed above.</b></span></label>";' +
+    'h+="<div style=\'margin-top:10px;\'>' +
+    '<button id=\'bs\' onclick=\'go(&quot;students&quot;)\' disabled>Send the ' +
+    '"+p.students.length+" student email(s)</button>' +
+    '<button id=\'bt\' onclick=\'go(&quot;teachers&quot;)\' disabled>Send the ' +
+    '"+p.teachers.length+" teacher email(s)</button></div>";' +
+    'document.getElementById("who").innerHTML=h;}' +
+    'function gate(){var on=document.getElementById("sure").checked;' +
+    'document.getElementById("bs").disabled=!on;' +
+    'document.getElementById("bt").disabled=!on;}' +
+    'function go(which){var b=document.getElementById("sure");' +
+    'if(!b||!b.checked){return;}' +
+    'document.getElementById("bs").disabled=true;' +
+    'document.getElementById("bt").disabled=true;' +
+    'document.getElementById("out").innerHTML="<p class=\'muted\'>Sending for real...</p>";' +
+    'google.script.run.withSuccessHandler(done).withFailureHandler(fail)' +
+    '.api_sendEmails(which,document.getElementById("d").value,false);}' +
+    'function done(r){var h="<div class=\'free\'><b>Sent.</b> ";' +
+    'if(r.note){h+=esc(r.note);}' +
+    'else if(r.sent!=null){h+=r.sent+" student email(s) went out for "+esc(r.date)+".";}' +
+    'else{h+=r.advisorsSent+" advisor, "+r.teachersSent+" class teacher"+' +
+    '(r.landingSent?", "+r.landingSent+" receiving class":"")+' +
+    '(r.hostsSent?", "+r.hostsSent+" host teacher":"")+" for "+esc(r.date)+".";}' +
+    'h+="</div>";' +
+    'if(r.skipped&&r.skipped.length){h+="<div class=\'warn\'><b>No Student Email on ' +
+    'file, so not sent:</b><br>"+esc(r.skipped.join(", "))+"</div>";}' +
+    'if(r.needsYou&&r.needsYou.length){h+="<div class=\'warn\'><b>Needs you - nobody ' +
+    'was emailed for these</b><ul>"+r.needsYou.map(function(w){' +
+    'return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>";}' +
+    'if(r.roster){h+="<div class=\'free\'><b>Who is on duty</b><br><a href=\'"+' +
+    'r.roster.url+"\' target=\'_blank\'>"+esc(r.roster.name)+"</a></div>";}' +
+    'document.getElementById("out").innerHTML=h;}' +
+    '<\/script>';
+  dialog_(html, 'Send Emails Now', 620, 640);
 }
 
 /* ---------- what the dialogs call ---------- */

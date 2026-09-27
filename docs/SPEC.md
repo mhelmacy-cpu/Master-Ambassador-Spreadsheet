@@ -518,6 +518,25 @@ always hear well before the students. The Wednesday send is the tight
 one: at the late end it arrives 8:00 AM, still twenty-five minutes before
 ambassadors are due in the cafeteria at 8:25.
 
+### Two commands, not one
+
+**Test Emails...** and **Send Emails Now...** are separate menu items.
+
+Nothing in Test Emails can reach a student or a teacher: every message
+goes to her, whichever button she presses. It holds the whole postbag
+for a day and the one-of-each-job samples.
+
+Send Emails Now is the real thing and only the real thing. There is no
+tick box to forget. It will not send anything until she has pressed
+**Show me who would get these** and read the actual list, by name and
+address, of every message that is about to go. The send buttons are
+disabled until she ticks that she means it, and they say how many are
+going: "Send the 11 student email(s)".
+
+That list is produced by running the real send with nothing allowed out
+(`DRY_RUN_` on the one function every message passes through), so the
+preview cannot drift from what actually happens.
+
 ### Testing them
 
 "Send Emails Now..." opens with **Test** ticked. Ticked, every copy goes
