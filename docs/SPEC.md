@@ -149,6 +149,28 @@ anyone who is already guiding or greeting.
 Nobody is given two jobs in the same slot. Whoever has done fewest jobs
 so far is offered first, so the work spreads evenly across the year.
 
+### Changing a guide before it is saved
+
+Every guide in the preview is a dropdown holding that person plus
+everybody still free to guide (active, allowed the job, not already
+working that tour), each shown with grade, gender, race, strength and
+how many jobs they have done, least busy first. Change as many as she
+likes and press Save: what she picked is what reaches the Tour Tracker
+and Prospective Students.
+
+The swap is refused only where it would break the sheet rather than a
+matching rule: a name not on the Ambassadors sheet, somebody not
+Active, somebody already working that tour, or two people the Keep
+Apart list says cannot walk the same family. Anything else goes
+through, and the Saved message says what each swap did to the pair.
+
+A pair that was already on the tracker from an earlier run shows as
+plain text, not a dropdown, since re-saving it would write a second
+row. Those are changed with "Change Who Is Working..." instead.
+
+A Yes/No column reads Yes, yes, Y, TRUE or a ticked box as yes.
+Anything else, blank included, is a no.
+
 ## Changing who is working
 
 "Change Who Is Working..." opens the whole roster for a date: every job,

@@ -282,7 +282,12 @@ function blankRow_(name) {
 
 function norm_(v) { return String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' '); }
 function trim_(v) { return String(v == null ? '' : v).trim(); }
-function isYes_(v) { return norm_(v) === 'yes'; }
+/* A Yes column read the way it gets typed: Yes, yes, Y, a ticked box.
+ * Anything else, blank included, is a No. */
+function isYes_(v) {
+  const t = norm_(v);
+  return t === 'yes' || t === 'y' || t === 'true' || t === 'x';
+}
 
 /**
  * 3 High, 2 Medium, 1 Low. A blank counts as Medium: not somebody she
@@ -2267,6 +2272,20 @@ function planTour(dateStr, keepExisting) {
     };
   });
 
+  // Everybody still free who could take a guide place, so a pair can be
+  // changed in the dialog before any of it reaches the sheet.
+  const spare = pool.filter(function (a) {
+    return !used[a.name] && canDo(a, JOBS.GUIDE);
+  }).sort(fairness).map(function (a) {
+    const h = hist[norm_(a.name)] || { total: 0 };
+    return {
+      name: a.name,
+      note: [a.grade ? 'gr ' + a.grade : '', a.gender, trim_(a.presenting),
+        trim_(a.strength), h.total + ' job(s)'].filter(Boolean).join(', '),
+      yellow: norm_(a.light) === 'yellow'
+    };
+  });
+
   const everyone = [];
   pairs.forEach(function (p) { p.guideNames.forEach(function (g) { everyone.push(g); }); });
   greeters.forEach(function (c) { c.chosen.forEach(function (n) { everyone.push(n); }); });
@@ -2300,6 +2319,7 @@ function planTour(dateStr, keepExisting) {
     pairs: pairs,
     greeters: greeters,
     free: free,
+    spare: spare,
     needConfirm: needConfirm,
     overallMix: genderMix_(everyone, pool),
     overallRaceMix: traitMix_(everyone, pool, 'presenting'),
@@ -2541,9 +2561,85 @@ function setupWarnings_(all, visitors) {
   return w;
 }
 
+/**
+ * Her own changes to a pair, made in the staffing dialog before anything
+ * is written. Each one is {visitor, from, to}.
+ *
+ * The plan is what gets saved, so these are the last word: the only
+ * things refused are the ones that would break the sheet rather than a
+ * matching rule - somebody who is not there, not Active, already
+ * working that tour, or kept apart from the guide they would stand
+ * beside. Everything else goes through, and what it does to the pair is
+ * handed back so it can be said out loud.
+ */
+function applySwaps_(plan, swaps) {
+  const list = [].concat(swaps || []).filter(function (x) {
+    return x && trim_(x.to) && trim_(x.from) && norm_(x.to) !== norm_(x.from);
+  });
+  if (!list.length) return [];
+
+  const byName = {};
+  ambassadors_().forEach(function (a) { byName[norm_(a.name)] = a; });
+
+  // Everybody the plan already has a job for, so nobody is put on twice.
+  const taken = {};
+  plan.pairs.forEach(function (p) {
+    (p.guideNames || []).forEach(function (g) { taken[norm_(g)] = true; });
+    if (p.buddy) taken[norm_(p.buddy.name)] = true;
+  });
+  plan.greeters.forEach(function (c) {
+    c.chosen.forEach(function (n) { taken[norm_(n)] = true; });
+  });
+
+  const out = [];
+  list.forEach(function (x) {
+    const who = byName[norm_(x.to)];
+    if (!who) throw new Error(trim_(x.to) + ' is not on the Ambassadors sheet.');
+    if (!who.active) throw new Error(who.name + ' is not marked Active.');
+    if (taken[norm_(who.name)]) {
+      throw new Error(who.name + ' is already on this tour, and nobody works two jobs.');
+    }
+    const pair = plan.pairs.filter(function (p) {
+      return norm_(p.visitor.name) === norm_(x.visitor);
+    })[0];
+    if (!pair) {
+      throw new Error('Nobody called ' + trim_(x.visitor) + ' is visiting that day any more. ' +
+        'Press Preview again.');
+    }
+    if (pair.kept) {
+      throw new Error(pair.visitor.name + ' was already staffed on an earlier run, so this ' +
+        'is not the place to change them. Use Change Who Is Working.');
+    }
+    let at = -1;
+    pair.guideNames.forEach(function (g, i) { if (norm_(g) === norm_(x.from)) at = i; });
+    if (at === -1) {
+      throw new Error(trim_(x.from) + ' is not guiding ' + pair.visitor.name +
+        ' any more. Press Preview again.');
+    }
+    const beside = pair.guideNames.filter(function (g, i) { return i !== at; });
+    const clash = beside.filter(function (g) { return keptApart_(who.name, g); });
+    if (clash.length) {
+      throw new Error(who.name + ' and ' + clash.join(' and ') +
+        ' are on the Keep Apart list, so they cannot walk the same family.');
+    }
+
+    delete taken[norm_(pair.guideNames[at])];
+    taken[norm_(who.name)] = true;
+    out.push({
+      visitor: pair.visitor.name, from: pair.guideNames[at], to: who.name,
+      problems: pairProblems_(pair.visitor, beside.concat([who.name]))
+    });
+    pair.guideNames[at] = who.name;
+    pair.guides[at] = who.name + ' (grade ' + (who.grade || '?') + ')';
+    pair.swapped = true;
+  });
+  return out;
+}
+
 /** Writes a plan to the Tour Tracker and back onto Prospective Students. */
-function commitTour(dateStr, keepExisting, panelists) {
+function commitTour(dateStr, keepExisting, panelists, swaps) {
   const plan = planTour(dateStr, keepExisting);
+  const swapped = applySwaps_(plan, swaps);
   clearReadCache_();               // the tracker is about to change
   const dateVal = toDate_(plan.date);
   const N = SHEETS.TRACKER;
@@ -2631,7 +2727,7 @@ function commitTour(dateStr, keepExisting, panelists) {
     }
   });
 
-  return { written: out.length, panel: panel, plan: plan };
+  return { written: out.length, panel: panel, plan: plan, swapped: swapped };
 }
 
 /**
@@ -4138,7 +4234,27 @@ function showStaffDialog() {
     'document.getElementById("keep").checked);}' +
     'function fail(e){busy(false);document.getElementById("out").innerHTML=' +
     '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
-    'function render(p){busy(false);' +
+    'function guidePicker(x){if(!x.guideNames||!x.guideNames.length){return "<b>none found</b>";}' +
+    'if(x.kept){return esc(x.guides.join(", "));}' +
+    'var sp=window.__spare||[],h="";' +
+    'x.guideNames.forEach(function(g,j){' +
+    'h+="<select class=\'gsel\' data-pair=\'"+x.order+"\' data-slot=\'"+j+"\'>";' +
+    'h+="<option value=\'\'>"+esc(g)+"</option>";' +
+    'sp.forEach(function(c,k){h+="<option value=\'"+k+"\'>"+esc(c.name)+" ("+esc(c.note)+")"+' +
+    '(c.yellow?" - check first":"")+"</option>";});' +
+    'h+="</select> ";});' +
+    'return h;}' +
+    'function swapsPicked(){var out=[],sp=window.__spare||[],pr=window.__pairs||[];' +
+    'var sels=document.querySelectorAll("select.gsel");' +
+    'for(var i=0;i<sels.length;i++){var v=sels[i].value;if(!v){continue;}' +
+    'var c=sp[Number(v)];if(!c){continue;}' +
+    'var slot=Number(sels[i].getAttribute("data-slot"));' +
+    'var key=Number(sels[i].getAttribute("data-pair")),x=null;' +
+    'for(var j=0;j<pr.length;j++){if(pr[j].order===key){x=pr[j];}}' +
+    'if(!x||!x.guideNames[slot]){continue;}' +
+    'out.push({visitor:x.visitor.name,from:x.guideNames[slot],to:c.name});}' +
+    'return out;}' +
+    'function render(p){busy(false);window.__pairs=p.pairs;window.__spare=p.spare||[];' +
     'var h="<div class=\'out\'><h3>"+esc(p.dateLabel)+"</h3><table><tr><th>Visiting student</th>' +
     '<th>Guides</th><th>Route</th></tr>";' +
     'if(p.keptAnything){h+="<p class=\'muted\'>"+(p.newPairs?p.newPairs+" student(s) staffed now; ":' +
@@ -4148,7 +4264,7 @@ function showStaffDialog() {
     '(x.visitor.race?" <span class=\'muted\'>"+esc(x.visitor.race)+"</span>":"")+' +
     '(x.priority?" <b class=\'yel\'>"+esc(x.priority)+"</b>":"")+' +
     '(x.visitor.school?" <span class=\'muted\'><br>("+esc(x.visitor.school)+")</span>":"")+"</td><td>"+' +
-    '(x.guides.length?esc(x.guides.join(", ")):"<b>none found</b>")+' +
+    'guidePicker(x)+' +
     '(x.anyGrade?"<br><span class=\'muted\'>no grade on this visitor, so any grade was ' +
     'used</span>":(x.wantGrades&&x.wantGrades.length?"<br><span class=\'muted\'>looking for ' +
     'grade "+esc(x.wantGrades.map(function(g){return [].concat(g).join(" or ");}).join(" + "))+' +
@@ -4179,6 +4295,9 @@ function showStaffDialog() {
     '(x.routeShared?"<br><span class=\'muted\'>shared - every route was already ' +
     'taken</span>":"")+"</td></tr>";});' +
     'h+="</table>";' +
+    'if((window.__spare||[]).length){h+="<p class=\'muted\'>Each guide is a dropdown. ' +
+    'Change anyone you like before you save, and the list beside each name is everybody ' +
+    'still free. Nothing is written until you press Save.</p>";}' +
     'p.greeters.forEach(function(c){h+="<h3>"+esc(c.job)+" ("+c.chosen.length+" of "+c.needed+")"+' +
     '(c.keptCount?" <span class=\'muted\'>"+c.keptCount+" already assigned</span>":"")+"</h3><div>"+' +
     '(c.chosen.length?esc(c.chosen.join(", ")):"<b>none available</b>")+' +
@@ -4217,9 +4336,13 @@ function showStaffDialog() {
     '" row(s) written to the Tour Tracker, and the routes and guides filled in on ' +
     'Prospective Students."+(r.panel?"<br>Panel: "+r.panel.total+" ambassador(s)"+' +
     '(r.panel.added?", "+r.panel.added+" added":"")+(r.panel.removed?", "+r.panel.removed+' +
-    '" taken off":"")+".":"")+"</div>";})' +
+    '" taken off":"")+".":"")+' +
+    '((r.swapped&&r.swapped.length)?"<br>"+r.swapped.map(function(w){' +
+    'return esc(w.to)+" in place of "+esc(w.from)+" for "+esc(w.visitor)+' +
+    '(w.problems&&w.problems.length?" (worth a look: "+esc(w.problems.join("; "))+")":"");' +
+    '}).join("<br>"):"")+"</div>";})' +
     '.withFailureHandler(fail).api_commitTour(document.getElementById("d").value,' +
-    'document.getElementById("keep").checked,panelPicked());}' +
+    'document.getElementById("keep").checked,panelPicked(),swapsPicked());}' +
     'function panelPicked(){var out=[];var f=window.__free||[];' +
     'var boxes=document.querySelectorAll("input.pan");' +
     'for(var i=0;i<boxes.length;i++){if(boxes[i].checked){' +
@@ -4573,8 +4696,8 @@ function api_saveByHand(dateStr, job, names) {
 }
 
 function api_planTour(dateStr, keep) { return planTour(dateStr, keep); }
-function api_commitTour(dateStr, keep, panelists) {
-  return commitTour(dateStr, keep, panelists);
+function api_commitTour(dateStr, keep, panelists, swaps) {
+  return commitTour(dateStr, keep, panelists, swaps);
 }
 /**
  * One test click gives her every version that will really go out.
