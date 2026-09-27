@@ -182,9 +182,11 @@ and writes the remaining guide back onto Prospective Students. It will
 not take the last guide off a family, and it is guides only: a greeter
 is cleared on the sheet.
 
-A pair that was already on the tracker from an earlier run shows as
-plain text, not a dropdown, since re-saving it would write a second
-row. Those are changed with "Change Who Is Working..." instead.
+A pair already on the tracker from an earlier run gets dropdowns too,
+with "keep what is already assigned" still ticked. Saving then takes the
+row it replaces off the Tour Tracker before writing the new one, so the
+old name never sits there beside it. Only the pairs and crews actually
+changed are touched; the rest of the tour is left exactly as it was.
 
 A Yes/No column reads Yes, yes, Y, TRUE or a ticked box as yes.
 Anything else, blank included, is a no.
@@ -221,6 +223,13 @@ period they are missing. A greeter is back before the bell.
     Table Greeter   8:25 AM - 8:55 AM
     Tour Guide      8:25 AM - 9:05 AM
     Class Buddy     9:05 AM - 9:25 AM
+
+Where the two guides go to different rooms, only one of them walks the
+family to class, and that is the one in an academic class: Humanities,
+Maths, Science, English, History or a world language. Anything else,
+Art, Music, PE, Band, counts as the other kind. Where both or neither
+are academic it stays with the first guide, and where they share a class
+they both go.
 
 On a route sheet the handback line names the class the guide is walking
 into, read off their own schedule: "Take Robin Visitor with you to Math

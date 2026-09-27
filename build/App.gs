@@ -35,7 +35,7 @@ const SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-const BUILD_ = '2026-09-27 j';
+const BUILD_ = '2026-09-27 k';
 
 const HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -2842,6 +2842,7 @@ function applySwaps_(plan, swaps) {
         cr.chosen[where] = who.name;
       }
       cr.short = Math.max(0, cr.needed - cr.chosen.length);
+      cr.swapped = true;
       return;
     }
 
@@ -2851,10 +2852,6 @@ function applySwaps_(plan, swaps) {
     if (!pair) {
       throw new Error('Nobody called ' + trim_(x.visitor) + ' is visiting that day any more. ' +
         'Press Preview again.');
-    }
-    if (pair.kept) {
-      throw new Error(pair.visitor.name + ' was already staffed on an earlier run, so this ' +
-        'is not the place to change them. Use Change Who Is Working.');
     }
     let at = -1;
     pair.guideNames.forEach(function (g, i) { if (norm_(g) === norm_(x.from)) at = i; });
@@ -2949,6 +2946,41 @@ function commitTour(dateStr, keepExisting, panelists, swaps) {
       if (!mine[trim_(existing[i][col_(N, 'Job')])]) continue;
       tracker.deleteRow(i + 2);
     }
+  }
+
+  /* Something she has changed that was already on the tracker. The new
+   * name is about to be written, so the one it replaces has to come off,
+   * or the old row would sit there beside it. Only the pairs and crews
+   * she actually touched are looked at; the rest of the tour is left
+   * exactly as it was. */
+  if (keepExisting && swapped.length) {
+    const wantGuide = {};
+    plan.pairs.forEach(function (p) {
+      if (!p.swapped) return;
+      const set = {};
+      (p.guideNames || []).forEach(function (g) { set[norm_(g)] = true; });
+      wantGuide[norm_(p.visitor.name)] = set;
+    });
+    const wantCrew = {};
+    plan.greeters.forEach(function (c) {
+      if (!c.swapped) return;
+      const set = {};
+      c.chosen.forEach(function (n) { set[norm_(n)] = true; });
+      wantCrew[c.job] = set;
+    });
+    const had = rows_(N);
+    for (let i = had.length - 1; i >= 0; i--) {
+      if (!sameDay_(toDate_(had[i][col_(N, 'Tour Date')]), dateVal)) continue;
+      const job = trim_(had[i][col_(N, 'Job')]);
+      const who = norm_(had[i][col_(N, 'Ambassador')]);
+      if (job === JOBS.GUIDE) {
+        const set = wantGuide[norm_(had[i][col_(N, 'Prospective Student(s)')])];
+        if (set && !set[who]) tracker.deleteRow(i + 2);
+      } else if (wantCrew[job] && !wantCrew[job][who]) {
+        tracker.deleteRow(i + 2);
+      }
+    }
+    clearReadCache_();
   }
 
   // A row already on the tracker is never written twice.
@@ -3157,6 +3189,22 @@ function readCell_(name, row, header) {
  * not here is printed as the schedule has it. */
 const SUBJECT_WORDS_ = { 'hum': 'Humanities', 'sci': 'Science' };
 
+/* A visiting family sees more of the school in a Humanities or a Maths
+ * room than in Art or PE, so where there is a choice of which guide walks
+ * them to class, the academic one wins. Anything not on this list counts
+ * as the other kind. */
+const ACADEMIC_SUBJECTS_ = ['hum', 'humanities', 'math', 'maths', 'science', 'sci',
+  'english', 'history', 'social studies', 'french', 'mandarin', 'spanish',
+  'world language', 'world languages'];
+
+/** Whether a block off the schedule is an academic class. */
+function isAcademicClass_(what) {
+  const label = classLabel_(what);
+  if (!label) return false;
+  const subject = norm_(label.replace(/\s+in\s+\S.*$/, ''));
+  return ACADEMIC_SUBJECTS_.indexOf(subject) !== -1;
+}
+
 /**
  * A class as a 12 year old would say it: the subject, and the room to
  * walk to. "Math A CB M311" becomes "Math in M311".
@@ -3213,7 +3261,16 @@ function handbackPlan_(page, dateVal) {
   if (first && second && norm_(first) === norm_(second)) {
     return { takers: names, others: [], where: where };
   }
-  return { takers: [names[0]], others: names.slice(1), where: where };
+  // They are going to different rooms, so only one of them takes the
+  // family. A Humanities or a Maths room shows the school better than
+  // Art or PE, so that one takes them where there is a choice.
+  let leads = names[0];
+  if (isAcademicClass_(second) && !isAcademicClass_(first)) leads = names[1];
+  return {
+    takers: [leads],
+    others: names.filter(function (n) { return n !== leads; }),
+    where: where
+  };
 }
 
 /**
@@ -4654,7 +4711,6 @@ function showStaffDialog() {
     'function fail(e){busy(false);document.getElementById("out").innerHTML=' +
     '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
     'function guidePicker(x){if(!x.guideNames||!x.guideNames.length){return "<b>none found</b>";}' +
-    'if(x.kept){return esc(x.guides.join(", "));}' +
     'var sp=window.__spare||[],h="";' +
     'x.guideNames.forEach(function(g,j){' +
     'h+="<select class=\'gsel\' data-pair=\'"+x.order+"\' data-slot=\'"+j+"\' ' +
