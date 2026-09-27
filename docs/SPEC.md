@@ -342,6 +342,24 @@ address; one untick puts them all in the To line instead. Anybody ticked
 who has no address on file is named back to her rather than quietly
 dropped.
 
+## Finding a time to see somebody
+
+"Find a Time to See Somebody..." has nothing to do with tours. Pick a
+day and a start and finish time, tick whoever she wants to see (tick
+nobody and it shows everyone), and it reads the schedule the same way
+the tour emails do: split groups followed properly, not the homeroom
+assumed.
+
+It reports, per student, what they would be walking out of, the time of
+that block and who teaches it. Lunch, recess and homeroom are included
+and marked, since those are the answer to "when can I catch them"
+rather than something to pull them out of. A block the schedule does
+not pin to one class says so, and a student with no Homeroom or Split
+is named rather than guessed at.
+
+Nothing is written and nothing is emailed. A button turns the same
+answer into a Google Doc for printing or forwarding.
+
 ## Printouts
 
 Two documents, both built as Google Docs so they can be corrected on the

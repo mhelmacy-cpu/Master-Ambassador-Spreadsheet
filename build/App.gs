@@ -35,7 +35,7 @@ const SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-const BUILD_ = '2026-09-27 k';
+const BUILD_ = '2026-09-27 m';
 
 const HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -1592,7 +1592,7 @@ function bellSchedule_() {
  * own homeroom. Anything the schedule genuinely leaves open comes back
  * with needsYou set rather than being guessed at.
  */
-function classesMissed_(pod, split, grade, dateVal, startMin, endMin) {
+function classesMissed_(pod, split, grade, dateVal, startMin, endMin, keepNonClass) {
   const day = WEEKDAYS_[dateVal.getDay()];
   const schedule = bellSchedule_();
   const byDay = schedule.byDay;
@@ -1630,7 +1630,10 @@ function classesMissed_(pod, split, grade, dateVal, startMin, endMin) {
       const s = toMinutes_(b.start);
       const e = toMinutes_(b.end);
       if (s == null || e == null || !(s < endMin && startMin < e)) return;
-      if (NON_CLASS_RE_.test(b.what)) return;
+      // Lunch, recess and homeroom are not a class anyone is pulled out
+      // of, so a tour email never mentions them. Asked whether somebody
+      // is free at a time, though, they are exactly the answer.
+      if (!keepNonClass && NON_CLASS_RE_.test(b.what)) return;
 
       const letter = splitLetter_(b.split) || splitLetterOf_(b.what);
       if (letter) {
@@ -1659,6 +1662,7 @@ function classesMissed_(pod, split, grade, dateVal, startMin, endMin) {
         end: timeLabel_(e),
         teachers: teachers,
         unresolved: unresolved,
+        free: NON_CLASS_RE_.test(b.what),
         // A student with no split on file, on a lettered block, is a guess
         // we refuse to make.
         needsYou: (!!letter && !mySplit) || isOpenChoice_(what)
@@ -4583,6 +4587,9 @@ function onOpen() {
     .addItem('Write an Email...', 'showWriteDialog')
     .addItem('Send Emails Now...', 'showEmailDialog')
     .addSeparator()
+    .addSeparator()
+    .addItem('Find a Time to See Somebody...', 'showMeetingDialog')
+    .addSeparator()
     .addItem('Check This Script...', 'showCheckDialog')
     .addSubMenu(SpreadsheetApp.getUi().createMenu('Automation')
       .addItem('Turn ON reminder emails', 'enableReminders')
@@ -5171,6 +5178,200 @@ function showSwapDialog() {
     'h+="</div>";document.getElementById("msg").innerHTML=h;load();}' +
     '<\/script>';
   dialog_(html, 'Change Who Is Working', 640, 640);
+}
+
+/* =========================================================
+ * Finding a time to see somebody
+ *
+ * Nothing to do with tours. She picks a day and an hour, ticks whoever
+ * she wants to see, and is told what each of them would be walking out
+ * of and who teaches it.
+ * ========================================================= */
+
+/** Everyone she could ask to a meeting, least busy first is no use here: by name. */
+function api_meetingPeople() {
+  clearReadCache_();
+  return {
+    rows: ambassadors_().filter(function (a) { return a.active; })
+      .sort(function (a, b) { return a.name < b.name ? -1 : 1; })
+      .map(function (a) {
+        return {
+          name: a.name,
+          note: [a.grade ? 'grade ' + a.grade : '', a.pod, a.split ? 'split ' + a.split : '',
+            a.advisor ? 'advisor ' + a.advisor : ''].filter(Boolean).join(', '),
+          ready: !!((a.pod || a.split) && a.grade)
+        };
+      })
+  };
+}
+
+/**
+ * What each of them is in between two times on a day, and who teaches it.
+ *
+ * The same reading of the schedule the tour emails use, so a split group
+ * is followed properly rather than the homeroom being assumed.
+ */
+function meetingCheck_(dateVal, fromMin, toMin, names) {
+  const want = {};
+  (names || []).forEach(function (n) { if (trim_(n)) want[norm_(n)] = true; });
+  const all = ambassadors_().filter(function (a) {
+    if (!a.active) return false;
+    return Object.keys(want).length ? !!want[norm_(a.name)] : true;
+  });
+
+  return all.map(function (a) {
+    if (!a.pod && !a.split) {
+      return { name: a.name, grade: a.grade, advisor: a.advisor,
+        problem: 'no Homeroom or Split on the Ambassadors sheet, so their day cannot be read',
+        blocks: [] };
+    }
+    const blocks = classesMissed_(a.pod, a.split, a.grade, dateVal, fromMin, toMin, true);
+    return {
+      name: a.name,
+      grade: a.grade,
+      advisor: a.advisor,
+      problem: blocks.length ? '' : 'nothing on the schedule at that time',
+      blocks: blocks.map(function (b) {
+        const named = b.teachers.map(function (t) { return t.name; });
+        return {
+          what: classLabel_(b.what) || b.what,
+          raw: b.what,
+          start: b.start,
+          end: b.end,
+          free: !!b.free,
+          teacher: named.length ? named.join(' and ')
+            : (b.unresolved.length ? b.unresolved.join('/') + ' (not on the Teachers sheet)' : ''),
+          needsYou: !!b.needsYou
+        };
+      })
+    };
+  });
+}
+
+function api_meetingCheck(dateStr, fromTime, toTime, names) {
+  clearReadCache_();
+  const dateVal = toDate_(dateStr);
+  if (!dateVal) throw new Error('Pick a day first.');
+  const fromMin = toMinutes_(fromTime);
+  const toMin = toMinutes_(toTime);
+  if (fromMin == null || toMin == null) throw new Error('Fill in both times.');
+  if (toMin <= fromMin) throw new Error('The finish time has to be after the start time.');
+  const day = WEEKDAYS_[dateVal.getDay()];
+  if (SCHEDULE_DAYS_.indexOf(day) === -1) {
+    throw new Error(longDate_(dateVal) + ' is a ' + day + ', and the schedule only covers ' +
+      SCHEDULE_DAYS_.join(', ') + '.');
+  }
+  return {
+    date: dateKey_(dateVal),
+    dateLabel: longDate_(dateVal),
+    window: timeLabel_(fromMin) + ' - ' + timeLabel_(toMin),
+    rows: meetingCheck_(dateVal, fromMin, toMin, names)
+  };
+}
+
+/** The same answer as a Google Doc, for printing or forwarding. */
+function buildMeetingDoc(dateStr, fromTime, toTime, names) {
+  const p = api_meetingCheck(dateStr, fromTime, toTime, names);
+  const title = 'Who is where - ' + p.dateLabel + ', ' + p.window;
+  const doc = DocumentApp.create(title);
+  const body = doc.getBody();
+  body.clear();
+  body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  body.appendParagraph(p.rows.length + ' student(s).');
+
+  const table = [['Student', 'In', 'Teacher', 'When']];
+  p.rows.forEach(function (r) {
+    if (!r.blocks.length) {
+      table.push([r.name, r.problem || 'nothing on the schedule', '', '']);
+      return;
+    }
+    r.blocks.forEach(function (b, i) {
+      table.push([i ? '' : r.name, b.what + (b.needsYou ? ' (needs you)' : ''),
+        b.teacher, b.start + ' - ' + b.end]);
+    });
+  });
+  body.appendTable(table);
+  doc.saveAndClose();
+  return { url: doc.getUrl(), name: title, rows: p.rows.length };
+}
+
+function api_buildMeetingDoc(dateStr, fromTime, toTime, names) {
+  return buildMeetingDoc(dateStr, fromTime, toTime, names);
+}
+
+function showMeetingDialog() {
+  const html =
+    '<style>' + DIALOG_CSS_ + '</style>' +
+    '<h2>Find a time to see somebody</h2>' +
+    '<p class="sub">Pick a day and an hour and tick whoever you want to see. Nothing is ' +
+    'written anywhere and no email goes out: this only reads the schedule and tells you ' +
+    'what each of them would be walking out of, and who teaches it.</p>' +
+    '<label for="d">Day</label>' +
+    '<input type="date" id="d" value="' + nextWednesday() + '">' +
+    '<div style="display:flex;gap:12px;">' +
+    '<div style="flex:1;"><label for="t1">From</label>' +
+    '<input type="time" id="t1" value="08:30"></div>' +
+    '<div style="flex:1;"><label for="t2">To</label>' +
+    '<input type="time" id="t2" value="09:30"></div></div>' +
+    '<div id="who"><p class="muted">Loading the names...</p></div>' +
+    '<div style="margin-top:12px;">' +
+    '<button id="go" onclick="look()">Show me</button>' +
+    '<button class="ghost" onclick="all(true)">Tick all</button>' +
+    '<button class="ghost" onclick="all(false)">Untick all</button>' +
+    '</div><div id="out"></div>' +
+    '<script>' +
+    'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
+    'function fail(e){document.getElementById("go").disabled=false;' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    'function people(p){window.__who=p.rows;' +
+    'var h="<label class=\'opt\' style=\'margin-top:10px;\'><b>Who</b></label>' +
+    '<div class=\'panel\' style=\'max-height:150px;overflow:auto;\'>";' +
+    'p.rows.forEach(function(r,i){' +
+    'h+="<label><input type=\'checkbox\' class=\'mp\' value=\'"+i+"\'> "+esc(r.name)+' +
+    '" <span class=\'muted\'>"+esc(r.note)+"</span>"+' +
+    '(r.ready?"":" <b class=\'yel\'>needs Homeroom, Split and Grade</b>")+"</label>";});' +
+    'h+="</div><span class=\'muted\'>Tick nobody and it shows everyone.</span>";' +
+    'document.getElementById("who").innerHTML=h;}' +
+    'function all(on){var b=document.querySelectorAll("input.mp");' +
+    'for(var i=0;i<b.length;i++){b[i].checked=on;}}' +
+    'function picked(){var out=[],w=window.__who||[];' +
+    'var b=document.querySelectorAll("input.mp");' +
+    'for(var i=0;i<b.length;i++){if(b[i].checked){var k=Number(b[i].value);' +
+    'if(w[k]){out.push(w[k].name);}}}return out;}' +
+    'function look(){document.getElementById("go").disabled=true;' +
+    'document.getElementById("out").innerHTML="<p class=\'muted\'>Reading the schedule...</p>";' +
+    'google.script.run.withSuccessHandler(show).withFailureHandler(fail)' +
+    '.api_meetingCheck(document.getElementById("d").value,' +
+    'document.getElementById("t1").value,document.getElementById("t2").value,picked());}' +
+    'function show(p){document.getElementById("go").disabled=false;' +
+    'var h="<div class=\'out\'><h3>"+esc(p.dateLabel)+", "+esc(p.window)+"</h3>";' +
+    'h+="<table><tr><th>Student</th><th>Would be in</th><th>Teacher</th></tr>";' +
+    'p.rows.forEach(function(r){' +
+    'h+="<tr><td>"+esc(r.name)+(r.grade?" <span class=\'muted\'>gr "+esc(r.grade)+"</span>":"")+' +
+    '(r.advisor?"<br><span class=\'muted\'>advisor "+esc(r.advisor)+"</span>":"")+"</td>";' +
+    'if(!r.blocks.length){h+="<td colspan=\'2\'><span class=\'muted\'>"+' +
+    'esc(r.problem||"nothing on the schedule")+"</span></td></tr>";return;}' +
+    'h+="<td>"+r.blocks.map(function(b){return (b.free?"<b class=\'yel\'>"+esc(b.what)+' +
+    '"</b>":esc(b.what))+" <span class=\'muted\'>"+esc(b.start)+" - "+esc(b.end)+"</span>"+' +
+    '(b.needsYou?"<br><b>the schedule does not pin this to one class</b>":"");})' +
+    '.join("<br>")+"</td>";' +
+    'h+="<td>"+r.blocks.map(function(b){return b.teacher?esc(b.teacher):' +
+    '"<span class=\'muted\'>-</span>";}).join("<br>")+"</td></tr>";});' +
+    'h+="</table><p class=\'muted\'>Anything in yellow is lunch, recess or homeroom, ' +
+    'which is nothing to pull them out of.</p></div>";' +
+    'h+="<div style=\'margin-top:10px;\'><button class=\'ghost\' onclick=\'asDoc()\'>' +
+    'Make a Google Doc</button><span id=\'docout\' class=\'muted\'></span></div>";' +
+    'document.getElementById("out").innerHTML=h;}' +
+    'function asDoc(){document.getElementById("docout").innerHTML=" Building...";' +
+    'google.script.run.withSuccessHandler(function(r){' +
+    'document.getElementById("docout").innerHTML=" <a href=\'"+r.url+"\' target=\'_blank\'>Open "+' +
+    'esc(r.name)+"</a>";}).withFailureHandler(function(e){' +
+    'document.getElementById("docout").innerHTML=" "+esc(e.message);})' +
+    '.api_buildMeetingDoc(document.getElementById("d").value,' +
+    'document.getElementById("t1").value,document.getElementById("t2").value,picked());}' +
+    'google.script.run.withSuccessHandler(people).withFailureHandler(fail).api_meetingPeople();' +
+    '<\/script>';
+  dialog_(html, 'Find a Time to See Somebody', 640, 640);
 }
 
 /**
