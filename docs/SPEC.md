@@ -222,6 +222,18 @@ period they are missing. A greeter is back before the bell.
     Tour Guide      8:25 AM - 9:05 AM
     Class Buddy     9:05 AM - 9:25 AM
 
+On a route sheet the handback line names the class the guide is walking
+into, read off their own schedule: "Take Robin Visitor with you to Math
+in M311." The subject is the words before the first split letter, set of
+initials or room, and the room comes from the block itself, so `Hum Bs
+ES+SdB M107 M108` prints as "Humanities in M107 or M108". Where the
+block cannot be pinned to one class, or the student has no Split, it
+falls back to "to class".
+
+A class teacher whose student is guiding is told, in bold, who is about
+to arrive with them: **Please expect a visitor in your class as well:
+Robin Visitor.**
+
 The teacher email prints this window, the student email uses the end of
 it for "back in class by", and it is also what decides which class the
 email goes to - a panelist back at 9:05 is not reported absent from a

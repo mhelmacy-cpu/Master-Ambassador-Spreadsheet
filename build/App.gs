@@ -35,7 +35,7 @@ const SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-const BUILD_ = '2026-09-27 i';
+const BUILD_ = '2026-09-27 j';
 
 const HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -3153,9 +3153,43 @@ function readCell_(name, row, header) {
  * they are in different classes only one can, so one takes the visitor
  * and the other goes back alone.
  */
+/* Words for a subject that is written short on the schedule. Anything
+ * not here is printed as the schedule has it. */
+const SUBJECT_WORDS_ = { 'hum': 'Humanities', 'sci': 'Science' };
+
+/**
+ * A class as a 12 year old would say it: the subject, and the room to
+ * walk to. "Math A CB M311" becomes "Math in M311".
+ *
+ * The subject is the words before the first thing that is not one - a
+ * split letter, a teacher's initials, a room. Blank if there is nothing
+ * to go on, and the sheet then falls back to saying "to class".
+ */
+function classLabel_(what) {
+  const text = cleanBlock_(what);
+  if (!text) return '';
+  // A word still part of the subject: "Groups/Olympic" counts, "DR" does not.
+  const isWord = function (tok) {
+    return tok.split('/').every(function (part) {
+      return !part || NOT_INITIALS_.indexOf(part) !== -1;
+    });
+  };
+  const words = [];
+  text.split(/\s+/).some(function (tok) {
+    if (ROOM_RE_.test(tok)) return true;
+    if (/^[A-C]s?$/.test(tok)) return true;          // the split letter
+    if (words.length && !isWord(tok)) return true;
+    words.push(tok);
+    return false;
+  });
+  if (!words.length) return '';
+  const subject = SUBJECT_WORDS_[norm_(words.join(' '))] || words.join(' ');
+  const rooms = roomsIn_(text);
+  return rooms.length ? subject + ' in ' + rooms.join(' or ') : subject;
+}
+
 function handbackPlan_(page, dateVal) {
   const names = page.guides.map(function (g) { return g.replace(/\s*\(.*$/, ''); });
-  if (names.length < 2) return { takers: names, others: [] };
 
   const startMin = toMinutes_(setting_('Class Visit Handoff Time', '9:06'));
   const endMin = toMinutes_(setting_('Tour End Time', '9:25'));
@@ -3168,12 +3202,18 @@ function handbackPlan_(page, dateVal) {
     const usable = blocks.filter(function (b) { return !b.needsYou; });
     return usable.length ? usable[0].what : '';
   };
+  // Which class each of them walks into, so the sheet can name it rather
+  // than say "class" and leave them to work it out.
+  const where = {};
+  names.forEach(function (n) { where[n] = classLabel_(classOf(n)); });
+
+  if (names.length < 2) return { takers: names, others: [], where: where };
   const first = classOf(names[0]);
   const second = classOf(names[1]);
   if (first && second && norm_(first) === norm_(second)) {
-    return { takers: names, others: [] };
+    return { takers: names, others: [], where: where };
   }
-  return { takers: [names[0]], others: names.slice(1) };
+  return { takers: [names[0]], others: names.slice(1), where: where };
 }
 
 /**
@@ -3186,15 +3226,19 @@ function handbackFor_(page, name, dateVal) {
   const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
   const wait = setting_('Wait For', 'Maren');
   const plan = handbackPlan_(page, dateVal);
+  const where = plan.where || {};
   const takes = plan.takers.indexOf(name) !== -1;
   if (takes) {
     const withWhom = plan.takers.filter(function (n) { return n !== name; });
+    const mine = where[name];
     return (withWhom.length ? 'You and ' + withWhom.join(' and ') + ' take ' : 'Take ') +
-      page.visitor.name + ' to class with you. At ' + endsAt + ' walk them down to the ' +
-      'cafeteria and wait there with them until ' + wait + ' comes back. Then you are done.';
+      page.visitor.name + ' with you to ' + (mine || 'class') +
+      '. At ' + endsAt + ' walk them down to the cafeteria and wait there with them ' +
+      'until ' + wait + ' comes back. Then you are done.';
   }
+  const theirs = where[plan.takers[0]];
   return plan.takers.join(' and ') + ' is taking ' + page.visitor.name +
-    ' to class. Go back to your own class. You are done.';
+    ' to ' + (theirs ? theirs : 'class') + '. Go back to your own class. You are done.';
 }
 
 /** The guides' line on a sheet that ends in a 5th grade class visit. */
@@ -4245,6 +4289,13 @@ function sendTeacherEmails(dateStr) {
     if (!who) { needsYou.push(name + ' is on the tracker but not on the Ambassadors sheet.'); return; }
     const jobText = jobs.map(function (j) { return j.job; }).join(', ');
     const guiding = jobs.some(function (j) { return j.job === JOBS.GUIDE; });
+    // The visiting student this one is walking round, so the teacher is
+    // told by name who is about to arrive in their room.
+    const visiting = [];
+    jobs.forEach(function (j) {
+      const v = trim_(j.visitor);
+      if (j.job === JOBS.GUIDE && v && visiting.indexOf(v) === -1) visiting.push(v);
+    });
 
     /* advisor */
     if (who.advisor) {
@@ -4297,7 +4348,8 @@ function sendTeacherEmails(dateStr) {
           // is the job's own window - a greeter is back before the bell.
           away: awayWindow_(jobs.map(function (j) { return j.job; })) ||
             (b.start + ' - ' + b.end),
-          guiding: guiding
+          guiding: guiding,
+          visiting: visiting
         });
       });
     });
@@ -4325,6 +4377,16 @@ function sendTeacherEmails(dateStr) {
   Object.keys(byTeacher).forEach(function (email) {
     const e = byTeacher[email];
     const anyGuiding = e.rows.some(function (r) { return r.guiding; });
+    const guests = [];
+    e.rows.forEach(function (r) {
+      (r.visiting || []).forEach(function (v) {
+        if (guests.indexOf(v) === -1) guests.push(v);
+      });
+    });
+    const guestNames = guests.length > 1
+      ? guests.slice(0, -1).join(', ') + ' and ' + guests[guests.length - 1]
+      : guests.join('');
+    const guideCount = e.rows.filter(function (r) { return r.guiding; }).length;
     const body = e.rows.map(function (r) {
       return '<tr><td style="' + TD_ + '">' + escapeHtml_(r.student) + '</td>' +
         '<td style="' + TD_ + '">' + escapeHtml_(r.away) + '</td>' +
@@ -4340,8 +4402,10 @@ function sendTeacherEmails(dateStr) {
       '<th style="' + TH_ + '">Class</th><th style="' + TH_ + '">Tour job</th></tr>' +
       body + '</table>' +
       (anyGuiding
-        ? '<p>The tour guides bring their visiting student back to class with them ' +
-          'before the end of the period, so please expect a visitor as well.</p>'
+        ? '<p><b>Please expect a visitor in your class as well' +
+          (guestNames ? ': ' + escapeHtml_(guestNames) : '') + '.</b> ' +
+          (guideCount === 1 ? 'Your student brings them' : 'The tour guides bring them') +
+          ' back to class before the end of the period.</p>'
         : '') +
       '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p></div>';
     if (!sampleAllows_('class teacher')) return;
