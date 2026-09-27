@@ -167,8 +167,20 @@ through, and the Saved message says what each swap did to the pair.
 Each dropdown also offers **nobody**, which takes that place off and
 sends the family out with one guide: two down to one, decided there
 rather than left to the Can Solo rule. The option names whoever would
-be left, and says so where that student is not marked Can Solo. The
-only thing refused is emptying a pair altogether.
+be left, and says so where that student is not marked Can Solo. It
+re-labels itself as the other dropdowns change, so after swapping one
+guide it names the new one rather than the one who has gone. The only
+thing refused is emptying a pair altogether.
+
+The **Lobby Greeter** and **Table Greeter** crews work the same way: a
+dropdown per place, offering everyone free who is allowed that job, and
+**nobody** to leave the place empty and let the crew run one short.
+
+"Change Who Is Working..." carries the same **nobody** option for a
+guide on a tour that is already saved. It deletes that Tour Tracker row
+and writes the remaining guide back onto Prospective Students. It will
+not take the last guide off a family, and it is guides only: a greeter
+is cleared on the sheet.
 
 A pair that was already on the tracker from an earlier run shows as
 plain text, not a dropdown, since re-saving it would write a second

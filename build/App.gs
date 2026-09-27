@@ -35,7 +35,7 @@ const SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-const BUILD_ = '2026-09-27 h';
+const BUILD_ = '2026-09-27 i';
 
 const HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -2470,13 +2470,21 @@ function planTour(dateStr, keepExisting) {
   // Everybody still free who could take a guide place, so a pair can be
   // changed in the dialog before any of it reaches the sheet.
   const spare = pool.filter(function (a) {
-    return !used[a.name] && canDo(a, JOBS.GUIDE);
+    return !used[a.name];
   }).sort(fairness).map(function (a) {
     const h = hist[norm_(a.name)] || { total: 0 };
+    // Which jobs this one is allowed, so a dropdown offers the right
+    // people for the place it is standing in.
+    const jobs = {};
+    [JOBS.GUIDE, JOBS.LOBBY, JOBS.TABLE].forEach(function (j) {
+      jobs[j] = canDo(a, j);
+    });
     return {
       name: a.name,
       note: [a.grade ? 'gr ' + a.grade : '', a.gender, trim_(a.presenting),
         trim_(a.strength), h.total + ' job(s)'].filter(Boolean).join(', '),
+      canSolo: !!a.canSolo,
+      jobs: jobs,
       yellow: norm_(a.light) === 'yellow'
     };
   });
@@ -2813,6 +2821,30 @@ function applySwaps_(plan, swaps) {
         throw new Error(who.name + ' is already on this tour, and nobody works two jobs.');
       }
     }
+    // A greeting crew: a flat list of names, no pair and no rules about
+    // who stands next to whom. Taking one off just makes the crew smaller.
+    if (x.job && x.job !== JOBS.GUIDE) {
+      const cr = plan.greeters.filter(function (c) { return c.job === x.job; })[0];
+      if (!cr) throw new Error('There is no ' + trim_(x.job) + ' crew on this tour.');
+      let where = -1;
+      cr.chosen.forEach(function (n, i) { if (norm_(n) === norm_(x.from)) where = i; });
+      if (where === -1) {
+        throw new Error(trim_(x.from) + ' is not on the ' + x.job +
+          ' crew any more. Press Preview again.');
+      }
+      delete taken[norm_(cr.chosen[where])];
+      if (x.drop) {
+        out.push({ visitor: '', job: x.job, from: cr.chosen[where], to: '', problems: [] });
+        cr.chosen.splice(where, 1);
+      } else {
+        taken[norm_(who.name)] = true;
+        out.push({ visitor: '', job: x.job, from: cr.chosen[where], to: who.name, problems: [] });
+        cr.chosen[where] = who.name;
+      }
+      cr.short = Math.max(0, cr.needed - cr.chosen.length);
+      return;
+    }
+
     const pair = plan.pairs.filter(function (p) {
       return norm_(p.visitor.name) === norm_(x.visitor);
     })[0];
@@ -2874,6 +2906,24 @@ function applySwaps_(plan, swaps) {
     pair.guideNames[at] = who.name;
     pair.guides[at] = who.name + ' (grade ' + (who.grade || '?') + ')';
     pair.swapped = true;
+  });
+
+  // A swap after a place was taken off changes who is left walking the
+  // family, so the answer is worked out once everything has been applied
+  // rather than at the moment of the drop.
+  plan.pairs.forEach(function (p) {
+    if (!p.solo) return;
+    p.solo = p.guideNames.join(', ');
+    out.forEach(function (w) {
+      if (!w.solo || norm_(w.visitor) !== norm_(p.visitor.name)) return;
+      w.solo = p.guideNames.join(' and ');
+      const notes = pairProblems_(p.visitor, p.guideNames);
+      p.guideNames.forEach(function (g) {
+        const a = byName[norm_(g)];
+        if (a && !a.canSolo) notes.push(g + ' is not marked Can Solo on the Ambassadors sheet');
+      });
+      w.problems = notes;
+    });
   });
   return out;
 }
@@ -3497,10 +3547,22 @@ function api_swapList(dateStr) {
         yellow: norm_(a.light) === 'yellow'
       };
     });
+    const amb = {};
+    pool.forEach(function (a) { amb[norm_(a.name)] = a; });
+    const leftSolo = entry.job === JOBS.GUIDE && withNames.length
+      ? withNames.filter(function (n) { return true; }) : [];
     return {
       row: entry.row, name: entry.name, job: entry.job,
       visitor: entry.visitor, route: entry.route,
       alongside: withNames.join(', '),
+      // Taking this place off leaves the rest of the pair to walk the
+      // family alone. Only a guide, and never the last one on a family.
+      canDrop: leftSolo.length > 0,
+      soloIf: leftSolo.join(' and '),
+      soloOk: leftSolo.every(function (n) {
+        const a = amb[norm_(n)];
+        return !!(a && a.canSolo);
+      }),
       candidates: can
     };
   });
@@ -3579,6 +3641,56 @@ function confirmList_(dateVal) {
     return a.name < b.name ? -1 : 1;
   });
   return out;
+}
+
+/**
+ * Takes one guide off a family that is already staffed, so the one left
+ * walks it alone. The row comes off the Tour Tracker, which every email,
+ * route sheet and locker slip is built from, so they all follow.
+ */
+function api_dropAmbassador(dateStr, row) {
+  clearReadCache_();
+  const dateVal = toDate_(dateStr);
+  if (!dateVal) throw new Error('Pick a tour date first.');
+  const N = SHEETS.TRACKER;
+  const at = Number(row);
+  const roster = rosterRows_(dateVal);
+  const entry = roster.filter(function (r) { return r.row === at; })[0];
+  if (!entry) throw new Error('That row is not on this tour any more - reload the list.');
+  if (entry.job !== JOBS.GUIDE) {
+    throw new Error('Only a tour guide can be taken off this way. ' +
+      'For anything else, clear the row on the Tour Tracker yourself.');
+  }
+  const beside = alongside_(roster, entry).map(function (r) { return r.name; });
+  if (!beside.length) {
+    throw new Error('Taking ' + entry.name + ' off would leave ' + entry.visitor +
+      ' with nobody at all.');
+  }
+
+  sheet_(N).deleteRow(at);
+  clearReadCache_();
+  refreshCounts_();
+
+  let visitor = null;
+  prospectiveFor_(dateVal).forEach(function (v) {
+    if (norm_(v.name) === norm_(entry.visitor)) visitor = v;
+  });
+  if (visitor) {
+    const P = SHEETS.PROSPECTIVE;
+    sheet_(P).getRange(visitor.row, col_(P, 'Tour Guides') + 1).setValue(beside.join(', '));
+  }
+  const problems = pairProblems_(visitor, beside);
+  const amb = {};
+  ambassadors_().forEach(function (a) { amb[norm_(a.name)] = a; });
+  beside.forEach(function (n) {
+    const a = amb[norm_(n)];
+    if (a && !a.canSolo) problems.push(n + ' is not marked Can Solo on the Ambassadors sheet');
+  });
+
+  return {
+    from: entry.name, to: '', job: entry.job, visitor: entry.visitor,
+    solo: beside.join(' and '), problems: problems
+  };
 }
 
 function api_loadConfirm(dateStr) {
@@ -4444,7 +4556,7 @@ function showStaffDialog() {
     'document.getElementById("hand").innerHTML="<button id=\'startpanel\' ' +
     'onclick=\'handLoad()\'>Show who is free</button><span class=\'muted\'> - pick ' +
     'your panelists, then move on.</span>";}' +
-    'var PANEL="' + JOBS.PANELIST + '";' +
+    'var PANEL="' + JOBS.PANELIST + '";var GUIDE="' + JOBS.GUIDE + '";' +
     'function handLoad(){' +
     'document.getElementById("hand").innerHTML="<p class=\'muted\'>Loading...</p>";' +
     'google.script.run.withSuccessHandler(handShow).withFailureHandler(fail)' +
@@ -4481,7 +4593,8 @@ function showStaffDialog() {
     'if(x.kept){return esc(x.guides.join(", "));}' +
     'var sp=window.__spare||[],h="";' +
     'x.guideNames.forEach(function(g,j){' +
-    'h+="<select class=\'gsel\' data-pair=\'"+x.order+"\' data-slot=\'"+j+"\'>";' +
+    'h+="<select class=\'gsel\' data-pair=\'"+x.order+"\' data-slot=\'"+j+"\' ' +
+    'onchange=\'relabel("+x.order+")\'>";' +
     'h+="<option value=\'\'>"+esc(g)+"</option>";' +
     'if(x.guideNames.length>1){' +
     'var oth=x.guideNames.filter(function(o,k){return k!==j;});' +
@@ -4489,10 +4602,41 @@ function showStaffDialog() {
     'var all=cs.length===oth.length&&cs.every(function(v){return v;});' +
     'h+="<option value=\'-\'>nobody: "+esc(oth.join(" and "))+" takes this family alone"+' +
     '(all?"":" (not marked Can Solo)")+"</option>";}' +
-    'sp.forEach(function(c,k){h+="<option value=\'"+k+"\'>"+esc(c.name)+" ("+esc(c.note)+")"+' +
+    'sp.forEach(function(c,k){if(c.jobs&&!c.jobs[GUIDE]){return;}' +
+    'h+="<option value=\'"+k+"\'>"+esc(c.name)+" ("+esc(c.note)+")"+' +
     '(c.yellow?" - check first":"")+"</option>";});' +
     'h+="</select> ";});' +
     'return h;}' +
+    'function crewPicker(c,ci){var sp=window.__spare||[],h="";' +
+    'if(!c.chosen.length){return "<b>none available</b>";}' +
+    'c.chosen.forEach(function(n,j){' +
+    'h+="<select class=\'csel\' data-crew=\'"+ci+"\' data-slot=\'"+j+"\'>";' +
+    'h+="<option value=\'\'>"+esc(n)+"</option>";' +
+    'h+="<option value=\'-\'>nobody: leave this place empty</option>";' +
+    'sp.forEach(function(x,k){if(x.jobs&&!x.jobs[c.job]){return;}' +
+    'h+="<option value=\'"+k+"\'>"+esc(x.name)+" ("+esc(x.note)+")"+' +
+    '(x.yellow?" - check first":"")+"</option>";});' +
+    'h+="</select> ";});' +
+    'return h;}' +
+    'function pairOf(key){var pr=window.__pairs||[];' +
+    'for(var i=0;i<pr.length;i++){if(pr[i].order===key){return pr[i];}}return null;}' +
+    'function selsFor(key){var all=document.querySelectorAll("select.gsel"),mine=[];' +
+    'for(var i=0;i<all.length;i++){' +
+    'if(Number(all[i].getAttribute("data-pair"))===key){' +
+    'mine[Number(all[i].getAttribute("data-slot"))]=all[i];}}return mine;}' +
+    'function relabel(key){var x=pairOf(key),sp=window.__spare||[];if(!x){return;}' +
+    'var mine=selsFor(key),now=[],solo=[];' +
+    'for(var j=0;j<mine.length;j++){var v=mine[j]?mine[j].value:"";' +
+    'if(v==="-"){now[j]=null;solo[j]=false;}' +
+    'else if(v===""){now[j]=x.guideNames[j];solo[j]=!!(x.guideSolo||[])[j];}' +
+    'else{var c=sp[Number(v)];now[j]=c?c.name:x.guideNames[j];solo[j]=c?!!c.canSolo:false;}}' +
+    'for(var j=0;j<mine.length;j++){var s=mine[j];if(!s){continue;}var opt=null;' +
+    'for(var k=0;k<s.options.length;k++){if(s.options[k].value==="-"){opt=s.options[k];}}' +
+    'if(!opt){continue;}var oth=[],all=true;' +
+    'for(var k=0;k<now.length;k++){if(k!==j&&now[k]){oth.push(now[k]);if(!solo[k]){all=false;}}}' +
+    'opt.disabled=!oth.length;' +
+    'opt.text=oth.length?("nobody: "+oth.join(" and ")+" takes this family alone"+' +
+    '(all?"":" (not marked Can Solo)")):"nobody (somebody has to walk with them)";}}' +
     'function swapsPicked(){var out=[],sp=window.__spare||[],pr=window.__pairs||[];' +
     'var sels=document.querySelectorAll("select.gsel");' +
     'for(var i=0;i<sels.length;i++){var v=sels[i].value;if(!v){continue;}' +
@@ -4503,8 +4647,18 @@ function showStaffDialog() {
     'if(v==="-"){out.push({visitor:x.visitor.name,from:x.guideNames[slot],drop:true});continue;}' +
     'var c=sp[Number(v)];if(!c){continue;}' +
     'out.push({visitor:x.visitor.name,from:x.guideNames[slot],to:c.name});}' +
+    'var crews=window.__greeters||[];' +
+    'var cs=document.querySelectorAll("select.csel");' +
+    'for(var i=0;i<cs.length;i++){var v=cs[i].value;if(!v){continue;}' +
+    'var cr=crews[Number(cs[i].getAttribute("data-crew"))];' +
+    'var slot=Number(cs[i].getAttribute("data-slot"));' +
+    'if(!cr||!cr.chosen[slot]){continue;}' +
+    'if(v==="-"){out.push({job:cr.job,from:cr.chosen[slot],drop:true});continue;}' +
+    'var c2=sp[Number(v)];if(!c2){continue;}' +
+    'out.push({job:cr.job,from:cr.chosen[slot],to:c2.name});}' +
     'return out;}' +
     'function render(p){busy(false);window.__pairs=p.pairs;window.__spare=p.spare||[];' +
+    'window.__greeters=p.greeters;' +
     'var h="<div class=\'out\'><h3>"+esc(p.dateLabel)+"</h3><table><tr><th>Visiting student</th>' +
     '<th>Guides</th><th>Route</th></tr>";' +
     'if(p.keptAnything){h+="<p class=\'muted\'>"+(p.newPairs?p.newPairs+" student(s) staffed now; ":' +
@@ -4546,11 +4700,12 @@ function showStaffDialog() {
     'taken</span>":"")+"</td></tr>";});' +
     'h+="</table>";' +
     'h+="<p class=\'muted\'>Each guide is a dropdown: swap in anyone still free, or pick ' +
-    '<i>nobody</i> to drop that place and send the family out with one guide. Nothing is ' +
-    'written until you press Save.</p>";' +
-    'p.greeters.forEach(function(c){h+="<h3>"+esc(c.job)+" ("+c.chosen.length+" of "+c.needed+")"+' +
+    '<i>nobody</i> to drop that place and send the family out with one guide. The ' +
+    'greeting crews below work the same way. Nothing is written until you press ' +
+    'Save.</p>";' +
+    'p.greeters.forEach(function(c,ci){h+="<h3>"+esc(c.job)+" ("+c.chosen.length+" of "+c.needed+")"+' +
     '(c.keptCount?" <span class=\'muted\'>"+c.keptCount+" already assigned</span>":"")+"</h3><div>"+' +
-    '(c.chosen.length?esc(c.chosen.join(", ")):"<b>none available</b>")+' +
+    'crewPicker(c,ci)+' +
     '(c.mix?" <span class=\'muted\'>("+esc(c.mix)+")</span>":"")+' +
     '(c.raceMix?"<br><span class=\'muted\'>"+esc(c.raceMix)+"</span>":"")+' +
     '(c.why?" <span class=\'muted\'>- "+esc(c.why)+"</span>":"")+"</div>";});' +
@@ -4588,8 +4743,9 @@ function showStaffDialog() {
     '(r.panel.added?", "+r.panel.added+" added":"")+(r.panel.removed?", "+r.panel.removed+' +
     '" taken off":"")+".":"")+' +
     '((r.swapped&&r.swapped.length)?"<br>"+r.swapped.map(function(w){' +
-    'return (w.to?esc(w.to)+" in place of "+esc(w.from):esc(w.from)+" taken off, "+' +
-    'esc(w.solo)+" alone")+" for "+esc(w.visitor)+' +
+    'return (w.to?esc(w.to)+" in place of "+esc(w.from):esc(w.from)+" taken off"+' +
+    '(w.solo?", "+esc(w.solo)+" alone":""))+' +
+    '(w.visitor?" for "+esc(w.visitor):(w.job?" on "+esc(w.job):""))+' +
     '(w.problems&&w.problems.length?" (worth a look: "+esc(w.problems.join("; "))+")":"");' +
     '}).join("<br>"):"")+"</div>";})' +
     '.withFailureHandler(fail).api_commitTour(document.getElementById("d").value,' +
@@ -4843,8 +4999,10 @@ function showSwapDialog() {
     '<style>' + DIALOG_CSS_ + '</style>' +
     '<h2>Change who is working</h2>' +
     '<p class="sub">Everyone on the tour, and next to each of them everybody who is ' +
-    'free to take their place. Pick a name and press Swap. It goes straight onto the ' +
-    'Tour Tracker, and the emails are built from the tracker, so they follow it.</p>' +
+    'free to take their place. Pick a name, or pick <i>nobody</i> to take a guide off ' +
+    'and let the other one walk the family alone, then press Save. It goes straight ' +
+    'onto the Tour Tracker, and every email, route sheet and locker slip is built ' +
+    'from the tracker, so they all follow it.</p>' +
     '<label for="d">Tour date</label>' +
     '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
     '<div style="margin-top:12px;"><button id="load" onclick="load()">Load that tour</button></div>' +
@@ -4865,22 +5023,29 @@ function showSwapDialog() {
     'h+="<div class=\'panel\'><b>"+esc(r.name)+"</b> <span class=\'muted\'>"+esc(r.job)+' +
     '(r.visitor?" for "+esc(r.visitor):"")+(r.route?", route "+esc(r.route):"")+' +
     '(r.alongside?"<br>working with "+esc(r.alongside):"")+"</span><br>";' +
-    'if(!r.candidates.length){h+="<span class=\'muted\'>nobody else is free that day</span>";}' +
+    'if(!r.candidates.length&&!r.canDrop){h+="<span class=\'muted\'>nobody else is ' +
+    'free that day</span>";}' +
     'else{h+="<select id=\'s"+i+"\'><option value=\'\'>leave as is</option>";' +
+    'if(r.canDrop){h+="<option value=\'-\'>nobody: "+esc(r.soloIf)+' +
+    '" takes this family alone"+(r.soloOk?"":" (not marked Can Solo)")+"</option>";}' +
     'r.candidates.forEach(function(c,j){h+="<option value=\'"+j+"\'>"+esc(c.name)+' +
     '" ("+esc(c.note)+")"+(c.yellow?" - check with me first":"")+"</option>";});' +
-    'h+="</select> <button onclick=\'swap("+i+")\'>Swap</button>";}' +
+    'h+="</select> <button onclick=\'swap("+i+")\'>Save</button>";}' +
     'h+="</div>";});' +
     'h+="</div>";document.getElementById("out").innerHTML=h;}' +
     'function swap(i){var r=window.__rows[i];' +
     'var sel=document.getElementById("s"+i);if(!sel||!sel.value){return;}' +
+    'document.getElementById("msg").innerHTML="<p class=\'muted\'>Saving...</p>";' +
+    'if(sel.value==="-"){google.script.run.withSuccessHandler(done).withFailureHandler(fail)' +
+    '.api_dropAmbassador(document.getElementById("d").value,r.row);return;}' +
     'var name=r.candidates[Number(sel.value)].name;' +
-    'document.getElementById("msg").innerHTML="<p class=\'muted\'>Swapping...</p>";' +
     'google.script.run.withSuccessHandler(done).withFailureHandler(fail)' +
     '.api_swapAmbassador(document.getElementById("d").value,r.row,name);}' +
-    'function done(res){var h="<div class=\'free\'><b>"+esc(res.to)+"</b> is now "+' +
-    'esc(res.job)+(res.visitor?" for "+esc(res.visitor):"")+", in place of "+' +
-    'esc(res.from)+". The counts are up to date.";' +
+    'function done(res){var h="<div class=\'free\'>"+(res.to?"<b>"+esc(res.to)+' +
+    '"</b> is now "+esc(res.job)+(res.visitor?" for "+esc(res.visitor):"")+' +
+    '", in place of "+esc(res.from):"<b>"+esc(res.from)+"</b> is off"+' +
+    '(res.visitor?" "+esc(res.visitor)+"\'s tour":"")+", and "+esc(res.solo)+' +
+    '" is walking them alone")+". The counts are up to date.";' +
     'if(res.problems&&res.problems.length){h+="<br><b>Worth a look:</b> "+' +
     'esc(res.problems.join("; "));}' +
     'h+="</div>";document.getElementById("msg").innerHTML=h;load();}' +
