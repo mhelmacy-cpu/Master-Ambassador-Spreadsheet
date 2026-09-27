@@ -1906,6 +1906,7 @@ function planTour(dateStr, keepExisting) {
         wantGrades: wantGrades, needsSoC: needsSoC,
         guideMix: traitMix_(asAmb.map(function (a) { return a.name; }), pool, 'presenting'),
         guideRead: asAmb.map(guideRead_).join('  |  '),
+        guideSolo: asAmb.map(function (a) { return !!a.canSolo; }),
         priority: priorityWhy_(v),
         strengths: asAmb.map(function (a) {
           return a.name + ' (' + (trim_(a.strength) || 'no strength set') + ')';
@@ -2094,6 +2095,7 @@ function planTour(dateStr, keepExisting) {
       needsSoC: needsSoC,
       guideMix: traitMix_(chosen.map(function (a) { return a.name; }), pool, 'presenting'),
       guideRead: chosen.map(guideRead_).join('  |  '),
+      guideSolo: chosen.map(function (a) { return !!a.canSolo; }),
       stretched: stretched.join(', '),
       solo: soloed ? chosen.map(function (a) { return a.name; }).join(', ') : '',
       priority: priorityWhy_(v),
@@ -2574,7 +2576,9 @@ function setupWarnings_(all, visitors) {
  */
 function applySwaps_(plan, swaps) {
   const list = [].concat(swaps || []).filter(function (x) {
-    return x && trim_(x.to) && trim_(x.from) && norm_(x.to) !== norm_(x.from);
+    if (!x || !trim_(x.from)) return false;
+    if (x.drop) return true;                 // this place taken off altogether
+    return trim_(x.to) && norm_(x.to) !== norm_(x.from);
   });
   if (!list.length) return [];
 
@@ -2593,11 +2597,13 @@ function applySwaps_(plan, swaps) {
 
   const out = [];
   list.forEach(function (x) {
-    const who = byName[norm_(x.to)];
-    if (!who) throw new Error(trim_(x.to) + ' is not on the Ambassadors sheet.');
-    if (!who.active) throw new Error(who.name + ' is not marked Active.');
-    if (taken[norm_(who.name)]) {
-      throw new Error(who.name + ' is already on this tour, and nobody works two jobs.');
+    const who = x.drop ? null : byName[norm_(x.to)];
+    if (!x.drop) {
+      if (!who) throw new Error(trim_(x.to) + ' is not on the Ambassadors sheet.');
+      if (!who.active) throw new Error(who.name + ' is not marked Active.');
+      if (taken[norm_(who.name)]) {
+        throw new Error(who.name + ' is already on this tour, and nobody works two jobs.');
+      }
     }
     const pair = plan.pairs.filter(function (p) {
       return norm_(p.visitor.name) === norm_(x.visitor);
@@ -2617,6 +2623,34 @@ function applySwaps_(plan, swaps) {
         ' any more. Press Preview again.');
     }
     const beside = pair.guideNames.filter(function (g, i) { return i !== at; });
+
+    // Taking a place off on purpose: one guide walks the family. The one
+    // thing refused is emptying the pair, because then nobody is with
+    // them at all.
+    if (x.drop) {
+      if (!beside.length) {
+        throw new Error('Taking ' + pair.guideNames[at] + ' off would leave ' +
+          pair.visitor.name + ' with nobody at all.');
+      }
+      const notes = pairProblems_(pair.visitor, beside);
+      beside.forEach(function (g) {
+        const a = byName[norm_(g)];
+        if (a && !a.canSolo) notes.push(g + ' is not marked Can Solo on the Ambassadors sheet');
+      });
+      delete taken[norm_(pair.guideNames[at])];
+      out.push({
+        visitor: pair.visitor.name, from: pair.guideNames[at], to: '',
+        solo: beside.join(' and '), problems: notes
+      });
+      pair.guideNames.splice(at, 1);
+      pair.guides.splice(at, 1);
+      if (pair.guideSolo) pair.guideSolo.splice(at, 1);
+      pair.solo = beside.join(', ');
+      pair.short = 0;
+      pair.swapped = true;
+      return;
+    }
+
     const clash = beside.filter(function (g) { return keptApart_(who.name, g); });
     if (clash.length) {
       throw new Error(who.name + ' and ' + clash.join(' and ') +
@@ -4240,6 +4274,12 @@ function showStaffDialog() {
     'x.guideNames.forEach(function(g,j){' +
     'h+="<select class=\'gsel\' data-pair=\'"+x.order+"\' data-slot=\'"+j+"\'>";' +
     'h+="<option value=\'\'>"+esc(g)+"</option>";' +
+    'if(x.guideNames.length>1){' +
+    'var oth=x.guideNames.filter(function(o,k){return k!==j;});' +
+    'var cs=(x.guideSolo||[]).filter(function(v,k){return k!==j;});' +
+    'var all=cs.length===oth.length&&cs.every(function(v){return v;});' +
+    'h+="<option value=\'-\'>nobody: "+esc(oth.join(" and "))+" takes this family alone"+' +
+    '(all?"":" (not marked Can Solo)")+"</option>";}' +
     'sp.forEach(function(c,k){h+="<option value=\'"+k+"\'>"+esc(c.name)+" ("+esc(c.note)+")"+' +
     '(c.yellow?" - check first":"")+"</option>";});' +
     'h+="</select> ";});' +
@@ -4247,11 +4287,12 @@ function showStaffDialog() {
     'function swapsPicked(){var out=[],sp=window.__spare||[],pr=window.__pairs||[];' +
     'var sels=document.querySelectorAll("select.gsel");' +
     'for(var i=0;i<sels.length;i++){var v=sels[i].value;if(!v){continue;}' +
-    'var c=sp[Number(v)];if(!c){continue;}' +
     'var slot=Number(sels[i].getAttribute("data-slot"));' +
     'var key=Number(sels[i].getAttribute("data-pair")),x=null;' +
     'for(var j=0;j<pr.length;j++){if(pr[j].order===key){x=pr[j];}}' +
     'if(!x||!x.guideNames[slot]){continue;}' +
+    'if(v==="-"){out.push({visitor:x.visitor.name,from:x.guideNames[slot],drop:true});continue;}' +
+    'var c=sp[Number(v)];if(!c){continue;}' +
     'out.push({visitor:x.visitor.name,from:x.guideNames[slot],to:c.name});}' +
     'return out;}' +
     'function render(p){busy(false);window.__pairs=p.pairs;window.__spare=p.spare||[];' +
@@ -4295,9 +4336,9 @@ function showStaffDialog() {
     '(x.routeShared?"<br><span class=\'muted\'>shared - every route was already ' +
     'taken</span>":"")+"</td></tr>";});' +
     'h+="</table>";' +
-    'if((window.__spare||[]).length){h+="<p class=\'muted\'>Each guide is a dropdown. ' +
-    'Change anyone you like before you save, and the list beside each name is everybody ' +
-    'still free. Nothing is written until you press Save.</p>";}' +
+    'h+="<p class=\'muted\'>Each guide is a dropdown: swap in anyone still free, or pick ' +
+    '<i>nobody</i> to drop that place and send the family out with one guide. Nothing is ' +
+    'written until you press Save.</p>";' +
     'p.greeters.forEach(function(c){h+="<h3>"+esc(c.job)+" ("+c.chosen.length+" of "+c.needed+")"+' +
     '(c.keptCount?" <span class=\'muted\'>"+c.keptCount+" already assigned</span>":"")+"</h3><div>"+' +
     '(c.chosen.length?esc(c.chosen.join(", ")):"<b>none available</b>")+' +
@@ -4338,7 +4379,8 @@ function showStaffDialog() {
     '(r.panel.added?", "+r.panel.added+" added":"")+(r.panel.removed?", "+r.panel.removed+' +
     '" taken off":"")+".":"")+' +
     '((r.swapped&&r.swapped.length)?"<br>"+r.swapped.map(function(w){' +
-    'return esc(w.to)+" in place of "+esc(w.from)+" for "+esc(w.visitor)+' +
+    'return (w.to?esc(w.to)+" in place of "+esc(w.from):esc(w.from)+" taken off, "+' +
+    'esc(w.solo)+" alone")+" for "+esc(w.visitor)+' +
     '(w.problems&&w.problems.length?" (worth a look: "+esc(w.problems.join("; "))+")":"");' +
     '}).join("<br>"):"")+"</div>";})' +
     '.withFailureHandler(fail).api_commitTour(document.getElementById("d").value,' +

@@ -164,6 +164,12 @@ Active, somebody already working that tour, or two people the Keep
 Apart list says cannot walk the same family. Anything else goes
 through, and the Saved message says what each swap did to the pair.
 
+Each dropdown also offers **nobody**, which takes that place off and
+sends the family out with one guide: two down to one, decided there
+rather than left to the Can Solo rule. The option names whoever would
+be left, and says so where that student is not marked Can Solo. The
+only thing refused is emptying a pair altogether.
+
 A pair that was already on the tracker from an earlier run shows as
 plain text, not a dropdown, since re-saving it would write a second
 row. Those are changed with "Change Who Is Working..." instead.
