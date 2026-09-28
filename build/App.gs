@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-28 e';
+var BUILD_ = '2026-09-28 f';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -2482,25 +2482,47 @@ function planTour(dateStr, keepExisting) {
     crew(JOBS.TABLE, Number(setting_('Table Greeters Needed', '2')) || 2)
   ];
 
-  /* ---- who is left, for the panel ----
+  /* ---- the panel ----
    *
-   * The panel is hers to pick, so this only offers the people who are
-   * free to be picked. Anyone already saved as a panelist for this date
-   * is in the list too, ticked, so the list is what the panel is rather
-   * than what is left over.
+   * The panel is hers to pick, so every ambassador is offered, with
+   * whoever is free first and anyone this run has already given a job
+   * below them, marked with what that job is. Offering only the ones
+   * left over made the list a record of what the command had done, and
+   * the panel is where she changes her mind: somebody down as a guide is
+   * exactly who she may want to move onto it. Anyone already saved as a
+   * panelist is in it too, ticked.
    */
   const onPanel = {};
   assignmentsOn_(dateVal).forEach(function (a) {
     if (a.job === JOBS.PANELIST) onPanel[norm_(a.name)] = true;
   });
+  // Which family each guide has, so the list can say what ticking them
+  // would take them off.
+  const guidingFor = {};
+  pairs.forEach(function (p) {
+    (p.guideNames || []).forEach(function (n) {
+      guidingFor[norm_(n)] = p.visitor.name;
+    });
+  });
   const free = pool.filter(function (a) {
     if (onPanel[norm_(a.name)]) return true;
-    return !used[a.name] && canDo(a, JOBS.PANELIST);
-  }).sort(fairness).map(function (a) {
+    return canDo(a, JOBS.PANELIST);
+  }).sort(function (a, b) {
+    // Whoever is free comes first, then the fairest pick among them.
+    const ba = used[a.name] && !onPanel[norm_(a.name)] ? 1 : 0;
+    const bb = used[b.name] && !onPanel[norm_(b.name)] ? 1 : 0;
+    if (ba !== bb) return ba - bb;
+    return fairness(a, b);
+  }).map(function (a) {
     const h = hist[norm_(a.name)] || { total: 0 };
     return {
       name: a.name, grade: a.grade, tours: h.total,
       onPanel: !!onPanel[norm_(a.name)],
+      // What this run has given them, so she can see what ticking them
+      // would clash with rather than finding out on the tracker.
+      busy: onPanel[norm_(a.name)] ? ''
+        : (used[a.name] ? used[a.name] + (guidingFor[norm_(a.name)]
+            ? ' for ' + guidingFor[norm_(a.name)] : '') : ''),
       yellow: norm_(a.light) === 'yellow'
     };
   });
@@ -5549,7 +5571,7 @@ function showStaffDialog() {
     '<input type="date" id="d" value="' + nextWednesday() + '" onchange="restart()">' +
     '<div class="byhand">' +
     '<label><span class="step">1</span> Your panel</label>' +
-    '<div id="hand"><button id="startpanel" onclick="handLoad()">Show who is free</button>' +
+    '<div id="hand"><button id="startpanel" onclick="handLoad()">Show the ambassadors</button>' +
     '<span class="muted"> - pick your panelists, then move on.</span></div>' +
     '</div>' +
     '<div class="byhand" id="step2" hidden>' +
@@ -5570,7 +5592,7 @@ function showStaffDialog() {
     'function restart(){document.getElementById("step2").hidden=true;' +
     'document.getElementById("out").innerHTML="";' +
     'document.getElementById("hand").innerHTML="<button id=\'startpanel\' ' +
-    'onclick=\'handLoad()\'>Show who is free</button><span class=\'muted\'> - pick ' +
+    'onclick=\'handLoad()\'>Show the ambassadors</button><span class=\'muted\'> - pick ' +
     'your panelists, then move on.</span>";}' +
     'var PANEL="' + JOBS.PANELIST + '";var GUIDE="' + JOBS.GUIDE + '";' +
     'function handLoad(){' +
@@ -5583,6 +5605,7 @@ function showStaffDialog() {
     'h+="<label><input type=\'checkbox\' class=\'hnd\' value=\'"+i+"\'"+' +
     '(r.onJob?" checked":"")+"> "+esc(r.name)+" <span class=\'muted\'>"+' +
     '(r.grade?"gr "+esc(r.grade)+", ":"")+r.tours+"</span>"+' +
+    '(r.busy?" <span class=\'muted\'>- already "+esc(r.busy)+"</span>":"")+' +
     '(r.yellow?" <b class=\'yel\'>check first</b>":"")+"</label>";});' +
     'h+="</div><button onclick=\'handSave()\'>Submit the panel</button>' +
     '<button class=\'ghost\' onclick=\'skipPanel()\'>No panel this week</button>' +
@@ -5597,7 +5620,11 @@ function showStaffDialog() {
     'google.script.run.withSuccessHandler(function(r){' +
     'document.getElementById("handout").innerHTML="<b>"+r.total+" on the panel.</b>"+' +
     '(r.added?" "+r.added+" added.":"")+(r.removed?" "+r.removed+" taken off.":"")+' +
-    '" They are out of the running for everything else.";openStep2();}).withFailureHandler(fail)' +
+    '" They are out of the running for everything else."+' +
+    '((r.clashes&&r.clashes.length)?"<div class=\'warn\'><b>"+' +
+    'r.clashes.map(esc).join("<br>")+"</b><br>Nothing has been taken off the Tour ' +
+    'Tracker. Change it below, or take the row off by hand.</div>":"");' +
+    'openStep2();}).withFailureHandler(fail)' +
     '.api_saveByHand(document.getElementById("d").value,PANEL,out);}' +
     'function doPreview(){busy(true);document.getElementById("out").innerHTML="<p class=\'muted\'>Working...</p>";' +
     'google.script.run.withSuccessHandler(render).withFailureHandler(fail)' +
@@ -5770,7 +5797,9 @@ function showStaffDialog() {
     '<div class=\'panel\'>"+p.free.map(function(f,i){' +
     'return "<label><input type=\'checkbox\' class=\'pan\' value=\'"+i+"\'"+' +
     '(f.onPanel?" checked":"")+"> "+esc(f.name)+" <span class=\'muted\'>"+(f.grade?"gr "+' +
-    'esc(f.grade)+", ":"")+(f.tours||0)+"</span>"+(f.yellow?" <b class=\'yel\'>check ' +
+    'esc(f.grade)+", ":"")+(f.tours||0)+"</span>"+' +
+    '(f.busy?" <span class=\'muted\'>- already "+esc(f.busy)+"</span>":"")+' +
+    '(f.yellow?" <b class=\'yel\'>check ' +
     'first</b>":"")+"</label>";}).join("")+"</div>"+' +
     '"<span class=\'muted\'>The number is how many jobs they have done, fewest first. ' +
     'Whoever is ticked when you save is put on the Tour Tracker, so they get the same ' +
@@ -6532,18 +6561,33 @@ function api_handChoices(dateStr, job) {
   if (!dateVal) throw new Error('Pick a tour date first.');
   if (!job) throw new Error('Pick a job first.');
 
+  /* For the panel, everybody active and allowed it, whether or not they
+   * already have another job on this tour.
+   *
+   * Leaving the busy ones off made the list a record of what was left
+   * rather than a list of the people, and picking the panel is where she
+   * changes her mind: somebody down as a guide is exactly who she may
+   * want to move onto it. They are shown with the job they already have,
+   * and sorted below everybody who is free.
+   *
+   * Every other job keeps the old list of who is free, because those are
+   * assigned around the panel rather than instead of it. */
+  const showBusy = job === JOBS.PANELIST;
   const busy = {};
   const onThis = {};
   assignmentsOn_(dateVal).forEach(function (a) {
     if (a.job === job) { onThis[norm_(a.name)] = true; return; }
-    busy[norm_(a.name)] = a.job;
+    const said = a.job + (a.visitor ? ' for ' + a.visitor : '');
+    busy[norm_(a.name)] = busy[norm_(a.name)]
+      ? busy[norm_(a.name)] + ' and ' + said
+      : said;
   });
 
   const elig = eligibility_();
   const hist = jobHistory_();
   const rows = ambassadors_().filter(function (a) {
     if (!a.active) return false;
-    if (busy[norm_(a.name)]) return false;
+    if (!showBusy && busy[norm_(a.name)]) return false;
     const e = elig[norm_(a.name)];
     return !e || e[job] !== false;
   }).map(function (a) {
@@ -6551,9 +6595,15 @@ function api_handChoices(dateStr, job) {
     return {
       name: a.name, grade: a.grade, tours: h.total,
       onJob: !!onThis[norm_(a.name)],
+      busy: busy[norm_(a.name)] || '',
       yellow: norm_(a.light) === 'yellow'
     };
   }).sort(function (a, b) {
+    // Whoever is free comes first, so the list still reads as the people
+    // she can pick without moving anything else around.
+    const ba = a.busy ? 1 : 0;
+    const bb = b.busy ? 1 : 0;
+    if (ba !== bb) return ba - bb;
     if (a.tours !== b.tours) return a.tours - b.tours;
     return a.name < b.name ? -1 : 1;
   });
@@ -6566,12 +6616,22 @@ function api_saveByHand(dateStr, job, names) {
   const dateVal = toDate_(dateStr);
   if (!dateVal) throw new Error('Pick a tour date first.');
   if (!job) throw new Error('Pick a job first.');
-  const offered = api_handChoices(dateStr, job).rows.map(function (r) { return r.name; });
+  const rows = api_handChoices(dateStr, job).rows;
+  const offered = rows.map(function (r) { return r.name; });
   const out = saveByHand_(dateVal, job, names || [], offered);
   clearReadCache_();
   refreshCounts_();
   refreshClassVisits_(dateVal);
   out.job = job;
+  /* Anybody she has just picked who is already down for something else
+   * that morning. Nothing is taken off the tracker for her: doing that
+   * would quietly leave a family a guide short. She is told by name
+   * instead, and changes it in the next step. */
+  const want = {};
+  (names || []).forEach(function (n) { if (trim_(n)) want[norm_(n)] = true; });
+  out.clashes = rows.filter(function (r) {
+    return r.busy && want[norm_(r.name)];
+  }).map(function (r) { return r.name + ' is also down as ' + r.busy + '.'; });
   return out;
 }
 

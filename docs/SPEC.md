@@ -133,18 +133,27 @@ panelist is never handed a second job - including when she unticks
 "keep what is already assigned" and starts the date over, because the
 panel is hers and a re-run never clears it.
 
-She ticks them in the dialog rather than typing them onto the tracker. The
-command offers everyone still free (and anyone already on the panel,
-ticked), marks the yellow lights, and whoever is ticked when she saves is
-written to the Tour Tracker as a Panelist. That is what puts them in the
-Tuesday and Wednesday emails with everybody else.
+She ticks them in the dialog rather than typing them onto the tracker.
+**Every ambassador is offered**, in both panel lists: whoever is free
+first, then anyone this tour has already given a job, marked with what
+that job is ("already Tour Guide for Sam Visitor"). Offering only the
+ones left over made the list a record of what the command had done, and
+the panel is where she changes her mind: somebody down as a guide is
+exactly who she may want to move onto it. Anyone already on the panel is
+there too, ticked. Yellow lights are marked. Whoever is ticked when she
+saves is written to the Tour Tracker as a Panelist, which is what puts
+them in the Tuesday and Wednesday emails with everybody else.
+
+Picking somebody who already has a job does not take that job off the
+tracker: doing that quietly would leave a family a guide short. She is
+told by name instead ("Mika Rivers is also down as Tour Guide for Sam
+Visitor.") and changes it in the next step, where the guide dropdowns
+are.
 
 Unticking somebody takes their row off again. A name typed straight onto
 the tracker that the dialog never offered is left alone.
 
-Because of that, the command finishes by listing every ambassador it did
-not use, so the panel can be picked from that list without double-booking
-anyone who is already guiding or greeting.
+The command also finishes by listing every ambassador it did not use.
 
 Nobody is given two jobs in the same slot. Whoever has done fewest jobs
 so far is offered first, so the work spreads evenly across the year.
