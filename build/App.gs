@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-28 d';
+var BUILD_ = '2026-09-28 e';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -4136,6 +4136,11 @@ function lockerSlipData_(dateVal) {
   return Object.keys(grouped).sort().map(function (name) {
     const who = amb[norm_(name)];
     const mine = receiving[name] || [];
+    // A hand-off does not take them out of class, so it does not put
+    // "cafeteria 8:25, back in class by" on their slip either.
+    const working = grouped[name].filter(function (j) {
+      return j.job !== JOBS.PASSOFF;
+    });
     return {
       passOff: mine.map(function (r) {
         return (r.from
@@ -4144,7 +4149,7 @@ function lockerSlipData_(dateVal) {
           ' to you in ' + r.where + ' at ' + handoffAt +
           '. Take them down to the cafeteria at ' + tourEnd + '.';
       }),
-      working: grouped[name].length > 0,
+      working: working.length > 0,
       name: name,
       // Homeroom and advisor go on the slip because that is how a pile
       // of them gets sorted before it reaches the lockers.
@@ -4156,8 +4161,8 @@ function lockerSlipData_(dateVal) {
       // When this one is actually finished, which is their own job's
       // hours and not the end of the tour. A greeter is back at 8:55.
       backBy: (function () {
-        if (!grouped[name].length) return tourEnd;
-        const w = awayMinutes_(grouped[name].map(function (j) { return j.job; }));
+        if (!working.length) return tourEnd;
+        const w = awayMinutes_(working.map(function (j) { return j.job; }));
         return w ? timeLabel_(w.to) : '';
       })()
     };
@@ -5015,6 +5020,12 @@ function sendStudentEmails(dateStr) {
     if (!who || !who.email) { skipped.push(name); return; }
     const jobs = grouped[name];
     const handed = receiving[name] || [];
+    /* A hand-off is not a job that takes them out of class. They are
+     * sitting in the room already, the visitor is brought to them, and
+     * they never report to the cafeteria at 8:25 or come back to a class
+     * they never left. So the two lines about that are only for somebody
+     * with a real job on the tour. */
+    const working = jobs.filter(function (j) { return j.job !== JOBS.PASSOFF; });
     // Back in class when their own last job ends, not when the tour does.
     let backAt = null;
     jobs.forEach(function (j) {
@@ -5045,10 +5056,12 @@ function sendStudentEmails(dateStr) {
       (jobs.length
         ? '<p>You are on the tour schedule for ' + escapeHtml_(when.body) + ':</p>' +
           '<ul>' + items + '</ul>' +
-          '<p><b>Please come to ' + escapeHtml_(reportTo) + ' at ' +
-          escapeHtml_(reportAt) + '.</b></p>' +
-          '<p>You will be back in class by ' + escapeHtml_(backBy) + '. ' +
-          'Your teachers already know you are out.</p>'
+          (working.length
+            ? '<p><b>Please come to ' + escapeHtml_(reportTo) + ' at ' +
+              escapeHtml_(reportAt) + '.</b></p>' +
+              '<p>You will be back in class by ' + escapeHtml_(backBy) + '. ' +
+              'Your teachers already know you are out.</p>'
+            : '')
         : '<p>You are not on the tour ' + escapeHtml_(when.body) +
           ', but you are being asked to do one thing at the end of it. ' +
           'Stay in your class as normal until then.</p>') +

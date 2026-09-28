@@ -294,8 +294,16 @@ afterwards. Handing the family on again moves the row; saving twice
 does not duplicate it.
 
 They also get their own **email and locker slip**, whether or not they
-had a job that morning. Someone with no other job is told to stay in
-class until 9:06 rather than to report to the cafeteria at 8:25.
+had a job that morning.
+
+A hand-off is not a job that takes anybody out of class. They are sitting
+in the room already and the visitor is brought to them, so their email
+says who is bringing whom, where and when, what to do with them and to
+take them down to the cafeteria at 9:25, and nothing else. No reporting
+to the cafeteria at 8:25, and no line about when they are back in a class
+they never left. Their slip reads the same way. Somebody who is handed a
+family and also has a real job on the tour keeps both lines, read off
+that job's own hours.
 
 Every active ambassador whose class can be worked out is on the hand-off
 list, bar the family's own two guides, who are its first option already.
