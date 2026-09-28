@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-27 y';
+var BUILD_ = '2026-09-28 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -3629,7 +3629,7 @@ function handbackAllocate_(dateVal, entries) {
     // Nothing readable for either of them: they all go, as before.
     if (!known.length) {
       out[key] = { visitor: entry.visitor, takers: entry.guides.slice(0, 1),
-        others: entry.guides.slice(1), where: null, over: false, count: 0 };
+        others: entry.guides.slice(1), where: null, classKey: '', over: false, count: 0 };
       return;
     }
     // Both in the same room: they both take the family in, as before.
@@ -3640,7 +3640,8 @@ function handbackAllocate_(dateVal, entries) {
       load[w.key] = (load[w.key] || 0) + 1;
       classes[w.key] = w;
       out[key] = { visitor: entry.visitor, takers: known.map(function (o) { return o.name; }),
-        others: [], where: w, over: load[w.key] > cap, count: load[w.key] };
+        others: [], where: w, classKey: w.key,
+        over: load[w.key] > cap, count: load[w.key] };
       return;
     }
 
@@ -3663,6 +3664,7 @@ function handbackAllocate_(dateVal, entries) {
       takers: [pick.name],
       others: entry.guides.filter(function (n) { return n !== pick.name; }),
       where: pick.where,
+      classKey: pick.where.key,
       over: load[pick.where.key] > cap,
       count: load[pick.where.key]
     };
@@ -3708,6 +3710,41 @@ function handbackAllocate_(dateVal, entries) {
 
   return { cap: cap, byVisitor: out, byClass: byClass, problems: problems };
 }
+/**
+ * The other visiting families walking into the same room at the same
+ * time, and who is with them.
+ *
+ * Two pairs can land in one class, and a 12 year old reading their own
+ * sheet has no way of knowing that. They should look after each other's
+ * visitors and go down to the cafeteria as one group rather than two
+ * halves leaving at different moments.
+ */
+function alsoInThatClass_(dateVal, visitorName) {
+  const landed = handbackChoices_(dateVal).byVisitor;
+  const mine = landed[norm_(visitorName)];
+  if (!mine || !mine.classKey) return [];
+  const out = [];
+  Object.keys(landed).forEach(function (k) {
+    const c = landed[k];
+    if (k === norm_(visitorName) || c.classKey !== mine.classKey) return;
+    out.push({ visitor: c.visitor, withWhom: c.takers.join(' and ') });
+  });
+  return out;
+}
+
+/** That, said to a guide standing in the room. */
+function togetherLine_(dateVal, visitorName) {
+  const others = alsoInThatClass_(dateVal, visitorName);
+  if (!others.length) return '';
+  const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
+  const bits = others.map(function (o) {
+    return o.visitor + (o.withWhom ? ' with ' + o.withWhom : '');
+  });
+  return (others.length === 1 ? bits[0] + ' is' : bits.join(', ') + ' are') +
+    ' in this class too. Look after each other, and at ' + endsAt +
+    ' go down to the cafeteria together.';
+}
+
 function handbackPlan_(page, dateVal) {
   const names = page.guides.map(function (g) { return g.replace(/\s*\(.*$/, ''); });
 
@@ -3941,6 +3978,9 @@ function buildRouteSheets(dateStr) {
     const takes = handoff.takers.indexOf(sheet.guide) !== -1;
     const toSomeoneElse = !page.buddy && sheet.guide && !takes && handoff.takers.length;
 
+    // Another family in the same room, for whoever is actually in it.
+    const together = page.buddy ? '' : togetherLine_(dateVal, page.visitor.name);
+
     if (page.buddy) {
       shout_(body, handoffAt + '   ' + handoffForGuides_(page));
       shout_(body, HANDOFF_ACTION_);
@@ -3954,8 +3994,10 @@ function buildRouteSheets(dateStr) {
       say_(body, 'FOR ' + to.toUpperCase(), true);
       shout_(body, 'Take ' + page.visitor.name + ' to ' +
         (handoff.landing || 'class') + ' with you. ' + handoffReceive_(page));
+      if (together) shout_(body, together);
     } else if (sheet.guide) {
       shout_(body, handoffAt + '   ' + handbackFor_(page, sheet.guide, dateVal));
+      if (together && takes) shout_(body, together);
     }
   });
 

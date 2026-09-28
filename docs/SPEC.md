@@ -303,6 +303,16 @@ emptiest room first.
 
 Three things follow from it:
 
+**Two families in one room.** Where more than one visiting student is
+walked into the same class at 9:06, every guide standing in that room is
+told, in large type: "Visitor 2 with Camille Bedeau and George Orlofsky
+is in this class too. Look after each other, and at 9:25 AM go down to
+the cafeteria together." A family on its own gets no such line.
+
+Where the two guides of one pair share a class, they both take their
+visitor in and both walk them back, which the sheet already says: "You
+and Avery Griffiths take Sam Visitor to Math in M311 with you."
+
 - **The route sheet.** The guide's page ends, in large type, with
   "Robin Visitor is going to Science in M307 with Jane Moss." and "Give
   them the tour route, the clock, and YOUR NAME TAG. Then go back to
