@@ -301,17 +301,20 @@ The hand-off list puts the people working the tour first, since they are
 out of class anyway and know how the morning runs, and within that the
 emptiest room first.
 
-Three things follow from it:
+**A pair who share a class stay together.** Where the two guides on one
+family are in the same class at 9:06, they both take their visitor in
+and both walk them down to the cafeteria at 9:25: "You and Avery
+Griffiths take Sam Visitor to Math in M311 with you." Neither of them is
+sent back on their own, and neither hands over their name tag.
 
-**Two families in one room.** Where more than one visiting student is
-walked into the same class at 9:06, every guide standing in that room is
-told, in large type: "Visitor 2 with Camille Bedeau and George Orlofsky
-is in this class too. Look after each other, and at 9:25 AM go down to
-the cafeteria together." A family on its own gets no such line.
+Two ways of knowing they are together: the block at 9:06 reads the same
+for both of them, or they are in the same grade, homeroom and split,
+which puts them in the same room even where the block itself is an open
+choice the schedule cannot read for one student (a language period,
+Majors, Electives). Other pairs in the same room are not this guide's
+business and are not mentioned.
 
-Where the two guides of one pair share a class, they both take their
-visitor in and both walk them back, which the sheet already says: "You
-and Avery Griffiths take Sam Visitor to Math in M311 with you."
+Three things follow from a hand-off:
 
 - **The route sheet.** The guide's page ends, in large type, with
   "Robin Visitor is going to Science in M307 with Jane Moss." and "Give
@@ -329,7 +332,9 @@ family to class, and that is the one in an academic class: Humanities,
 Maths, Science, English, History or a world language. Anything else,
 Art, Music, PE, Band, counts as the other kind. Where both or neither
 are academic it stays with the first guide, and where they share a class
-they both go.
+they both go. The guide who goes back is told where the family has gone
+and nothing else: "Avery Griffiths takes Sam Visitor to Math in M311. Go
+back to your own class. You are finished."
 
 On a route sheet the handback line names the class the guide is walking
 into, read off their own schedule: "Take Robin Visitor with you to Math

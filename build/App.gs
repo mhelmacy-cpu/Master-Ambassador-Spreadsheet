@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-28 a';
+var BUILD_ = '2026-09-28 b';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -3544,6 +3544,20 @@ function handbackAllocate_(dateVal, entries) {
     };
   };
 
+  /* Which schedule a guide follows, whether or not the block at 9:06
+   * can be read.
+   *
+   * Two ambassadors in the same grade, the same homeroom and the same
+   * split sit in the same room all morning. Comparing the block text
+   * alone misses that whenever the period is an open choice (a language
+   * or an elective), and a pair that is really together was being split
+   * up, one of them sent back to a class they share with the other. */
+  const groupOf = function (name) {
+    const a = amb[norm_(name)];
+    if (!a || (!a.pod && !a.split)) return '';
+    return norm_(a.grade) + '|' + norm_(a.pod) + '|' + norm_(a.split);
+  };
+
   const byVisitor = {};
   const order = [];
   (entries || []).forEach(function (e) {
@@ -3582,6 +3596,7 @@ function handbackAllocate_(dateVal, entries) {
    * that still belongs to one of the visitor's own guides is honoured
    * either way, because there is nothing stale about it. */
   const chosenBy = {};
+  const told = {};
   const problems = [];
   if (optionalCol_(SHEETS.PROSPECTIVE, 'Class Visit To') !== -1) {
     prospectiveFor_(dateVal).forEach(function (v) {
@@ -3601,6 +3616,11 @@ function handbackAllocate_(dateVal, entries) {
       const stillGuiding = theirs.some(function (g) { return norm_(g) === norm_(said); });
       if (!(hers || v.passOff || stillGuiding)) return;
       chosenBy[norm_(v.name)] = said;
+      // Hers, or flagged as a hand-off: an instruction, and it outranks
+      // everything, a pair who share a class included. The long form on
+      // a family she has not touched is only the script's own record of
+      // what it worked out last time, so it settles nothing.
+      if (hers || v.passOff) told[norm_(v.name)] = said;
       // A name it cannot act on is said out loud rather than dropped.
       // Being quietly ignored is how an afternoon gets wasted.
       if (!handedTo[norm_(said)]) {
@@ -3622,26 +3642,57 @@ function handbackAllocate_(dateVal, entries) {
   order.forEach(function (key) {
     const entry = byVisitor[key];
     const options = entry.guides.map(function (n) {
-      return { name: n, where: classOf(n) };
+      return { name: n, where: classOf(n), group: groupOf(n) };
     });
     const known = options.filter(function (o) { return !!o.where; });
 
-    // Nothing readable for either of them: they all go, as before.
+    /* Her own answer, typed into Class Visit To or picked in the dialog,
+     * beats everything below it, including a pair who share a class. */
+    const said = chosenBy[norm_(entry.visitor)];
+    const instruction = told[norm_(entry.visitor)];
+    if (instruction && handedTo[norm_(instruction)]) {
+      const hers = handedTo[norm_(instruction)];
+      load[hers.where.key] = (load[hers.where.key] || 0) + 1;
+      classes[hers.where.key] = hers.where;
+      out[key] = {
+        visitor: entry.visitor, takers: [hers.name],
+        others: entry.guides.filter(function (n) { return norm_(n) !== norm_(hers.name); }),
+        where: hers.where, classKey: hers.where.key,
+        over: load[hers.where.key] > cap, count: load[hers.where.key]
+      };
+      return;
+    }
+
+    /* The pair are in the same class, so they both stay with the family
+     * and walk them down to the cafeteria together. Two ways of knowing
+     * it: the block at 9:06 reads the same for both of them, or they are
+     * in the same grade, homeroom and split, which puts them in the same
+     * room even when the block itself cannot be read. */
+    const together = options.length > 1 && (
+      (known.length === options.length && known.every(function (o) {
+        return o.where.key === known[0].where.key;
+      })) ||
+      (!!options[0].group && options.every(function (o) {
+        return o.group === options[0].group;
+      })));
+    if (together) {
+      const w = known.length ? known[0].where : null;
+      if (w) {
+        load[w.key] = (load[w.key] || 0) + 1;
+        classes[w.key] = w;
+      }
+      out[key] = { visitor: entry.visitor,
+        takers: entry.guides.slice(), others: [],
+        where: w, classKey: w ? w.key : '',
+        over: w ? load[w.key] > cap : false, count: w ? load[w.key] : 0 };
+      return;
+    }
+
+    // Nothing readable for any of them: the first one takes the family,
+    // and the sheet says "class" because it has no room to name.
     if (!known.length) {
       out[key] = { visitor: entry.visitor, takers: entry.guides.slice(0, 1),
         others: entry.guides.slice(1), where: null, classKey: '', over: false, count: 0 };
-      return;
-    }
-    // Both in the same room: they both take the family in, as before.
-    if (known.length > 1 && known.every(function (o) {
-      return o.where.key === known[0].where.key;
-    })) {
-      const w = known[0].where;
-      load[w.key] = (load[w.key] || 0) + 1;
-      classes[w.key] = w;
-      out[key] = { visitor: entry.visitor, takers: known.map(function (o) { return o.name; }),
-        others: [], where: w, classKey: w.key,
-        over: load[w.key] > cap, count: load[w.key] };
       return;
     }
 
@@ -3651,12 +3702,7 @@ function handbackAllocate_(dateVal, entries) {
     known.sort(function (a, b) {
       return (a.where.academic ? 0 : 1) - (b.where.academic ? 0 : 1);
     });
-    let pick = known[0];
-
-    // Her own answer, typed into Class Visit To or picked in the dialog,
-    // beats all of it.
-    const said = chosenBy[norm_(entry.visitor)];
-    if (said && handedTo[norm_(said)]) pick = handedTo[norm_(said)];
+    const pick = known[0];
     load[pick.where.key] = (load[pick.where.key] || 0) + 1;
     classes[pick.where.key] = pick.where;
     out[key] = {
@@ -3710,41 +3756,6 @@ function handbackAllocate_(dateVal, entries) {
 
   return { cap: cap, byVisitor: out, byClass: byClass, problems: problems };
 }
-/**
- * The other visiting families walking into the same room at the same
- * time, and who is with them.
- *
- * Two pairs can land in one class, and a 12 year old reading their own
- * sheet has no way of knowing that. They should look after each other's
- * visitors and go down to the cafeteria as one group rather than two
- * halves leaving at different moments.
- */
-function alsoInThatClass_(dateVal, visitorName) {
-  const landed = handbackChoices_(dateVal).byVisitor;
-  const mine = landed[norm_(visitorName)];
-  if (!mine || !mine.classKey) return [];
-  const out = [];
-  Object.keys(landed).forEach(function (k) {
-    const c = landed[k];
-    if (k === norm_(visitorName) || c.classKey !== mine.classKey) return;
-    out.push({ visitor: c.visitor, withWhom: c.takers.join(' and ') });
-  });
-  return out;
-}
-
-/** That, said to a guide standing in the room. */
-function togetherLine_(dateVal, visitorName) {
-  const others = alsoInThatClass_(dateVal, visitorName);
-  if (!others.length) return '';
-  const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
-  const bits = others.map(function (o) {
-    return o.visitor + (o.withWhom ? ' with ' + o.withWhom : '');
-  });
-  return (others.length === 1 ? bits[0] + ' is' : bits.join(', ') + ' are') +
-    ' in this class too. Look after each other, and at ' + endsAt +
-    ' go down to the cafeteria together.';
-}
-
 function handbackPlan_(page, dateVal) {
   const names = page.guides.map(function (g) { return g.replace(/\s*\(.*$/, ''); });
 
@@ -3783,7 +3794,15 @@ function handbackPlan_(page, dateVal) {
   }
   const first = classOf(names[0]);
   const second = classOf(names[1]);
-  if (first && second && norm_(first) === norm_(second)) {
+  const groupOf = function (name) {
+    const a = amb[norm_(name)];
+    if (!a || (!a.pod && !a.split)) return '';
+    return norm_(a.grade) + '|' + norm_(a.pod) + '|' + norm_(a.split);
+  };
+  // The same room, either because the block reads the same or because
+  // they are in the same grade, homeroom and split.
+  if ((first && second && norm_(first) === norm_(second)) ||
+      (groupOf(names[0]) && groupOf(names[0]) === groupOf(names[1]))) {
     return { takers: names, others: [], where: where };
   }
   let leads = names[0];
@@ -3976,10 +3995,15 @@ function buildRouteSheets(dateStr) {
      * the block for whoever is receiving them. */
     const handoff = handbackPlan_(page, dateVal);
     const takes = handoff.takers.indexOf(sheet.guide) !== -1;
-    const toSomeoneElse = !page.buddy && sheet.guide && !takes && handoff.takers.length;
-
-    // Another family in the same room, for whoever is actually in it.
-    const together = page.buddy ? '' : togetherLine_(dateVal, page.visitor.name);
+    /* Handed over only where nobody on this pair is taking the family.
+     * When the other guide takes them, this guide keeps their name tag
+     * and the sheet just tells them where the family has gone. */
+    const mine = [sheet.guide].concat(sheet.others);
+    const kept = handoff.takers.some(function (n) {
+      return mine.some(function (g) { return norm_(g) === norm_(n); });
+    });
+    const toSomeoneElse = !page.buddy && sheet.guide && !takes && !kept &&
+      handoff.takers.length;
 
     if (page.buddy) {
       shout_(body, handoffAt + '   ' + handoffForGuides_(page));
@@ -3994,10 +4018,8 @@ function buildRouteSheets(dateStr) {
       say_(body, 'FOR ' + to.toUpperCase(), true);
       shout_(body, 'Take ' + page.visitor.name + ' to ' +
         (handoff.landing || 'class') + ' with you. ' + handoffReceive_(page));
-      if (together) shout_(body, together);
     } else if (sheet.guide) {
       shout_(body, handoffAt + '   ' + handbackFor_(page, sheet.guide, dateVal));
-      if (together && takes) shout_(body, together);
     }
   });
 
