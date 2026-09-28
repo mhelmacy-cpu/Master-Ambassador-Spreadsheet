@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-28 b';
+var BUILD_ = '2026-09-28 c';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -2543,7 +2543,7 @@ function planTour(dateStr, keepExisting) {
       takers: c.takers, where: c.where.label, teacher: c.where.teacher,
       count: c.count, over: c.over
     } : null;
-    p.classOptions = (c.options || []).slice(0, 40);
+    p.classOptions = (c.options || []).slice();
   });
 
   const everyone = [];
@@ -3716,16 +3716,34 @@ function handbackAllocate_(dateVal, entries) {
     };
   });
 
-  // For each family, who else could take them and where that would be.
+  /* For each family, who else could take them and where that would be.
+   *
+   * Everybody active whose class can be worked out is on this list, bar
+   * the family's own guides, who are the list's first option already.
+   * Somebody sitting in the room the family is walking into used to be
+   * left off it, on the grounds that handing them over would not empty
+   * the room out. That went wrong in the one way a list must not: a name
+   * she went looking for was not there, with nothing on the screen to
+   * say why. They are on it now, marked as being in that class and put
+   * last, and the reason for picking them is hers. */
   order.forEach(function (key) {
     const mine = out[key];
     const hereKey = mine.where ? mine.where.key : '';
+    const guiding = {};
+    (byVisitor[key] || { guides: [] }).guides.forEach(function (n) {
+      guiding[norm_(n)] = true;
+    });
     mine.options = elsewhere.filter(function (o) {
-      return o.where.key !== hereKey;
+      return !guiding[norm_(o.name)];
     }).sort(function (a, b) {
-      // Whoever is already working the tour comes first: they are out of
-      // class anyway and know what the morning is. Then the emptiest
-      // room, so a class that is already full is not the easy pick.
+      // The room the family is already going to comes last: it is a real
+      // answer, but rarely the one she wants. Then whoever is working the
+      // tour, since they are out of class anyway and know what the
+      // morning is, and then the emptiest room, so a class that is
+      // already full is not the easy pick.
+      const sa = a.where.key === hereKey ? 1 : 0;
+      const sb = b.where.key === hereKey ? 1 : 0;
+      if (sa !== sb) return sa - sb;
       const ja = a.job ? 0 : 1;
       const jb = b.job ? 0 : 1;
       if (ja !== jb) return ja - jb;
@@ -3737,7 +3755,8 @@ function handbackAllocate_(dateVal, entries) {
       return {
         name: o.name, where: o.where.label, teacher: o.where.teacher,
         job: o.job, count: load[o.where.key] || 0,
-        full: (load[o.where.key] || 0) >= cap
+        full: (load[o.where.key] || 0) >= cap,
+        same: !!hereKey && o.where.key === hereKey
       };
     });
   });
@@ -5595,7 +5614,8 @@ function showStaffDialog() {
     'if(pass){h+="<option value=\'none\'>No hand-off: back to their own guide</option>";}' +
     'o.forEach(function(c,k){h+="<option value=\'"+k+"\'>"+esc(c.name)+" - "+' +
     'esc(c.where)+(c.teacher?" ("+esc(c.teacher)+")":"")+", "+c.count+" there"+' +
-    '(c.full?" - full":"")+(c.job?"":" - not on this tour")+"</option>";});' +
+    '(c.full?" - full":"")+(c.same?" - same room":"")+' +
+    '(c.job?"":" - not on this tour")+"</option>";});' +
     'h+="</select>";return h;}' +
     'function handoffsPicked(){var out=[],pr=window.__pairs||[];' +
     'var sels=document.querySelectorAll("select.hsel");' +

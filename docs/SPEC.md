@@ -297,9 +297,18 @@ They also get their own **email and locker slip**, whether or not they
 had a job that morning. Someone with no other job is told to stay in
 class until 9:06 rather than to report to the cafeteria at 8:25.
 
-The hand-off list puts the people working the tour first, since they are
-out of class anyway and know how the morning runs, and within that the
-emptiest room first.
+Every active ambassador whose class can be worked out is on the hand-off
+list, bar the family's own two guides, who are its first option already.
+Nobody is filtered out of it and it is never cut short: a name she goes
+looking for has to be there, and a name missing with nothing on screen
+to say why is a bug, not a shortcut.
+
+The order is: a different room first, then whoever is working the tour,
+since they are out of class anyway and know how the morning runs, then
+the emptiest room. Somebody sitting in the room the family is already
+walking into comes last, marked "same room", because it is a real answer
+(the guide has to leave, another student in that class takes the visitor)
+and rarely the one she wants.
 
 **A pair who share a class stay together.** Where the two guides on one
 family are in the same class at 9:06, they both take their visitor in
