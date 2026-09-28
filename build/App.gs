@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-28 f';
+var BUILD_ = '2026-09-28 g';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -148,6 +148,12 @@ var DEFAULT_SETTINGS = [
   ['Tour End Time', '9:25'],
   ['Ambassadors Report To', 'the cafeteria'],
   ['Ambassadors Report At', '8:25 AM'],
+  /* Where a visiting family is taken at the end and left with her. Not
+   * the same place as the one above: they start in the cafeteria and
+   * finish in the co-lab. Every sentence about the end of the morning,
+   * in the emails, on the slips and on the route sheets, reads it from
+   * here, so moving it moves all of them at once. */
+  ['Visitors End In', 'the co-lab'],
   ['Lobby Greeters Needed', '3'],
   ['Table Greeters Needed', '2'],
   ['Tour Guides Per Visiting Student', '2'],
@@ -672,7 +678,7 @@ function setupProspective_() {
     'with one of their guides, as usual.\n\n' +
     'For a rising 5th grader you can instead pick one of the 5th grade ' +
     'language classes. A 5th grader from that class collects them from the ' +
-    'guides and walks them down to the cafeteria at the end.');
+    'guides and walks them to ' + endPlace_() + ' at the end.');
   note_(s, SHEETS.PROSPECTIVE, 'Full Pay',
     'Yes on either this or Well Connected and their guides are picked from the ' +
     'High Strength ambassadors first. It never overrides the grade, gender or ' +
@@ -741,8 +747,8 @@ function setupBuddies_() {
     'visits follow - the Teacher and Room should change with it.');
   note_(s, SHEETS.BUDDIES, 'Can Host a Visitor',
     'Yes means this student can have a visiting student join them in class. ' +
-    'They collect the visitor from the tour guides and walk them down to the ' +
-    'cafeteria at the end.');
+    'They collect the visitor from the tour guides and walk them to ' +
+    endPlace_() + ' at the end.');
   s.autoResizeColumns(1, HEADERS[SHEETS.BUDDIES].length);
 }
 
@@ -757,7 +763,7 @@ function setupJobs_() {
     [JOBS.GUIDE, 'Walks a prospective student round the building on a set route.', 'Yes'],
     [JOBS.BUDDY, 'A 5th grader hosting a visiting student in their own class after the tour.', 'Yes'],
     [JOBS.PASSOFF, 'Given a visiting student at the end of a tour they did not guide, ' +
-      'and takes them down to the cafeteria at the end.', 'Yes']
+      'and takes them to ' + endPlace_() + ' at the end.', 'Yes']
   ].map(function (r) {
     const hours = JOB_HOURS_[r[0]] || ['', ''];
     return r.concat([hours[0], hours[1]]);
@@ -927,6 +933,17 @@ function keepApart_() {
     });
     return { apart: apart, pairs: pairs, unknown: unknown, ambiguous: ambiguous };
   });
+}
+
+/**
+ * Where a visiting family is taken at the end and left with her.
+ *
+ * One place, read from Settings, so the emails, the locker slips, the
+ * route sheets and the tracker notes cannot drift apart from each other
+ * or from where she is actually standing at 9:25.
+ */
+function endPlace_() {
+  return setting_('Visitors End In', 'the co-lab');
 }
 
 /** True if these two are on the list. */
@@ -1247,9 +1264,32 @@ function setupRoutes_() {
   s.autoResizeColumns(1, 4);
 }
 
+/**
+ * Settings added since her sheet was made, put on the end of it.
+ *
+ * Only ever adds. A value she has changed is left exactly as it is, and
+ * the order of what is already there does not move. Without this a new
+ * setting works off its default and she can never see it, let alone
+ * change it.
+ */
+function ensureSettings_() {
+  const s = sheet_(SHEETS.SETTINGS);
+  if (s.getLastRow() < 2) return 0;
+  const have = {};
+  s.getRange(2, 1, s.getLastRow() - 1, 1).getValues().forEach(function (r) {
+    have[norm_(r[0])] = true;
+  });
+  const add = DEFAULT_SETTINGS.filter(function (d) { return !have[norm_(d[0])]; });
+  if (!add.length) return 0;
+  const at = s.getLastRow() + 1;
+  s.getRange(at, 2, add.length, 1).setNumberFormat('@');
+  s.getRange(at, 1, add.length, 2).setValues(add);
+  return add.length;
+}
+
 function setupSettings_() {
   const s = sheet_(SHEETS.SETTINGS);
-  if (s.getLastRow() > 1) return;
+  if (s.getLastRow() > 1) { ensureSettings_(); return; }
   // Plain text, or Sheets reads "6 and 6" style values as dates and the
   // grades come back as a day and a year.
   s.getRange(2, 2, Math.max(DEFAULT_SETTINGS.length, 200), 1).setNumberFormat('@');
@@ -2040,7 +2080,7 @@ function buddyHandoff_(p, buddy, handoff, tourEnd) {
   return timeLabelOrRaw_(handoff) + ' - bring ' + p.visitor.name + ' to ' + buddy.name +
     ' in ' + buddy.room + ' (' + buddy.teacher + ', ' + buddy.language + '). Tour guides are ' +
     'finished and can go back to class. ' + buddy.name + ' brings ' + p.visitor.name +
-    ' down to the cafeteria at ' + timeLabelOrRaw_(tourEnd) + '.';
+    ' to ' + endPlace_() + ' at ' + timeLabelOrRaw_(tourEnd) + '.';
 }
 
 function planTour(dateStr, keepExisting) {
@@ -3686,7 +3726,7 @@ function handbackAllocate_(dateVal, entries) {
     }
 
     /* The pair are in the same class, so they both stay with the family
-     * and walk them down to the cafeteria together. Two ways of knowing
+     * and walk them down together at the end. Two ways of knowing
      * it: the block at 9:06 reads the same for both of them, or they are
      * in the same grade, homeroom and split, which puts them in the same
      * room even when the block itself cannot be read. */
@@ -3882,7 +3922,7 @@ function handbackFor_(page, name, dateVal) {
     const mine = where[name];
     return (withWhom.length ? 'You and ' + withWhom.join(' and ') + ' take ' : 'Take ') +
       page.visitor.name + ' to ' + (mine || 'your class') + ' with you. At ' + endsAt +
-      ' take them to the cafeteria and wait there with them until ' + wait + ' comes.';
+      ' take them to ' + endPlace_() + ' and wait there with them until ' + wait + ' comes.';
   }
   const theirs = where[plan.takers[0]];
   return plan.takers.join(' and ') + ' takes ' + page.visitor.name +
@@ -3911,7 +3951,7 @@ function handoffReceive_(page, visitorName) {
   const wait = setting_('Wait For', 'Maren');
   const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
   return 'At ' + endsAt + ' take ' + (visitorName || 'them') +
-    ' to the cafeteria and wait there with them until ' + wait + ' comes.';
+    ' to ' + endPlace_() + ' and wait there with them until ' + wait + ' comes.';
 }
 
 /** What the 5th grader does once the sheet reaches them. */
@@ -4032,7 +4072,7 @@ function buildRouteSheets(dateStr) {
     // The walk itself. The last two lines of every route are about
     // handing the visitor back, which the sheet says in its own words
     // below, to this guide rather than to both of them.
-    const closing = /Bring visitors to class|Bring visitor down to cafeteria/;
+    const closing = /Bring visitors? (to class|down to|to the)/;
     page.lines.forEach(function (line) {
       if (closing.test(line)) return;
       say_(body, line);
@@ -4169,7 +4209,7 @@ function lockerSlipData_(dateVal) {
           ? r.from + (r.from.indexOf(' and ') === -1 ? ' brings ' : ' bring ')
           : 'You are given ') + r.visitor +
           ' to you in ' + r.where + ' at ' + handoffAt +
-          '. Take them down to the cafeteria at ' + tourEnd + '.';
+          '. Take them to ' + endPlace_() + ' at ' + tourEnd + '.';
       }),
       working: working.length > 0,
       name: name,
@@ -5069,8 +5109,9 @@ function sendStudentEmails(dateStr) {
       return '<p><b>' + (r.from ? escapeHtml_(r.from) + ' will bring ' : 'You are being given ') +
         escapeHtml_(r.visitor) + ', a visiting student, to you in ' + escapeHtml_(r.where) +
         ' at ' + escapeHtml_(handoffAt) + '.</b> Look after them for the rest of the ' +
-        'period, and at ' + escapeHtml_(timeLabelOrRaw_(endTime)) + ' take them down to ' +
-        'the cafeteria and wait with them until ' + escapeHtml_(waitFor) + ' gets back.</p>';
+        'period, and at ' + escapeHtml_(timeLabelOrRaw_(endTime)) + ' take them to ' +
+        escapeHtml_(endPlace_()) + ' and wait with them until ' +
+        escapeHtml_(waitFor) + ' gets back.</p>';
     }).join('');
 
     const html = '<div style="' + MAIL_STYLE_ + '">' +
@@ -5347,7 +5388,7 @@ function sendTeacherEmails(dateStr) {
       parts.push('<p><b>' + (many ? 'Prospective students are' : 'A prospective student is') +
         ' coming into your class ' + escapeHtml_(when.body) + '.</b> They are at the ' +
         'end of a Middle School tour. They arrive at about ' + escapeHtml_(handoff) +
-        ', and are taken down to the cafeteria at ' + escapeHtml_(endsAt) + '.</p>' +
+        ', and are taken to ' + escapeHtml_(endPlace_()) + ' at ' + escapeHtml_(endsAt) + '.</p>' +
         (handedOn.length
           ? '<p>The tour guide hands them over at your door and goes back to their own ' +
             'class, so the student in the third column is the one looking after them.</p>'
@@ -5372,7 +5413,7 @@ function sendTeacherEmails(dateStr) {
       parts.push('<p><b>' + (many ? 'Prospective students are' : 'A prospective student is') +
         ' joining your class ' + escapeHtml_(when.body) + '</b>, at the end of a Middle ' +
         'School tour. Their tour guides bring them up at about ' + escapeHtml_(handoff) +
-        ', and the 5th grader below walks them down to the cafeteria at ' +
+        ', and the 5th grader below walks them to ' + escapeHtml_(endPlace_()) + ' at ' +
         escapeHtml_(endsAt) + '.</p>' +
         '<table style="' + TABLE_STYLE_ + '">' +
         '<tr><th style="' + TH_ + '">Visiting student</th>' +

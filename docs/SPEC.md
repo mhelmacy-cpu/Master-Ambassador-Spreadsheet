@@ -305,11 +305,23 @@ does not duplicate it.
 They also get their own **email and locker slip**, whether or not they
 had a job that morning.
 
+**Where the morning ends** is the setting **Visitors End In**, and it is
+not where it starts. Ambassadors report to the cafeteria at 8:25
+(**Ambassadors Report To**); a visiting family is taken to **the co-lab**
+at 9:25 and left with her there. Every sentence about the end of the
+morning reads it from that one setting: the students' emails, the
+teachers' emails, the locker slips, the route sheets and the Tour Tracker
+notes. Change the setting and all of them change together.
+
+A setting added after her spreadsheet was made is put on the end of the
+Settings sheet the next time setup runs, with its default. A value she
+has changed is never touched.
+
 A hand-off is not a job that takes anybody out of class. They are sitting
 in the room already and the visitor is brought to them, so their email
 says who is bringing whom, where and when, what to do with them and to
-take them down to the cafeteria at 9:25, and nothing else. No reporting
-to the cafeteria at 8:25, and no line about when they are back in a class
+take them to the co-lab at 9:25, and nothing else. No reporting to the
+cafeteria at 8:25, and no line about when they are back in a class
 they never left. Their slip reads the same way. Somebody who is handed a
 family and also has a real job on the tour keeps both lines, read off
 that job's own hours.
@@ -329,7 +341,7 @@ and rarely the one she wants.
 
 **A pair who share a class stay together.** Where the two guides on one
 family are in the same class at 9:06, they both take their visitor in
-and both walk them down to the cafeteria at 9:25: "You and Avery
+and both walk them to the co-lab at 9:25: "You and Avery
 Griffiths take Sam Visitor to Math in M311 with you." Neither of them is
 sent back on their own, and neither hands over their name tag.
 
@@ -352,7 +364,7 @@ schedule.
   them the tour route, the clock, and YOUR NAME TAG. Then go back to
   your own class. You are finished." Underneath, a block headed FOR
   JANE MOSS tells the receiving student to take them to class and bring
-  them down to the cafeteria at 9:25.
+  them to the co-lab at 9:25.
 - **The teacher whose room it is** gets their own email, naming the
   visiting student, who is bringing them up and who they will be
   sitting with.
