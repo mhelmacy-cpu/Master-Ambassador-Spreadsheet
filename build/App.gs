@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-28 c';
+var BUILD_ = '2026-09-28 d';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -3794,10 +3794,15 @@ function handbackPlan_(page, dateVal) {
   const where = {};
   names.forEach(function (n) { where[n] = classLabel_(classOf(n)); });
 
-  if (names.length < 2) return { takers: names, others: [], where: where };
-
-  // Decided across the whole tour, so no one teacher is given more
-  // visitors than Max Visitors Per Class allows.
+  /* What was decided for this family across the whole tour, so no one
+   * teacher is given more visitors than Max Visitors Per Class allows.
+   *
+   * This is read first, before anything is worked out from the guides'
+   * own schedules, because a family she has handed to somebody else has
+   * an answer already. A guide walking a family on their own is not a
+   * reason to skip it: a solo tour can be handed off like any other, and
+   * skipping it was how a hand-off she had made and saved, sitting on
+   * the Tour Tracker, never reached the route sheet. */
   const chosen = handbackChoices_(dateVal).byVisitor[norm_(page.visitor.name)];
   if (chosen && chosen.takers.length) {
     // Whoever takes them may be somebody she handed the family to, and
@@ -3811,6 +3816,11 @@ function handbackPlan_(page, dateVal) {
       landing: chosen.where ? chosen.where.label : ''
     };
   }
+
+  // Nothing decided for this family, so it falls back to the guides'
+  // own schedules. On their own, they take the family in themselves.
+  if (names.length < 2) return { takers: names, others: [], where: where };
+
   const first = classOf(names[0]);
   const second = classOf(names[1]);
   const groupOf = function (name) {

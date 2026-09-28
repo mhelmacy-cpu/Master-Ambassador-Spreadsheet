@@ -325,6 +325,11 @@ business and are not mentioned.
 
 Three things follow from a hand-off:
 
+A hand-off reaches the route sheet whether the family has two guides or
+one. A solo tour is handed off like any other, and the sheet reads off
+what she decided rather than working it out again from the guide's own
+schedule.
+
 - **The route sheet.** The guide's page ends, in large type, with
   "Robin Visitor is going to Science in M307 with Jane Moss." and "Give
   them the tour route, the clock, and YOUR NAME TAG. Then go back to
