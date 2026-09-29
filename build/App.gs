@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-28 g';
+var BUILD_ = '2026-09-29 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -92,12 +92,20 @@ var JOBS = {
  * Jobs sheet holds the real values and can be edited there; these are
  * only what a new sheet starts with.
  */
+/* Hours this script set for these jobs in an earlier version. A cell
+ * still holding one of them is the script's own old answer, not hers, so
+ * setup may bring it up to date. Anything else on the Jobs sheet is
+ * something she has decided, and is never overwritten. */
+var JOB_HOURS_WAS_ = {};
+
 var JOB_HOURS_ = {};
 JOB_HOURS_[JOBS.PANELIST] = ['8:25 AM', '9:05 AM'];
-JOB_HOURS_[JOBS.LOBBY] = ['8:25 AM', '8:55 AM'];
-JOB_HOURS_[JOBS.TABLE] = ['8:25 AM', '8:55 AM'];
+JOB_HOURS_[JOBS.LOBBY] = ['8:25 AM', '8:45 AM'];
+JOB_HOURS_[JOBS.TABLE] = ['8:25 AM', '8:45 AM'];
 JOB_HOURS_[JOBS.GUIDE] = ['8:25 AM', '9:05 AM'];
 JOB_HOURS_[JOBS.BUDDY] = ['9:05 AM', '9:25 AM'];
+JOB_HOURS_WAS_[JOBS.LOBBY] = { to: ['9:05 AM', '8:55 AM'] };
+JOB_HOURS_WAS_[JOBS.TABLE] = { to: ['9:05 AM', '8:55 AM'] };
 /* Nothing for Pass Off on purpose. Being handed a family does not take
  * that student out of anything: they are sitting in their own class and
  * the family comes to them. So no teacher is told they are missing. */
@@ -499,6 +507,9 @@ function setupSpreadsheet() {
   }
   if (ensureJobHourColumns_()) {
     added.push('Out of Class From/To on Jobs');
+  } else {
+    const hours = refreshJobHours_();
+    if (hours.length) added.push(hours.join(', '));
   }
   if (ensureColumn_(SHEETS.AMBASSADORS, 'Strength', STRENGTH_OPTIONS)) {
     added.push('Strength on Ambassadors');
@@ -1396,6 +1407,46 @@ function ensureBellGrade_() {
   }
   clearReadCache_();
   return true;
+}
+
+/**
+ * Brings the Jobs sheet's hours up to date where they still hold an
+ * answer this script gave in an older version.
+ *
+ * The sheet wins over the script, which is what lets her change a job's
+ * hours herself. That also means changing them here does nothing on its
+ * own: her sheet keeps saying what it said. So a cell still holding a
+ * value this script used to write is updated, and a cell holding
+ * anything else, including a time she has typed, is left alone. A job she
+ * has added herself is not touched at all.
+ */
+function refreshJobHours_() {
+  const N = SHEETS.JOBS;
+  if (col_(N, 'Out of Class From') === -1 || col_(N, 'Out of Class To') === -1) return [];
+  const s = sheet_(N);
+  const fromCol = col_(N, 'Out of Class From') + 1;
+  const toCol = col_(N, 'Out of Class To') + 1;
+  const said = [];
+  rows_(N).forEach(function (r, i) {
+    const job = trim_(r[col_(N, 'Job Name')]);
+    const now = JOB_HOURS_[job];
+    if (!now) return;
+    const was = JOB_HOURS_WAS_[job] || {};
+    const check = [
+      { at: fromCol, has: timeCell_(cell_(r, N, 'Out of Class From')),
+        want: now[0], old: was.from || [] },
+      { at: toCol, has: timeCell_(cell_(r, N, 'Out of Class To')),
+        want: now[1], old: was.to || [] }
+    ];
+    check.forEach(function (c) {
+      if (norm_(c.has) === norm_(c.want)) return;
+      if (c.has && c.old.map(norm_).indexOf(norm_(c.has)) === -1) return;
+      s.getRange(i + 2, c.at).setNumberFormat('@');
+      s.getRange(i + 2, c.at).setValue(c.want);
+      said.push(job + ' ' + (c.at === fromCol ? 'starts' : 'finishes') + ' at ' + c.want);
+    });
+  });
+  return said;
 }
 
 function ensureJobHourColumns_() {
@@ -4221,7 +4272,7 @@ function lockerSlipData_(dateVal) {
         return j.job + (j.visitor ? ' for ' + j.visitor : '');
       }),
       // When this one is actually finished, which is their own job's
-      // hours and not the end of the tour. A greeter is back at 8:55.
+      // hours and not the end of the tour. A greeter is back at 8:45.
       backBy: (function () {
         if (!working.length) return tourEnd;
         const w = awayMinutes_(working.map(function (j) { return j.job; }));
@@ -4268,6 +4319,10 @@ function buildLockerSlips(dateStr) {
     if (slip.working) {
       cell.appendParagraph(capitalize_(reportTo) + ' ' + reportAt + '. Back in class by ' +
         (slip.backBy || endTime) + '.');
+      // They go straight from the tour to their own class, so whatever
+      // they need for it has to come downstairs with them.
+      cell.appendParagraph('Bring everything you need for class with you to the ' +
+        reportTo + '.');
     } else {
       cell.appendParagraph('Stay in your class until the time below.');
     }

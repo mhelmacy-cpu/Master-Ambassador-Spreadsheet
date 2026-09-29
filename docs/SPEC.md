@@ -228,10 +228,22 @@ each job really keeps somebody away, which is not the length of the
 period they are missing. A greeter is back before the bell.
 
     Panelist        8:25 AM - 9:05 AM
-    Lobby Greeter   8:25 AM - 8:55 AM
-    Table Greeter   8:25 AM - 8:55 AM
+    Lobby Greeter   8:25 AM - 8:45 AM
+    Table Greeter   8:25 AM - 8:45 AM
     Tour Guide      8:25 AM - 9:05 AM
     Class Buddy     9:05 AM - 9:25 AM
+
+The first block of the day starts at 8:45, so a greeter finishing then
+misses no class at all: their own email says they are back in class by
+8:45, and no class teacher is written to about them, because there is
+nothing to tell. A guide is still out until 9:05 and their teacher still
+hears.
+
+The sheet wins over the script, which is what lets her change an hour
+herself. That also means changing an hour in the script does nothing on
+its own, so setup brings a cell still holding one of the script's own
+older answers up to date and says which ones it changed. A time she has
+typed, and any job she has added herself, are never touched.
 
 ## Class visits at the end
 
@@ -522,9 +534,13 @@ morning before they reach the printer.
   their own part.
 - **Print Locker Slips** - one slip per ambassador, several to a page in
   bordered boxes so the page cuts into strips. They go up on lockers on
-  Tuesday morning, so each one is four lines and no more: name (with
-  homeroom and advisor, for sorting the pile), the date in full, the job
-  with the visitor and route, and where to be and when they are back.
+  Tuesday morning, so each one is a handful of lines and no more: name
+  (with homeroom and advisor, for sorting the pile), the date in full, the
+  job with the visitor and route, where to be and when they are back, and
+  to bring everything they need for class down with them, since they go
+  straight from the tour to their own lesson. Somebody who is only being
+  handed a visitor at the end stays in their class all morning, so their
+  slip says that instead and has nothing to bring.
   The 5th grade class visit buddies are left out, the same as the emails
   - they are told in person, and their instructions print on the
   visitor's route sheet.
