@@ -234,10 +234,15 @@ period they are missing. A greeter is back before the bell.
     Class Buddy     9:05 AM - 9:25 AM
 
 The first block of the day starts at 8:45, so a greeter finishing then
-misses no class at all: their own email says they are back in class by
-8:45, and no class teacher is written to about them, because there is
-nothing to tell. A guide is still out until 9:05 and their teacher still
-hears.
+misses no class at all. Their teacher is told anyway, because a teacher
+wants to know their student is working the tour. The class they walk into
+at the end of the job hears, under **Your Student Is on Tour Duty**: the
+hours, the job, and plainly that they are not missing the class but may
+walk in right on the bell. A guide, who is out until 9:05, is still
+reported absent under **Student Out of Your Class**, and a teacher who
+gets both, or who is also receiving a visitor, gets one email.
+
+The advisor always hears, whether or not any class is missed.
 
 The sheet wins over the script, which is what lets her change an hour
 herself. That also means changing an hour in the script does nothing on

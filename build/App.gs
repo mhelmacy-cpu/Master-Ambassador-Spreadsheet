@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-29 a';
+var BUILD_ = '2026-09-29 b';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -5222,6 +5222,7 @@ function sendTeacherEmails(dateStr) {
 
   const byAdvisor = {};       // email -> {name, rows:[]}
   const byTeacher = {};       // email -> {name, rows:[]}
+  const byOnDuty = {};        // email -> {name, rows:[]}, nothing missed
   const needsYou = [];
   const seen = {};
 
@@ -5343,7 +5344,37 @@ function sendTeacherEmails(dateStr) {
     const win = awayMinutes_(jobs.map(function (j) { return j.job; })) ||
       { from: startMin, to: endMin };
     const blocks = classesMissed_(who.pod, who.split, who.grade, dateVal, win.from, win.to);
-    if (!blocks.length) { return; }
+
+    /* Nothing missed, which is what a greeter finishing before the first
+     * block of the day looks like. The teacher still wants to know their
+     * student is working the tour, so the class they walk into at the end
+     * of the job hears instead: they are not losing them, but somebody is
+     * arriving off the lobby, possibly right on the bell. */
+    if (!blocks.length) {
+      const next = classesMissed_(who.pod, who.split, who.grade, dateVal,
+        win.to, win.to + 1).filter(function (b) { return !b.needsYou; })[0];
+      const window = awayWindow_(jobs.map(function (j) { return j.job; })) || '';
+      if (!next) {
+        needsYou.push(name + ' is on ' + jobText + ' and misses no class. The class ' +
+          'they go to afterwards cannot be worked out from the schedule, so only their ' +
+          'advisor was told.');
+        return;
+      }
+      if (!next.teachers.length) {
+        needsYou.push(name + ' is on ' + jobText + ' and misses no class, but "' +
+          next.what + '", which they go to afterwards, has no teacher with an email ' +
+          'on the Teachers sheet, so only their advisor was told.');
+        return;
+      }
+      next.teachers.forEach(function (t) {
+        if (!byOnDuty[t.email]) byOnDuty[t.email] = { name: t.name, rows: [] };
+        byOnDuty[t.email].rows.push({
+          student: name, job: jobText, what: next.what, away: window,
+          guiding: guiding, visiting: visiting
+        });
+      });
+      return;
+    }
     blocks.forEach(function (b) {
       if (b.needsYou) {
         needsYou.push(name + ' misses "' + b.what + '" (' + b.start + '-' + b.end +
@@ -5413,12 +5444,14 @@ function sendTeacherEmails(dateStr) {
     });
   };
   bucket(byTeacher, 'out');
+  bucket(byOnDuty, 'onduty');
   bucket(byLanding, 'arriving');
   bucket(byHost, 'hosting');
 
   Object.keys(every).forEach(function (email) {
     const e = every[email];
     const out = e.out || [];
+    const onDuty = e.onduty || [];
     const arriving = e.arriving || [];
     const hosting = e.hosting || [];
     const parts = [];
@@ -5430,6 +5463,23 @@ function sendTeacherEmails(dateStr) {
         '<tr><th style="' + TH_ + '">Student</th><th style="' + TH_ + '">Out of class</th>' +
         '<th style="' + TH_ + '">Class</th><th style="' + TH_ + '">Tour job</th></tr>' +
         out.map(function (r) {
+          return '<tr><td style="' + TD_ + '">' + escapeHtml_(r.student) + '</td>' +
+            '<td style="' + TD_ + '">' + escapeHtml_(r.away) + '</td>' +
+            '<td style="' + TD_ + '">' + escapeHtml_(r.what) + '</td>' +
+            '<td style="' + TD_ + '">' + escapeHtml_(r.job) + '</td></tr>';
+        }).join('') + '</table>');
+    }
+
+    if (onDuty.length) {
+      const many = onDuty.length > 1;
+      parts.push('<p><b>' + (many ? 'Students of yours are' : 'A student of yours is') +
+        ' working a Middle School tour ' + escapeHtml_(when.body) + '.</b> ' +
+        'They are not missing your class. They come to you straight from the tour, ' +
+        'so they may walk in right on the bell.</p>' +
+        '<table style="' + TABLE_STYLE_ + '">' +
+        '<tr><th style="' + TH_ + '">Student</th><th style="' + TH_ + '">On duty</th>' +
+        '<th style="' + TH_ + '">Coming to</th><th style="' + TH_ + '">Tour job</th></tr>' +
+        onDuty.map(function (r) {
           return '<tr><td style="' + TD_ + '">' + escapeHtml_(r.student) + '</td>' +
             '<td style="' + TD_ + '">' + escapeHtml_(r.away) + '</td>' +
             '<td style="' + TD_ + '">' + escapeHtml_(r.what) + '</td>' +
@@ -5484,23 +5534,31 @@ function sendTeacherEmails(dateStr) {
     const visitorsToo = arriving.length || hosting.length;
     const html = '<div style="' + MAIL_STYLE_ + '">' +
       '<p>Hi ' + escapeHtml_(e.name) + ',</p>' + parts.join('') +
-      (visitorsToo && !out.length
+      (visitorsToo && !out.length && !onDuty.length
         ? '<p>Nothing is needed from you beyond a seat.<br>'
         : '<p>Thank you!<br>') +
       escapeHtml_(senderName) + '</p></div>';
 
-    const subject = (out.length && visitorsToo)
+    /* One subject line for whichever of the four this is. A class that
+     * only has a student on duty is not losing anybody, so saying so
+     * would be wrong: it says they are working the tour. */
+    const subject = ((out.length || onDuty.length) && visitorsToo)
       ? 'Your Class and the Middle School Tour - ' + when.subject
       : (out.length
           ? 'Student Out of Your Class - ' + when.subject
-          : 'Student Visitor in Your Class - ' + when.subject);
+          : (onDuty.length
+              ? 'Your Student Is on Tour Duty - ' + when.subject
+              : 'Student Visitor in Your Class - ' + when.subject));
 
     // A test shows one of each shape rather than one in total: a class
-    // losing a student, a class gaining a visitor, and one doing both.
-    const shape = (out.length ? 'out' : '') + (arriving.length ? '+in' : '') +
-      (hosting.length ? '+host' : '');
+    // losing a student, one whose student is on duty without missing it,
+    // a class gaining a visitor, and one doing both.
+    const shape = (out.length ? 'out' : '') + (onDuty.length ? '+duty' : '') +
+      (arriving.length ? '+in' : '') + (hosting.length ? '+host' : '');
     if (!sampleAllowsJobs_('class teacher',
-      out.map(function (r) { return r.job; }).concat([shape]))) return;
+      out.map(function (r) { return r.job; })
+        .concat(onDuty.map(function (r) { return r.job; }))
+        .concat([shape]))) return;
     sendMail_(email, subject, html);
     teachersSent++;
     if (arriving.length) landingSent++;
