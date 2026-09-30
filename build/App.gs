@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-30 c';
+var BUILD_ = '2026-09-30 d';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -2647,11 +2647,20 @@ function planTour(dateStr, keepExisting) {
     };
   });
 
-  // Everybody still free who could take a guide place, so a pair can be
-  // changed in the dialog before any of it reaches the sheet.
-  const spare = pool.filter(function (a) {
-    return !used[a.name];
-  }).sort(fairness).map(function (a) {
+  /* Everybody, for the dropdowns, so a pair or a crew can be changed in
+   * the dialog before any of it reaches the sheet.
+   *
+   * Not only the ones left over. She works down the tour changing her
+   * mind as she goes, and the person she wants is often somebody this
+   * run has already put somewhere else. They are offered with the job
+   * they already have written beside them, and sorted below everybody
+   * who is free; picking one moves them, and says what it left. */
+  const spare = pool.slice().sort(function (a, b) {
+    const ba = used[a.name] ? 1 : 0;
+    const bb = used[b.name] ? 1 : 0;
+    if (ba !== bb) return ba - bb;
+    return fairness(a, b);
+  }).map(function (a) {
     const h = hist[norm_(a.name)] || { total: 0 };
     // Which jobs this one is allowed, so a dropdown offers the right
     // people for the place it is standing in.
@@ -2659,12 +2668,18 @@ function planTour(dateStr, keepExisting) {
     [JOBS.GUIDE, JOBS.LOBBY, JOBS.TABLE].forEach(function (j) {
       jobs[j] = canDo(a, j);
     });
+    // What this run has already given them, so she can see what picking
+    // them would move them off.
+    const busyWith = used[a.name]
+      ? used[a.name] + (guidingFor[norm_(a.name)] ? ' for ' + guidingFor[norm_(a.name)] : '')
+      : '';
     return {
       name: a.name,
       note: [a.grade ? 'gr ' + a.grade : '', a.gender, trim_(a.presenting),
         trim_(a.strength), h.total + ' job(s)'].filter(Boolean).join(', '),
       canSolo: !!a.canSolo,
       jobs: jobs,
+      busy: busyWith,
       yellow: norm_(a.light) === 'yellow'
     };
   });
@@ -2719,6 +2734,7 @@ function planTour(dateStr, keepExisting) {
     keptAnything: !!(kept && kept.any),
     newPairs: pairs.filter(function (p) { return !p.kept; }).length,
     pairs: pairs,
+    guidesPer: perVisitor,
     greeters: greeters,
     free: free,
     spare: spare,
@@ -2993,7 +3009,10 @@ function setupWarnings_(all, visitors) {
  */
 function applySwaps_(plan, swaps) {
   const list = [].concat(swaps || []).filter(function (x) {
-    if (!x || !trim_(x.from)) return false;
+    if (!x) return false;
+    // A place added to a family that has fewer guides than it should.
+    if (x.add) return !!trim_(x.to) && !!trim_(x.visitor);
+    if (!trim_(x.from)) return false;
     if (x.drop) return true;                 // this place taken off altogether
     return trim_(x.to) && norm_(x.to) !== norm_(x.from);
   });
@@ -3002,26 +3021,126 @@ function applySwaps_(plan, swaps) {
   const byName = {};
   ambassadors_().forEach(function (a) { byName[norm_(a.name)] = a; });
 
-  // Everybody the plan already has a job for, so nobody is put on twice.
+  // Everybody the plan already has a job for, and where, so picking one
+  // of them moves them rather than putting them on twice.
   const taken = {};
+  const standing = {};
   plan.pairs.forEach(function (p) {
-    (p.guideNames || []).forEach(function (g) { taken[norm_(g)] = true; });
-    if (p.buddy) taken[norm_(p.buddy.name)] = true;
+    (p.guideNames || []).forEach(function (g) {
+      taken[norm_(g)] = true;
+      standing[norm_(g)] = { kind: 'guide', visitor: p.visitor.name };
+    });
+    if (p.buddy) {
+      taken[norm_(p.buddy.name)] = true;
+      standing[norm_(p.buddy.name)] = { kind: 'buddy', visitor: p.visitor.name };
+    }
   });
   plan.greeters.forEach(function (c) {
-    c.chosen.forEach(function (n) { taken[norm_(n)] = true; });
+    c.chosen.forEach(function (n) {
+      taken[norm_(n)] = true;
+      standing[norm_(n)] = { kind: 'crew', job: c.job };
+    });
   });
+
+  /* Somebody she has picked who is already somewhere else in this plan.
+   * They come off that place first, because nobody works two jobs at
+   * once, and what it left is said out loud rather than discovered on
+   * the tracker afterwards. The one thing refused is emptying a family,
+   * since then nobody is walking them at all. */
+  const freeUp = function (name, forVisitor) {
+    const at = standing[norm_(name)];
+    if (!at) return '';
+    /* Already on this very family. Moving them here would leave the
+     * family with one guide by a side door, and there is a plain way to
+     * ask for that, so it says so instead of quietly doing it. */
+    if (at.kind === 'guide' && forVisitor && norm_(at.visitor) === norm_(forVisitor)) {
+      throw new Error(name + ' is already guiding ' + at.visitor +
+        '. To make it one guide, pick "nobody" on the other place instead.');
+    }
+    if (at.kind === 'buddy') {
+      throw new Error(name + ' is hosting ' + at.visitor + ' for their class visit. ' +
+        'Change that on the Prospective Students sheet first.');
+    }
+    if (at.kind === 'crew') {
+      const cr = plan.greeters.filter(function (c) { return c.job === at.job; })[0];
+      if (!cr) return '';
+      let i = -1;
+      cr.chosen.forEach(function (n, k) { if (norm_(n) === norm_(name)) i = k; });
+      if (i === -1) return '';
+      cr.chosen.splice(i, 1);
+      cr.short = Math.max(0, cr.needed - cr.chosen.length);
+      cr.swapped = true;
+      delete taken[norm_(name)];
+      delete standing[norm_(name)];
+      return name + ' comes off the ' + at.job + ' crew, which is one short now.';
+    }
+    const p = plan.pairs.filter(function (x) {
+      return norm_(x.visitor.name) === norm_(at.visitor);
+    })[0];
+    if (!p) return '';
+    let i = -1;
+    p.guideNames.forEach(function (g, k) { if (norm_(g) === norm_(name)) i = k; });
+    if (i === -1) return '';
+    if (p.guideNames.length < 2) {
+      throw new Error(name + ' is the only guide ' + at.visitor + ' has. Give them ' +
+        'somebody else first, or ' + at.visitor + ' is left with nobody.');
+    }
+    p.guideNames.splice(i, 1);
+    p.guides.splice(i, 1);
+    if (p.guideSolo) p.guideSolo.splice(i, 1);
+    p.solo = p.guideNames.join(', ');
+    p.swapped = true;
+    delete taken[norm_(name)];
+    delete standing[norm_(name)];
+    return name + ' comes off ' + at.visitor + ', who is down to ' +
+      p.guideNames.join(' and ') + '.';
+  };
 
   const out = [];
   list.forEach(function (x) {
     const who = x.drop ? null : byName[norm_(x.to)];
+    let moved = '';
     if (!x.drop) {
       if (!who) throw new Error(trim_(x.to) + ' is not on the Ambassadors sheet.');
       if (!who.active) throw new Error(who.name + ' is not marked Active.');
-      if (taken[norm_(who.name)]) {
-        throw new Error(who.name + ' is already on this tour, and nobody works two jobs.');
-      }
+      // Already working this tour: they are moved, not refused.
+      if (taken[norm_(who.name)]) moved = freeUp(who.name, x.visitor);
     }
+    /* A second guide put back on a family that is walking with one.
+     * The other way round from a drop, and the same in reverse: the
+     * family has a pair again and nothing else about them changes. */
+    if (x.add) {
+      const pair = plan.pairs.filter(function (p) {
+        return norm_(p.visitor.name) === norm_(x.visitor);
+      })[0];
+      if (!pair) {
+        throw new Error('Nobody called ' + trim_(x.visitor) + ' is visiting that day ' +
+          'any more. Press Preview again.');
+      }
+      if (pair.guideNames.length >= (plan.guidesPer || 2)) {
+        throw new Error(pair.visitor.name + ' already has ' + pair.guideNames.length +
+          ' guides. Press Preview again.');
+      }
+      const clash = pair.guideNames.filter(function (g) { return keptApart_(who.name, g); });
+      if (clash.length) {
+        throw new Error(who.name + ' and ' + clash.join(' and ') +
+          ' are on the Keep Apart list, so they cannot walk the same family.');
+      }
+      taken[norm_(who.name)] = true;
+      standing[norm_(who.name)] = { kind: 'guide', visitor: pair.visitor.name };
+      pair.guideNames.push(who.name);
+      pair.guides.push(who.name + ' (grade ' + (who.grade || '?') + ')');
+      if (pair.guideSolo) pair.guideSolo.push(!!who.canSolo);
+      pair.solo = '';
+      pair.short = 0;
+      pair.swapped = true;
+      out.push({
+        visitor: pair.visitor.name, from: '', to: who.name, added: true,
+        problems: pairProblems_(pair.visitor, pair.guideNames).concat(moved ? [moved] : [])
+      });
+      return;
+    }
+
     // A greeting crew: a flat list of names, no pair and no rules about
     // who stands next to whom. Taking one off just makes the crew smaller.
     if (x.job && x.job !== JOBS.GUIDE) {
@@ -3039,7 +3158,8 @@ function applySwaps_(plan, swaps) {
         cr.chosen.splice(where, 1);
       } else {
         taken[norm_(who.name)] = true;
-        out.push({ visitor: '', job: x.job, from: cr.chosen[where], to: who.name, problems: [] });
+        out.push({ visitor: '', job: x.job, from: cr.chosen[where], to: who.name,
+          problems: moved ? [moved] : [] });
         cr.chosen[where] = who.name;
       }
       cr.short = Math.max(0, cr.needed - cr.chosen.length);
@@ -3100,6 +3220,7 @@ function applySwaps_(plan, swaps) {
     out.push({
       visitor: pair.visitor.name, from: pair.guideNames[at], to: who.name,
       problems: pairProblems_(pair.visitor, beside.concat([who.name]))
+        .concat(moved ? [moved] : [])
     });
     pair.guideNames[at] = who.name;
     pair.guides[at] = who.name + ' (grade ' + (who.grade || '?') + ')';
@@ -4458,8 +4579,13 @@ function api_swapList(dateStr) {
   const roster = rosterRows_(dateVal);
   if (!roster.length) throw new Error('Nothing is staffed for ' + longDate_(dateVal) + '.');
 
+  /* What each of them is already down for that morning, so the list can
+   * offer everybody and still say what picking them would move. */
   const busy = {};
-  roster.forEach(function (r) { busy[norm_(r.name)] = true; });
+  roster.forEach(function (r) {
+    const said = r.job + (r.visitor ? ' for ' + r.visitor : '');
+    busy[norm_(r.name)] = busy[norm_(r.name)] ? busy[norm_(r.name)] + ' and ' + said : said;
+  });
   const elig = eligibility_();
   const hist = jobHistory_();
   const pool = ambassadors_().filter(function (a) { return a.active; });
@@ -4469,12 +4595,20 @@ function api_swapList(dateStr) {
   const out = roster.map(function (entry) {
     const with_ = alongside_(roster, entry);
     const withNames = with_.map(function (r) { return r.name; });
+    /* Everybody who could stand here, not only the ones with nothing on.
+     * She changes her mind as she goes, and the person she wants is often
+     * already down for something else; they are offered with that written
+     * beside them, below everybody who is free, and picking one moves
+     * them off it. Only the person standing here already is left out. */
     const can = pool.filter(function (a) {
-      if (busy[norm_(a.name)]) return false;
+      if (norm_(a.name) === norm_(entry.name)) return false;
       const e = elig[norm_(a.name)];
       if (e && e[entry.job] === false) return false;
       return !withNames.some(function (n) { return keptApart_(a.name, n); });
     }).sort(function (a, b) {
+      const ba = busy[norm_(a.name)] ? 1 : 0;
+      const bb = busy[norm_(b.name)] ? 1 : 0;
+      if (ba !== bb) return ba - bb;
       const ha = (hist[norm_(a.name)] || {}).total || 0;
       const hb = (hist[norm_(b.name)] || {}).total || 0;
       if (ha !== hb) return ha - hb;
@@ -4485,6 +4619,7 @@ function api_swapList(dateStr) {
         note: [a.grade ? 'gr ' + a.grade : '', a.gender, trim_(a.presenting),
           trim_(a.strength), ((hist[norm_(a.name)] || {}).total || 0) + ' job(s)']
           .filter(Boolean).join(', '),
+        busy: busy[norm_(a.name)] || '',
         yellow: norm_(a.light) === 'yellow'
       };
     });
@@ -4508,7 +4643,135 @@ function api_swapList(dateStr) {
     };
   });
 
-  return { date: dateKey_(dateVal), dateLabel: longDate_(dateVal), rows: out };
+  /* Families walking with fewer guides than they should, so a second one
+   * can be put back without starting the date over. The other direction
+   * is already there: choosing "nobody" on a place takes it off. */
+  const per = Number(setting_('Tour Guides Per Visiting Student', '2')) || 2;
+  const guidesOf = {};
+  roster.forEach(function (r) {
+    if (r.job !== JOBS.GUIDE || !r.visitor) return;
+    (guidesOf[norm_(r.visitor)] = guidesOf[norm_(r.visitor)] || []).push(r);
+  });
+  const short = [];
+  Object.keys(guidesOf).forEach(function (key) {
+    const have = guidesOf[key];
+    if (have.length >= per) return;
+    const withNames = have.map(function (r) { return r.name; });
+    short.push({
+      visitor: have[0].visitor,
+      have: withNames.join(' and '),
+      candidates: pool.filter(function (a) {
+        if (withNames.some(function (n) { return norm_(n) === norm_(a.name); })) return false;
+        const e = elig[norm_(a.name)];
+        if (e && e[JOBS.GUIDE] === false) return false;
+        return !withNames.some(function (n) { return keptApart_(a.name, n); });
+      }).sort(function (a, b) {
+        const ba = busy[norm_(a.name)] ? 1 : 0;
+        const bb = busy[norm_(b.name)] ? 1 : 0;
+        if (ba !== bb) return ba - bb;
+        const ha = (hist[norm_(a.name)] || {}).total || 0;
+        const hb = (hist[norm_(b.name)] || {}).total || 0;
+        if (ha !== hb) return ha - hb;
+        return a.name < b.name ? -1 : 1;
+      }).map(function (a) {
+        return {
+          name: a.name,
+          note: [a.grade ? 'gr ' + a.grade : '', a.gender, trim_(a.presenting),
+            trim_(a.strength), ((hist[norm_(a.name)] || {}).total || 0) + ' job(s)']
+            .filter(Boolean).join(', '),
+          busy: busy[norm_(a.name)] || '',
+          yellow: norm_(a.light) === 'yellow'
+        };
+      })
+    });
+  });
+
+  return { date: dateKey_(dateVal), dateLabel: longDate_(dateVal), rows: out, short: short };
+}
+
+/**
+ * A second guide put back on a family that is walking with one, on a
+ * tour that is already saved.
+ *
+ * The row goes straight on the Tour Tracker, which every email, route
+ * sheet and locker slip is built from, so they all follow. Somebody
+ * already working that morning is moved rather than refused, the same as
+ * a swap, and what it left empty is said in the answer.
+ */
+function api_addGuide(dateStr, visitor, newName) {
+  clearReadCache_();
+  const dateVal = toDate_(dateStr);
+  if (!dateVal) throw new Error('Pick a tour date first.');
+  if (!trim_(visitor)) throw new Error('Which family is it for?');
+  if (!trim_(newName)) throw new Error('Choose who is walking with them.');
+  const N = SHEETS.TRACKER;
+  const roster = rosterRows_(dateVal);
+  const have = roster.filter(function (r) {
+    return r.job === JOBS.GUIDE && norm_(r.visitor) === norm_(visitor);
+  });
+  if (!have.length) {
+    throw new Error('Nobody is guiding ' + trim_(visitor) + ' yet. Staff the tour first.');
+  }
+  const per = Number(setting_('Tour Guides Per Visiting Student', '2')) || 2;
+  if (have.length >= per) {
+    throw new Error(have[0].visitor + ' already has ' + have.length +
+      ' guides. Reload the list.');
+  }
+  const who = ambassadors_().filter(function (a) {
+    return norm_(a.name) === norm_(newName);
+  })[0];
+  if (!who) throw new Error(trim_(newName) + ' is not on the Ambassadors sheet.');
+  if (!who.active) throw new Error(who.name + ' is not marked Active.');
+
+  const beside = have.map(function (r) { return r.name; });
+  const clash = beside.filter(function (n) { return keptApart_(who.name, n); });
+  if (clash.length) {
+    throw new Error(who.name + ' and ' + clash.join(' and ') +
+      ' are on the Keep Apart list, so they cannot walk the same family.');
+  }
+
+  // Already working that morning: moved, not refused.
+  const elsewhere = roster.filter(function (r) { return norm_(r.name) === norm_(who.name); });
+  elsewhere.forEach(function (r) {
+    if (r.job !== JOBS.GUIDE) return;
+    const rest = roster.filter(function (o) {
+      return o.row !== r.row && o.job === JOBS.GUIDE && norm_(o.visitor) === norm_(r.visitor);
+    });
+    if (!rest.length) {
+      throw new Error(who.name + ' is the only guide ' + r.visitor + ' has. Give ' +
+        r.visitor + ' somebody else first.');
+    }
+  });
+  elsewhere.slice().sort(function (a, b) { return b.row - a.row; }).forEach(function (r) {
+    sheet_(N).deleteRow(r.row);
+  });
+  const moved = elsewhere.map(function (r) {
+    return who.name + ' comes off ' + r.job + (r.visitor ? ' for ' + r.visitor : '') + '.';
+  });
+
+  const tracker = sheet_(N);
+  const row = blankRow_(N);
+  row[col_(N, 'Tour Date')] = dateVal;
+  row[col_(N, 'Ambassador')] = who.name;
+  row[col_(N, 'Job')] = JOBS.GUIDE;
+  row[col_(N, 'Prospective Student(s)')] = have[0].visitor;
+  row[col_(N, 'Route')] = have[0].route;
+  tracker.getRange(tracker.getLastRow() + 1, 1, 1, row.length).setValues([row]);
+  tracker.getRange(2, col_(N, 'Tour Date') + 1, tracker.getLastRow() - 1, 1)
+    .setNumberFormat('yyyy-mm-dd');
+  clearReadCache_();
+  refreshCounts_();
+  refreshClassVisits_(dateVal);
+
+  let v = null;
+  prospectiveFor_(dateVal).forEach(function (x) {
+    if (norm_(x.name) === norm_(have[0].visitor)) v = x;
+  });
+  return {
+    added: true, to: who.name, job: JOBS.GUIDE, visitor: have[0].visitor,
+    from: beside.join(' and '),
+    problems: pairProblems_(v, beside.concat([who.name])).concat(moved)
+  };
 }
 
 function api_swapAmbassador(dateStr, row, newName) {
@@ -4526,24 +4789,54 @@ function api_swapAmbassador(dateStr, row, newName) {
     return norm_(a.name) === norm_(newName);
   })[0];
   if (!who) throw new Error(trim_(newName) + ' is not on the Ambassadors sheet.');
-  if (roster.some(function (r) { return r.row !== at && norm_(r.name) === norm_(who.name); })) {
-    throw new Error(who.name + ' is already working this tour.');
-  }
+  /* Already working that morning: they are moved rather than refused,
+   * because this is where she changes her mind. What it leaves empty is
+   * said in the answer, and the list underneath refreshes to show it.
+   * The one thing refused is taking the only guide off a family. */
+  const elsewhere = roster.filter(function (r) {
+    return r.row !== at && norm_(r.name) === norm_(who.name);
+  });
+  elsewhere.forEach(function (r) {
+    if (r.job !== JOBS.GUIDE) return;
+    /* Already guiding this very family. Moving them across would take the
+     * family down to one guide by a side door, and there is a plain way
+     * to ask for that, so it says so instead. */
+    if (entry.job === JOBS.GUIDE && norm_(r.visitor) === norm_(entry.visitor)) {
+      throw new Error(who.name + ' is already guiding ' + r.visitor +
+        '. To make it one guide, choose "nobody" on this place instead.');
+    }
+    const rest = roster.filter(function (o) {
+      return o.row !== r.row && o.job === JOBS.GUIDE && norm_(o.visitor) === norm_(r.visitor);
+    });
+    if (!rest.length) {
+      throw new Error(who.name + ' is the only guide ' + r.visitor + ' has. Give ' +
+        r.visitor + ' somebody else first.');
+    }
+  });
+  let target = at;
+  elsewhere.slice().sort(function (a, b) { return b.row - a.row; }).forEach(function (r) {
+    sheet_(N).deleteRow(r.row);
+    if (r.row < target) target--;          // the rows above it have shifted up
+  });
+  const moved = elsewhere.map(function (r) {
+    return who.name + ' comes off ' + r.job + (r.visitor ? ' for ' + r.visitor : '') + '.';
+  });
 
-  sheet_(N).getRange(at, col_(N, 'Ambassador') + 1).setValue(who.name);
+  sheet_(N).getRange(target, col_(N, 'Ambassador') + 1).setValue(who.name);
   clearReadCache_();
   refreshCounts_();
   refreshClassVisits_(dateVal);
 
   // What the swap did to the pair, said plainly rather than left to be found.
   const after = rosterRows_(dateVal);
-  const now = after.filter(function (r) { return r.row === at; })[0];
+  const now = after.filter(function (r) { return r.row === target; })[0];
   const names = [who.name].concat(alongside_(after, now).map(function (r) { return r.name; }));
   let visitor = null;
   prospectiveFor_(dateVal).forEach(function (v) {
     if (norm_(v.name) === norm_(entry.visitor)) visitor = v;
   });
-  const problems = entry.job === JOBS.GUIDE ? pairProblems_(visitor, names) : [];
+  const problems = (entry.job === JOBS.GUIDE ? pairProblems_(visitor, names) : [])
+    .concat(moved);
 
   return {
     from: entry.name, to: who.name, job: entry.job, visitor: entry.visitor,
@@ -6081,8 +6374,22 @@ function showStaffDialog() {
     '(all?"":" (not marked Can Solo)")+"</option>";}' +
     'sp.forEach(function(c,k){if(c.jobs&&!c.jobs[GUIDE]){return;}' +
     'h+="<option value=\'"+k+"\'>"+esc(c.name)+" ("+esc(c.note)+")"+' +
+    '(c.busy?" - already "+esc(c.busy):"")+' +
     '(c.yellow?" - check first":"")+"</option>";});' +
     'h+="</select> ";});' +
+    /* A family walking with one guide gets an empty place beside them, so
+     * one can be put back without starting the date over. */
+    'var per=window.__guidesPer||2;' +
+    'if(x.guideNames.length<per){' +
+    'h+="<select class=\'gsel\' data-pair=\'"+x.order+"\' data-slot=\'add\' ' +
+    'onchange=\'relabel("+x.order+")\'>";' +
+    'h+="<option value=\'\'>nobody: "+esc(x.guideNames.join(" and "))+" alone ' +
+    '(as it is)</option>";' +
+    'sp.forEach(function(c,k){if(c.jobs&&!c.jobs[GUIDE]){return;}' +
+    'h+="<option value=\'"+k+"\'>add "+esc(c.name)+" ("+esc(c.note)+")"+' +
+    '(c.busy?" - already "+esc(c.busy):"")+' +
+    '(c.yellow?" - check first":"")+"</option>";});' +
+    'h+="</select> ";}' +
     'return h;}' +
     'function classVisitLine(x){if(x.buddy||!x.classVisit){return "";}' +
     'var v=x.classVisit,pass=v.takers.some(function(n){' +
@@ -6120,6 +6427,7 @@ function showStaffDialog() {
     'h+="<option value=\'-\'>nobody: leave this place empty</option>";' +
     'sp.forEach(function(x,k){if(x.jobs&&!x.jobs[c.job]){return;}' +
     'h+="<option value=\'"+k+"\'>"+esc(x.name)+" ("+esc(x.note)+")"+' +
+    '(x.busy?" - already "+esc(x.busy):"")+' +
     '(x.yellow?" - check first":"")+"</option>";});' +
     'h+="</select> ";});' +
     'return h;}' +
@@ -6145,10 +6453,14 @@ function showStaffDialog() {
     'function swapsPicked(){var out=[],sp=window.__spare||[],pr=window.__pairs||[];' +
     'var sels=document.querySelectorAll("select.gsel");' +
     'for(var i=0;i<sels.length;i++){var v=sels[i].value;if(!v){continue;}' +
-    'var slot=Number(sels[i].getAttribute("data-slot"));' +
+    'var raw=sels[i].getAttribute("data-slot");' +
+    'var slot=Number(raw);' +
     'var key=Number(sels[i].getAttribute("data-pair")),x=null;' +
     'for(var j=0;j<pr.length;j++){if(pr[j].order===key){x=pr[j];}}' +
-    'if(!x||!x.guideNames[slot]){continue;}' +
+    'if(!x){continue;}' +
+    'if(raw==="add"){var ac=sp[Number(v)];' +
+    'if(ac){out.push({visitor:x.visitor.name,to:ac.name,add:true});}continue;}' +
+    'if(!x.guideNames[slot]){continue;}' +
     'if(v==="-"){out.push({visitor:x.visitor.name,from:x.guideNames[slot],drop:true});continue;}' +
     'var c=sp[Number(v)];if(!c){continue;}' +
     'out.push({visitor:x.visitor.name,from:x.guideNames[slot],to:c.name});}' +
@@ -6163,6 +6475,7 @@ function showStaffDialog() {
     'out.push({job:cr.job,from:cr.chosen[slot],to:c2.name});}' +
     'return out;}' +
     'function render(p){busy(false);window.__pairs=p.pairs;window.__spare=p.spare||[];' +
+    'window.__guidesPer=p.guidesPer||2;' +
     'window.__greeters=p.greeters;window.__cap=p.classCap;' +
     'var h="<div class=\'out\'><h3>"+esc(p.dateLabel)+"</h3><table><tr><th>Visiting student</th>' +
     '<th>Guides</th><th>Route</th></tr>";' +
@@ -6260,8 +6573,9 @@ function showStaffDialog() {
     '(r.panel.added?", "+r.panel.added+" added":"")+(r.panel.removed?", "+r.panel.removed+' +
     '" taken off":"")+".":"")+' +
     '((r.swapped&&r.swapped.length)?"<br>"+r.swapped.map(function(w){' +
-    'return (w.to?esc(w.to)+" in place of "+esc(w.from):esc(w.from)+" taken off"+' +
-    '(w.solo?", "+esc(w.solo)+" alone":""))+' +
+    'return (w.added?esc(w.to)+" added":' +
+    '(w.to?esc(w.to)+" in place of "+esc(w.from):esc(w.from)+" taken off"+' +
+    '(w.solo?", "+esc(w.solo)+" alone":"")))+' +
     '(w.visitor?" for "+esc(w.visitor):(w.job?" on "+esc(w.job):""))+' +
     '(w.problems&&w.problems.length?" (worth a look: "+esc(w.problems.join("; "))+")":"");' +
     '}).join("<br>"):"")+"</div>";})' +
@@ -6690,10 +7004,31 @@ function showSwapDialog() {
     '"nobody: "+esc(r.soloIf)+" takes this family alone"+' +
     '(r.soloOk?"":" (not marked Can Solo)"))+"</option>";}' +
     'r.candidates.forEach(function(c,j){h+="<option value=\'"+j+"\'>"+esc(c.name)+' +
-    '" ("+esc(c.note)+")"+(c.yellow?" - check with me first":"")+"</option>";});' +
+    '" ("+esc(c.note)+")"+(c.busy?" - already "+esc(c.busy):"")+' +
+    '(c.yellow?" - check with me first":"")+"</option>";});' +
     'h+="</select> <button onclick=\'swap("+i+")\'>Save</button>";}' +
     'h+="</div>";});' +
+    /* The other direction: a family walking with one guide, and a place
+     * to put a second one back. */
+    'window.__short=p.short||[];' +
+    '(p.short||[]).forEach(function(s,i){' +
+    'h+="<div class=\'panel\'><b>"+esc(s.visitor)+"</b> <span class=\'muted\'>is ' +
+    'walking with "+esc(s.have)+" alone</span><br>";' +
+    'if(!s.candidates.length){h+="<span class=\'muted\'>nobody else could walk ' +
+    'with them</span>";}' +
+    'else{h+="<select id=\'a"+i+"\'><option value=\'\'>leave them alone</option>";' +
+    's.candidates.forEach(function(c,j){h+="<option value=\'"+j+"\'>add "+esc(c.name)+' +
+    '" ("+esc(c.note)+")"+(c.busy?" - already "+esc(c.busy):"")+' +
+    '(c.yellow?" - check with me first":"")+"</option>";});' +
+    'h+="</select> <button onclick=\'addOne("+i+")\'>Save</button>";}' +
+    'h+="</div>";});' +
     'h+="</div>";document.getElementById("out").innerHTML=h;}' +
+    'function addOne(i){var s=window.__short[i];' +
+    'var sel=document.getElementById("a"+i);if(!sel||!sel.value){return;}' +
+    'document.getElementById("msg").innerHTML="<p class=\'muted\'>Saving...</p>";' +
+    'google.script.run.withSuccessHandler(done).withFailureHandler(fail)' +
+    '.api_addGuide(document.getElementById("d").value,s.visitor,' +
+    's.candidates[Number(sel.value)].name);}' +
     'function swap(i){var r=window.__rows[i];' +
     'var sel=document.getElementById("s"+i);if(!sel||!sel.value){return;}' +
     'document.getElementById("msg").innerHTML="<p class=\'muted\'>Saving...</p>";' +
@@ -6707,11 +7042,13 @@ function showSwapDialog() {
     'called off.</b> "+esc(res.visitor)+" goes with "+' +
     '(res.backWith?esc(res.backWith):"their own guide")+" again, and "+esc(res.from)+' +
     '" is off the tour.</div>";load();return;}' +
-    'var h="<div class=\'free\'>"+(res.to?"<b>"+esc(res.to)+' +
+    'var h="<div class=\'free\'>"+(res.added?"<b>"+esc(res.to)+"</b> is walking "+' +
+    'esc(res.visitor)+" with "+esc(res.from)+" now":' +
+    '(res.to?"<b>"+esc(res.to)+' +
     '"</b> is now "+esc(res.job)+(res.visitor?" for "+esc(res.visitor):"")+' +
     '", in place of "+esc(res.from):"<b>"+esc(res.from)+"</b> is off"+' +
     '(res.visitor?" "+esc(res.visitor)+"\'s tour":"")+", and "+esc(res.solo)+' +
-    '" is walking them alone")+". The counts are up to date.";' +
+    '" is walking them alone"))+". The counts are up to date.";' +
     'if(res.problems&&res.problems.length){h+="<br><b>Worth a look:</b> "+' +
     'esc(res.problems.join("; "));}' +
     'h+="</div>";document.getElementById("msg").innerHTML=h;load();}' +

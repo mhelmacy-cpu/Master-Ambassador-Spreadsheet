@@ -160,6 +160,29 @@ the tracker that the dialog never offered is left alone.
 
 The command also finishes by listing every ambassador it did not use.
 
+**Every dropdown offers every ambassador.** The guide places, the greeter
+places, the swap dialog and both panel lists all show the whole roster,
+because she works down the tour changing her mind and the person she
+wants is often already somewhere else. Whoever is free comes first, then
+anyone already down for something that morning, each with what they are
+down for written beside them ("already Tour Guide for Sam Visitor").
+
+Picking one of them **moves** them. They come off the place they were on,
+and the answer says so ("Mika Rivers comes off the Lobby Greeter crew,
+which is one short now"), so the gap is hers to fill rather than a
+surprise on the tracker. Two things are refused instead of done quietly:
+taking the only guide off a family, and moving somebody onto the other
+place on the family they are already guiding, which is a roundabout way
+of asking for one guide when choosing "nobody" says it plainly.
+
+**A pair goes down to one and back up to two.** Choosing "nobody" on a
+guide place leaves the other one walking the family alone, as before. A
+family walking with fewer guides than **Tour Guides Per Visiting Student**
+now gets an empty place beside them: in the staffing preview as one more
+dropdown ("add Mika Rivers"), and in Change Who Is Working as a block of
+its own ("Sam Visitor is walking with Aurelia Walker alone"). The added
+guide takes the family's own route, so the sheets and emails follow.
+
 Nobody is given two jobs in the same slot. Whoever has done fewest jobs
 so far is offered first, so the work spreads evenly across the year.
 
