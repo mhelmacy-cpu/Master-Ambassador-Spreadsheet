@@ -1,7 +1,7 @@
 /**
  * Ravenna paste, formatted into the applications sheet.
  *
- * PASTED IN FULL? This file is 1745 lines. Scroll to the bottom of the
+ * PASTED IN FULL? This file is 1791 lines. Scroll to the bottom of the
  * editor: the last line should read END OF FILE. If it does not, the
  * paste was cut short, and nothing will work until it is pasted again.
  *
@@ -247,7 +247,7 @@ function pasteGrid_(text) {
  * guess. Bump it on every change that goes to her, or it is worse than
  * useless: it says the fix is in when it is not.
  */
-const APP_VERSION_ = 'v13';
+const APP_VERSION_ = 'v14';
 
 const APP_MAP_KEY_ = 'ravennaColumnMap';
 
@@ -1342,6 +1342,52 @@ function forgetColumnMemory() {
   forgetMap_();
   alert_('Forgotten. The next paste is read from Ravenna\'s headings again, as if for the ' +
     'first time.');
+}
+
+/* =========================================================
+ * Noticing a paste as it lands
+ *
+ * Pasting onto the landing tab is the whole of Step 1, so the sheet may
+ * as well say what it just caught: how many applicants, and which tabs
+ * they are headed for. Then Step 2 holds no surprises.
+ *
+ * This runs on every edit to that one tab and nowhere else, and it only
+ * ever puts a message on screen. Anything it cannot work out it keeps to
+ * itself rather than interrupting her typing.
+ * ========================================================= */
+
+function onEdit(e) {
+  try {
+    if (!e || !e.range || e.range.getSheet().getName() !== PASTE_TAB_) return;
+    const rows = pastedRows_();
+    if (!rows.length) {
+      toast_('Cleared.', PASTE_TAB_);
+      return;
+    }
+    const p = readGrid_(bestAppTab_(), rows, {});
+    if (!p.people.length) {
+      toast_('Nothing here reads as an applicant yet. Paste the Ravenna block in, ' +
+        'headings and all.', PASTE_TAB_);
+      return;
+    }
+    const each = p.destinations.map(function (d) { return d.count + ' to ' + d.tab; });
+    const dupes = p.people.length - p.adding;
+    toast_(p.people.length + ' applicant' + (p.people.length === 1 ? '' : 's') + ' seen' +
+      (each.length ? ': ' + each.join(', ') : '') +
+      (dupes ? ' (' + dupes + ' already on the sheet)' : '') +
+      '. Admissions > Step 2 to sort them.', PASTE_TAB_);
+  } catch (err) {
+    // Reading a half-finished paste is not worth interrupting her for.
+  }
+}
+
+/** A message across the corner of the sheet, where one is allowed. */
+function toast_(message, title) {
+  try {
+    SpreadsheetApp.getActiveSpreadsheet().toast(message, title || 'Admissions', 10);
+  } catch (err) {
+    // No spreadsheet in front of us, which is fine.
+  }
 }
 
 /* =========================================================

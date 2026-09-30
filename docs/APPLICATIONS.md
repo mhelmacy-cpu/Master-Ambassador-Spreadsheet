@@ -44,6 +44,22 @@ Nothing reaches your sheet until that last button. The `Paste Here` tab
 is only somewhere to land: it is never a destination, and it is not
 offered in the list of tabs to add to.
 
+## It counts them as they land
+
+Pasting onto `Paste Here` is the whole of Step 1, so the sheet says what
+it caught, in a message across the corner:
+
+    3 applicants seen: 1 to 5-8th, 1 to 1-4th, 1 to Pre-K.
+    Admissions > Step 2 to sort them.
+
+One applicant or thirty, it says which. Anyone already on their sheet is
+counted separately, so a paste that is mostly repeats shows that before
+you go any further.
+
+A paste it cannot read anything out of says so instead, and an edit to
+any other tab is ignored. It only ever puts a message on screen: nothing
+is written until Step 2 and the Add button.
+
 ## Which tab each one goes to
 
 The applications are kept on a tab per grade band, and those names
