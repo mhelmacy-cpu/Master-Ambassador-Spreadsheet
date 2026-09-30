@@ -585,8 +585,16 @@ different surnames come out right.
 The dialog shows what it read before anything is written. Where the count
 Ravenna gives does not match the names that came over, or a family has no
 parents listed at all, it says so by name rather than quietly dropping
-them. The sheet is called "Check In" and the date, and making it again for
-the same date replaces it rather than leaving two.
+them.
+
+It comes out as a **Google Doc**, not a tab, because it is read standing
+at the door with families arriving: the table runs the full width of the
+page, the names are set at 16pt, and the rows are given whatever height is
+left over, so three families fill the page instead of sitting in the top
+corner and twenty run on to a second one. Portrait by default, with a tick
+box for sideways where the names are long. There is no orientation to set
+on a Document, so landscape is the page's two measurements the other way
+round.
 
 ## Emails
 

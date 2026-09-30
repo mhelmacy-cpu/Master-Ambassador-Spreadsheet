@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-30 a';
+var BUILD_ = '2026-09-30 b';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -5695,29 +5695,74 @@ function parseCheckIn_(text) {
   return rows;
 }
 
-/** The sheet itself, two columns and nothing else. */
-function buildCheckInSheet(dateStr, text) {
+/**
+ * The sheet itself: a Google Doc, two columns, meant to be held.
+ *
+ * She reads this standing at the door with families arriving, so it is
+ * built to be read at arm's length rather than to fit: the table runs the
+ * full width of the page, the names are set large, and the rows are given
+ * whatever height is left over so a short list fills the page instead of
+ * sitting in the top corner. A long list simply runs on.
+ */
+function buildCheckInDoc(dateStr, text, sideways) {
   const rows = parseCheckIn_(text);
   if (!rows.length) {
     throw new Error('Nothing in that looked like a name. Copy the whole row out of ' +
       'Ravenna, from the student\'s name across to the end, and paste it again.');
   }
   const dateVal = toDate_(dateStr) || new Date();
-  const name = 'Check In ' + dateKey_(dateVal);
-  let s = ss_().getSheetByName(name);
-  const fresh = !s;
-  if (!s) s = ss_().insertSheet(name);
-  s.clear();
-  const values = [['Student', 'Parent(s)']].concat(rows.map(function (r) {
+  const title = 'Check In - ' + longDate_(dateVal);
+  const doc = DocumentApp.create(title);
+  const body = doc.getBody();
+  body.clear();
+
+  /* Letter paper, in points, turned on its side when she asks for it.
+   * There is no orientation to set on a Document: the page is as wide as
+   * you say it is, so landscape is the two numbers the other way round. */
+  const wide = !!sideways;
+  const pageW = wide ? 792 : 612;
+  const pageH = wide ? 612 : 792;
+  const margin = 40;
+  body.setPageWidth(pageW).setPageHeight(pageH);
+  body.setMarginTop(margin).setMarginBottom(margin)
+    .setMarginLeft(margin).setMarginRight(margin);
+
+  const head = body.appendParagraph(title);
+  head.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+
+  const grid = [['Student', 'Parent(s)']].concat(rows.map(function (r) {
     return [r.student, r.parents.join(' and ')];
   }));
-  s.getRange(1, 1, values.length, 2).setValues(values);
-  s.getRange(1, 1, 1, 2).setFontWeight('bold');
-  s.setFrozenRows(1);
-  s.autoResizeColumns(1, 2);
-  ss_().setActiveSheet(s);
+  const table = body.appendTable(grid);
+  table.setBorderWidth(1);
+
+  // The student is the column her eye goes to, so it is given the width
+  // it needs and the parents take the rest.
+  const usableW = pageW - margin * 2;
+  table.setColumnWidth(0, Math.round(usableW * 0.42));
+  table.setColumnWidth(1, usableW - Math.round(usableW * 0.42));
+
+  /* What is left of the page, shared out between the rows. Bounded at
+   * both ends: never so short that it is cramped, never so tall that
+   * three families turn into three enormous bands. */
+  const usableH = pageH - margin * 2 - 60;          // 60 for the heading
+  const each = Math.floor(usableH / grid.length);
+  const rowHeight = Math.max(30, Math.min(64, each));
+
+  grid.forEach(function (line, i) {
+    table.getRow(i).setMinimumHeight(rowHeight);
+    line.forEach(function (value, k) {
+      const cell = table.getCell(i, k);
+      cell.setPaddingTop(6).setPaddingBottom(6).setPaddingLeft(10).setPaddingRight(10);
+      const p = cell.getChild(0).asParagraph();
+      p.setText(value);
+      p.editAsText().setBold(i === 0).setFontSize(i === 0 ? 12 : 16);
+    });
+  });
+
+  doc.saveAndClose();
   return {
-    sheet: name, rows: rows.length, fresh: fresh,
+    url: doc.getUrl(), name: title, rows: rows.length, sideways: wide,
     notes: rows.filter(function (r) { return r.note; })
       .map(function (r) { return r.student + ': ' + r.note; })
   };
@@ -5727,9 +5772,9 @@ function api_previewCheckIn(text) {
   return { rows: parseCheckIn_(text) };
 }
 
-function api_buildCheckIn(dateStr, text) {
+function api_buildCheckIn(dateStr, text, sideways) {
   clearReadCache_();
-  return buildCheckInSheet(dateStr, text);
+  return buildCheckInDoc(dateStr, text, sideways);
 }
 
 function showCheckInDialog() {
@@ -5737,13 +5782,16 @@ function showCheckInDialog() {
     '<style>' + DIALOG_CSS_ + '</style>' +
     '<h2>Make a check in sheet</h2>' +
     '<p class="sub">Copy the registered families out of Ravenna and paste them in. ' +
-    'You get two columns, the student and their parents, with everything else ' +
-    'taken out. Paste as many rows as you like.</p>' +
+    'You get a Google Doc to print or hold: two columns, the student and their ' +
+    'parents, in large type, with everything else taken out. Paste as many rows ' +
+    'as you like.</p>' +
     '<label for="d">Tour date</label>' +
     '<input type="date" id="d" value="' + nextWednesday() + '">' +
     '<label for="paste" style="margin-top:10px;display:block;">What you copied</label>' +
     '<textarea id="paste" rows="8" style="width:100%;font:inherit;padding:6px;' +
     'border:1px solid #bbb;border-radius:4px;" oninput="look()"></textarea>' +
+    '<label class="opt" style="margin-top:8px;"><input type="checkbox" id="wide">' +
+    '<span>Sideways, for long names. Portrait otherwise.</span></label>' +
     '<div style="margin-top:10px;">' +
     '<button onclick="build()" id="go" disabled>Make the sheet</button>' +
     '</div><div id="out"></div>' +
@@ -5775,12 +5823,13 @@ function showCheckInDialog() {
     'function build(){document.getElementById("go").disabled=true;' +
     'google.script.run.withSuccessHandler(function(r){' +
     'document.getElementById("out").innerHTML="<div class=\'free\'><b>Done.</b> "+' +
-    'r.rows+" famil"+(r.rows===1?"y":"ies")+" on <b>"+esc(r.sheet)+"</b>, which is ' +
-    'open now."+((r.notes&&r.notes.length)?"<br>Worth a look: "+esc(r.notes.join(" ")):"")+' +
+    'r.rows+" famil"+(r.rows===1?"y":"ies")+".<br><a href=\'"+r.url+"\' ' +
+    'target=\'_blank\'>"+esc(r.name)+"</a>"+' +
+    '((r.notes&&r.notes.length)?"<br>Worth a look: "+esc(r.notes.join(" ")):"")+' +
     '"</div>";}).withFailureHandler(function(e){' +
     'document.getElementById("go").disabled=false;fail(e);})' +
     '.api_buildCheckIn(document.getElementById("d").value,' +
-    'document.getElementById("paste").value);}' +
+    'document.getElementById("paste").value,document.getElementById("wide").checked);}' +
     '<\/script>';
   dialog_(html, 'Check In Sheet', 620, 620);
 }
