@@ -554,6 +554,39 @@ morning before they reach the printer.
       Wednesday, October 7
       Tour Guide for Visitor 1 - route 1
       Cafeteria 8:25 AM. Back in class by 9:25 AM.
+      Bring everything you need for class with you to the cafeteria.
+
+## The check in sheet
+
+**Make a Check In Sheet** takes what she copies out of Ravenna and gives
+her two columns to stand at the door with: the student, and the parent or
+parents, both written first name first. Everything else in the paste goes.
+
+What comes over is a whole table row per family, tabs and line breaks and
+all:
+
+    Helmacy, Maren
+    M      2: Helmacy, Sarah, Helmacy, Lou   272 Sixth Avenue   Sep 13, 11:04 PM
+
+which becomes
+
+    Student          Parent(s)
+    Maren Helmacy    Sarah Helmacy and Lou Helmacy
+
+Tabs and line breaks are both just edges between pieces, since a paste out
+of a browser table uses each of them somewhere. A piece is used only when
+it can only be a name: anything with a digit or an @ in it is an address,
+a date or an email address, so it is passed over rather than turned into a
+person. The parent group announces itself with a count ("2: ..."), and
+where it does not, a run of four or more names beside a student is taken
+as theirs. Parents are read two at a time, "Last, First", so parents with
+different surnames come out right.
+
+The dialog shows what it read before anything is written. Where the count
+Ravenna gives does not match the names that came over, or a family has no
+parents listed at all, it says so by name rather than quietly dropping
+them. The sheet is called "Check In" and the date, and making it again for
+the same date replaces it rather than leaving two.
 
 ## Emails
 

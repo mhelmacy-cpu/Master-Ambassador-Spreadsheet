@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-29 b';
+var BUILD_ = '2026-09-30 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -5584,6 +5584,208 @@ function sendTeacherEmailsForNextTour() {
 }
 
 /* =========================================================
+ * The check in sheet
+ *
+ * She copies the registered families straight out of Ravenna and pastes
+ * them in. What comes over is a whole table row per family, tabs and
+ * newlines and all:
+ *
+ *     Helmacy, Maren
+ *     M      2: Helmacy, Sarah, Helmacy, Lou   272 Sixth Avenue   Sep 13, 11:04 PM
+ *
+ * Out of that she wants two columns to stand at the door with: the
+ * student, and the parent or parents, both written the way you say them
+ * out loud. Everything else goes.
+ *
+ * Nothing here guesses at what a name means. A piece of the paste is
+ * used only when it is unmistakably a name, so an address, a date, a
+ * gender or an empty column is passed over rather than turned into a
+ * person.
+ * ========================================================= */
+
+/** "Helmacy, Maren" as "Maren Helmacy". Anything without a comma is left. */
+function flipName_(text) {
+  const t = trim_(String(text == null ? '' : text)).replace(/\s+/g, ' ');
+  if (!t) return '';
+  const at = t.indexOf(',');
+  if (at === -1) return t;
+  const last = trim_(t.slice(0, at));
+  const first = trim_(t.slice(at + 1));
+  if (!first) return last;
+  if (!last) return first;
+  return first + ' ' + last;
+}
+
+/** True where a piece of the paste can only be a name. */
+function looksLikeName_(text) {
+  const t = trim_(text);
+  if (!t || t.indexOf(',') === -1) return false;
+  // A date ("Sep 13, 11:04 PM"), an address and an email address all have
+  // a comma or look like they might. None of them is a person.
+  if (/[0-9@]/.test(t)) return false;
+  return /^[A-Za-z][A-Za-z '.\-]*,\s*[A-Za-z][A-Za-z '.\-]*$/.test(t);
+}
+
+/**
+ * The parents in a group, which Ravenna writes as one run of
+ * "Last, First" pairs: "Helmacy, Sarah, Helmacy, Lou".
+ *
+ * Taken two at a time, so parents with different surnames come out
+ * right. An odd piece left at the end is kept as it is rather than
+ * dropped, because a name half-printed is still a name she needs.
+ */
+function parentNames_(text) {
+  const bits = String(text == null ? '' : text).split(',').map(trim_).filter(Boolean);
+  const out = [];
+  let i = 0;
+  for (; i + 1 < bits.length; i += 2) out.push(trim_(bits[i + 1] + ' ' + bits[i]));
+  if (i < bits.length) out.push(bits[i]);
+  return out;
+}
+
+/** True where a piece is a run of names rather than one name. */
+function looksLikeNameList_(text) {
+  const bits = String(text == null ? '' : text).split(',').map(trim_).filter(Boolean);
+  if (bits.length < 4 || bits.length % 2) return false;
+  return bits.every(function (b) {
+    return !/[0-9@]/.test(b) && /^[A-Za-z][A-Za-z '.\-]*$/.test(b);
+  });
+}
+
+/**
+ * The pasted rows, read into {student, parents}.
+ *
+ * Tabs and line breaks are both just edges between pieces, because a
+ * paste out of a browser table uses each of them somewhere. The parent
+ * group announces itself with a count ("2: ..."), and where it does not,
+ * a run of four or more names next to a student is taken as theirs.
+ */
+function parseCheckIn_(text) {
+  const pieces = String(text == null ? '' : text).split(/[\t\r\n]+/).map(trim_);
+  const rows = [];
+  let student = '';
+  const flush = function (parents, note) {
+    if (!student) return;
+    rows.push({ student: flipName_(student), parents: parents || [], note: note || '' });
+    student = '';
+  };
+  pieces.forEach(function (piece) {
+    if (!piece) return;
+    const marker = piece.match(/^(\d+)\s*:\s*(.*)$/);
+    if (marker) {
+      if (!student) return;            // parents with nobody to belong to
+      const names = parentNames_(marker[2]);
+      const want = Number(marker[1]);
+      flush(names, names.length === want ? ''
+        : 'Ravenna says ' + want + ', and ' + names.length + ' name(s) came over. Check it.');
+      return;
+    }
+    if (student && looksLikeNameList_(piece)) {
+      flush(parentNames_(piece), '');
+      return;
+    }
+    if (looksLikeName_(piece)) {
+      // A second name with no parent group between them means the one
+      // before it has no parents listed.
+      if (student) flush([], 'No parents came over for them.');
+      student = piece;
+    }
+  });
+  flush([], 'No parents came over for them.');
+  return rows;
+}
+
+/** The sheet itself, two columns and nothing else. */
+function buildCheckInSheet(dateStr, text) {
+  const rows = parseCheckIn_(text);
+  if (!rows.length) {
+    throw new Error('Nothing in that looked like a name. Copy the whole row out of ' +
+      'Ravenna, from the student\'s name across to the end, and paste it again.');
+  }
+  const dateVal = toDate_(dateStr) || new Date();
+  const name = 'Check In ' + dateKey_(dateVal);
+  let s = ss_().getSheetByName(name);
+  const fresh = !s;
+  if (!s) s = ss_().insertSheet(name);
+  s.clear();
+  const values = [['Student', 'Parent(s)']].concat(rows.map(function (r) {
+    return [r.student, r.parents.join(' and ')];
+  }));
+  s.getRange(1, 1, values.length, 2).setValues(values);
+  s.getRange(1, 1, 1, 2).setFontWeight('bold');
+  s.setFrozenRows(1);
+  s.autoResizeColumns(1, 2);
+  ss_().setActiveSheet(s);
+  return {
+    sheet: name, rows: rows.length, fresh: fresh,
+    notes: rows.filter(function (r) { return r.note; })
+      .map(function (r) { return r.student + ': ' + r.note; })
+  };
+}
+
+function api_previewCheckIn(text) {
+  return { rows: parseCheckIn_(text) };
+}
+
+function api_buildCheckIn(dateStr, text) {
+  clearReadCache_();
+  return buildCheckInSheet(dateStr, text);
+}
+
+function showCheckInDialog() {
+  const html =
+    '<style>' + DIALOG_CSS_ + '</style>' +
+    '<h2>Make a check in sheet</h2>' +
+    '<p class="sub">Copy the registered families out of Ravenna and paste them in. ' +
+    'You get two columns, the student and their parents, with everything else ' +
+    'taken out. Paste as many rows as you like.</p>' +
+    '<label for="d">Tour date</label>' +
+    '<input type="date" id="d" value="' + nextWednesday() + '">' +
+    '<label for="paste" style="margin-top:10px;display:block;">What you copied</label>' +
+    '<textarea id="paste" rows="8" style="width:100%;font:inherit;padding:6px;' +
+    'border:1px solid #bbb;border-radius:4px;" oninput="look()"></textarea>' +
+    '<div style="margin-top:10px;">' +
+    '<button onclick="build()" id="go" disabled>Make the sheet</button>' +
+    '</div><div id="out"></div>' +
+    '<script>' +
+    'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
+    'function fail(e){document.getElementById("out").innerHTML=' +
+    '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    'function look(){var t=document.getElementById("paste").value;' +
+    'if(!t.trim()){document.getElementById("out").innerHTML="";' +
+    'document.getElementById("go").disabled=true;return;}' +
+    'google.script.run.withSuccessHandler(show).withFailureHandler(fail)' +
+    '.api_previewCheckIn(t);}' +
+    'function show(p){var r=p.rows||[];' +
+    'document.getElementById("go").disabled=!r.length;' +
+    'if(!r.length){document.getElementById("out").innerHTML="<div class=\'warn\'>' +
+    '<b>Nothing in that looked like a name yet.</b></div>";return;}' +
+    'var h="<div class=\'free\'><b>"+r.length+" famil"+(r.length===1?"y":"ies")+"</b>";' +
+    'h+="<table style=\'border-collapse:collapse;margin-top:6px;\'>";' +
+    'h+="<tr><th style=\'text-align:left;padding:2px 12px 2px 0;\'>Student</th>' +
+    '<th style=\'text-align:left;padding:2px 0;\'>Parent(s)</th></tr>";' +
+    'r.forEach(function(x){h+="<tr><td style=\'padding:2px 12px 2px 0;\'>"+esc(x.student)+' +
+    '"</td><td style=\'padding:2px 0;\'>"+esc((x.parents||[]).join(" and "))+"</td></tr>";});' +
+    'h+="</table></div>";' +
+    'var notes=r.filter(function(x){return x.note;});' +
+    'if(notes.length){h+="<div class=\'warn\'><b>Worth a look</b><ul>"+' +
+    'notes.map(function(x){return "<li>"+esc(x.student)+": "+esc(x.note)+"</li>";})' +
+    '.join("")+"</ul></div>";}' +
+    'document.getElementById("out").innerHTML=h;}' +
+    'function build(){document.getElementById("go").disabled=true;' +
+    'google.script.run.withSuccessHandler(function(r){' +
+    'document.getElementById("out").innerHTML="<div class=\'free\'><b>Done.</b> "+' +
+    'r.rows+" famil"+(r.rows===1?"y":"ies")+" on <b>"+esc(r.sheet)+"</b>, which is ' +
+    'open now."+((r.notes&&r.notes.length)?"<br>Worth a look: "+esc(r.notes.join(" ")):"")+' +
+    '"</div>";}).withFailureHandler(function(e){' +
+    'document.getElementById("go").disabled=false;fail(e);})' +
+    '.api_buildCheckIn(document.getElementById("d").value,' +
+    'document.getElementById("paste").value);}' +
+    '<\/script>';
+  dialog_(html, 'Check In Sheet', 620, 620);
+}
+
+/* =========================================================
  * Automatic sends
  * ========================================================= */
 
@@ -5646,6 +5848,7 @@ function onOpen() {
     .addItem('Print Locker Slips...', 'showLockerSlipDialog')
     .addItem('Change Who Is Working...', 'showSwapDialog')
     .addItem('Confirm a Tour Afterwards...', 'showConfirmDialog')
+    .addItem('Make a Check In Sheet...', 'showCheckInDialog')
     .addSeparator()
     .addItem('Write an Email...', 'showWriteDialog')
     .addItem('Test Emails...', 'showTestEmailDialog')
