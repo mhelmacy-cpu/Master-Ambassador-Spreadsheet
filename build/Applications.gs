@@ -1,7 +1,7 @@
 /**
  * Ravenna paste, formatted into the applications sheet.
  *
- * PASTED IN FULL? This file is 1727 lines. Scroll to the bottom of the
+ * PASTED IN FULL? This file is 1735 lines. Scroll to the bottom of the
  * editor: the last line should read END OF FILE. If it does not, the
  * paste was cut short, and nothing will work until it is pasted again.
  *
@@ -247,7 +247,7 @@ function pasteGrid_(text) {
  * guess. Bump it on every change that goes to her, or it is worse than
  * useless: it says the fix is in when it is not.
  */
-const APP_VERSION_ = 'v11';
+const APP_VERSION_ = 'v12';
 
 const APP_MAP_KEY_ = 'ravennaColumnMap';
 
@@ -816,6 +816,14 @@ function readGrid_(tab, gridRows, overrides) {
     }
   });
   filling.sort(function (a, b) { return headers.map[a] - headers.map[b]; });
+
+  // Without a Name column on the destination there is nothing to match a
+  // person to, and the screen would otherwise just come up empty.
+  if (!nameCol && !firstCol && !lastCol) {
+    warn('The "' + tab + '" tab has no Name column in row 1, so nobody can be matched to ' +
+      'it. Its headings have to be the very first row of the tab: if there is a title ' +
+      'above them, or row 1 is blank, that is what this is.');
+  }
 
   /**
    * The value a column feeds, for one row.
