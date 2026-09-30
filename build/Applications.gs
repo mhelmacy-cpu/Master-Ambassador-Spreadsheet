@@ -1,7 +1,7 @@
 /**
  * Ravenna paste, formatted into the applications sheet.
  *
- * PASTED IN FULL? This file is 1735 lines. Scroll to the bottom of the
+ * PASTED IN FULL? This file is 1745 lines. Scroll to the bottom of the
  * editor: the last line should read END OF FILE. If it does not, the
  * paste was cut short, and nothing will work until it is pasted again.
  *
@@ -247,7 +247,7 @@ function pasteGrid_(text) {
  * guess. Bump it on every change that goes to her, or it is worse than
  * useless: it says the fix is in when it is not.
  */
-const APP_VERSION_ = 'v12';
+const APP_VERSION_ = 'v13';
 
 const APP_MAP_KEY_ = 'ravennaColumnMap';
 
@@ -1464,8 +1464,18 @@ function pasteDialog_(fromTab) {
     'function boxText(){var b=document.getElementById("paste");return b?b.value:"";}' +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;")' +
     '.replace(/>/g,"&gt;").replace(/"/g,"&quot;");}' +
-    'function fail(e){document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+' +
-    'esc(e.message)+"</b></div>";}' +
+    'function fail(e){var m=String((e&&e.message)||e||"");' +
+    'var h="<div class=\'warn\'><b>"+esc(m)+"</b>";' +
+    // Google's own storage refusing the file, which is about the account
+    // rather than about anything in this script.
+    'if(/PERMISSION_DENIED|reading from storage|server error occurred/i.test(m)){' +
+    'h+="<br><br>That one is Google, not this script, and it means the spreadsheet itself ' +
+    'could not be read.<br><br><b>Usually it is two Google accounts at once.</b> If you ' +
+    'are signed in to more than one, the page can open as one account while the request ' +
+    'goes as the other. Open the spreadsheet in a private window signed in only as the ' +
+    'account that owns it, and try again.<br><br>If that is not it, reload the spreadsheet, ' +
+    'and check with whoever manages the school Google account that Apps Script is allowed.";}' +
+    'h+="</div>";document.getElementById("out").innerHTML=h;}' +
     'function count(m){document.getElementById("count").innerHTML=m;}' +
     'function read(pressed){var t=boxText();' +
     'if(!FROMTAB&&!t.replace(/\\s/g,"")){document.getElementById("out").innerHTML="";' +

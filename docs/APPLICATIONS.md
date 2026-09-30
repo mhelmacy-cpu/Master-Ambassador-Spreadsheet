@@ -148,6 +148,24 @@ own, for when the automatic read does not fire.
 The version is printed at the right of the same line. Quoting it says
 exactly which script is running, which saves guessing after an update.
 
+## PERMISSION_DENIED
+
+    We're sorry, a server error occurred while reading from storage.
+    Error code PERMISSION_DENIED.
+
+This one is Google, not this script, and nothing in here can fix it. It
+means the spreadsheet itself could not be read, so **File > Download**
+usually fails at the same time, which is the giveaway.
+
+Nearly always it is **two Google accounts signed in at once**: the page
+opens as one account while the request goes as the other. Open the
+spreadsheet in a private window, signed in only as the account that owns
+it.
+
+If that is not it: reload the spreadsheet, check the address bar for
+`/u/0/` or `/u/1/` (the number is which account is being used), and ask
+whoever manages the school Google account whether Apps Script is allowed.
+
 ## The columns
 
 It works them out for itself, three ways, in this order:
