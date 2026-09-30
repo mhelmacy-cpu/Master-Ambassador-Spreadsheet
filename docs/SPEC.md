@@ -93,7 +93,12 @@ One command, run once the prospective students are entered. It assigns:
 
 - **Tour Guides** - two per prospective student, matched on borough,
   grade and gender. Grade and gender are requirements; borough is a
-  preference. Most tours are rising 6th graders, so that pair reads
+  preference. The codes are M, B, Q, X, S, J and LI: Manhattan,
+  Brooklyn, Queens, Bronx, Staten Island, New Jersey and Long Island.
+  Setup puts the current list back on both dropdowns, so a sheet made
+  before a code existed stops showing a warning triangle against it.
+  Only the dropdown and the note on the heading are touched, never a
+  value. Most tours are rising 6th graders, so that pair reads
   `6 and 6 or 8`: a 6th grader first, and a second 6th grader where
   there is one free, an 8th grader where there is not. Only if a place
   would otherwise go empty does it widen further, since one guide and a

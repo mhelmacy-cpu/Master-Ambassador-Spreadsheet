@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-30 b';
+var BUILD_ = '2026-09-30 c';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -137,8 +137,19 @@ var LIGHT_OPTIONS = ['Green', 'Yellow'];
  */
 var STRENGTH_OPTIONS = ['High', 'Medium', 'Low'];
 var RACE_OPTIONS = ['White', 'African American', 'Asian'];
-var BOROUGHS = ['M', 'B', 'Q', 'X', 'S', 'J'];
-var BOROUGH_NAMES = { M: 'Manhattan', B: 'Brooklyn', Q: 'Queens', X: 'Bronx', S: 'Staten Island', J: 'New Jersey' };
+/* Where a family comes in from. Two letters where one would be unclear:
+ * LI is Long Island, which is neither a borough nor New Jersey but is
+ * where a good few of them travel from. */
+var BOROUGHS = ['M', 'B', 'Q', 'X', 'S', 'J', 'LI'];
+var BOROUGH_NAMES = { M: 'Manhattan', B: 'Brooklyn', Q: 'Queens', X: 'Bronx',
+  S: 'Staten Island', J: 'New Jersey', LI: 'Long Island' };
+
+/** The list as it goes in a note on the column heading. */
+function boroughKey_() {
+  return Object.keys(BOROUGH_NAMES).map(function (c) {
+    return c + ' = ' + BOROUGH_NAMES[c];
+  }).join('\n');
+}
 
 /** The class-visit choices offered for a rising 5th grader. */
 function classVisitOptions_() {
@@ -505,6 +516,7 @@ function setupSpreadsheet() {
   if (ensureColumn_(SHEETS.AMBASSADORS, 'Light', LIGHT_OPTIONS)) {
     added.push('Light on Ambassadors');
   }
+  refreshBoroughOptions_();
   if (ensureJobHourColumns_()) {
     added.push('Out of Class From/To on Jobs');
   } else {
@@ -628,8 +640,7 @@ function setupAmbassadors_() {
     'First name as the office writes it - Carrie, Chantilly, Mo. ' +
     'They get the "your advisee is out" email, so the name must match the ' +
     'Teachers sheet.');
-  note_(s, SHEETS.AMBASSADORS, 'Borough',
-    Object.keys(BOROUGH_NAMES).map(function (c) { return c + ' = ' + BOROUGH_NAMES[c]; }).join('\n'));
+  note_(s, SHEETS.AMBASSADORS, 'Borough', boroughKey_());
   note_(s, SHEETS.AMBASSADORS, 'Race (Presenting)',
     'WP or SOC is fine - so are W, White, White presenting, POC and ' +
     'Student of color. They all read correctly.\n\n' +
@@ -1447,6 +1458,24 @@ function refreshJobHours_() {
     });
   });
   return said;
+}
+
+/**
+ * The borough list, put back on both sheets.
+ *
+ * A dropdown made before a code was added still offers the old list, so a
+ * code typed anyway sits there under a warning triangle. The list is the
+ * script's rather than hers, so setup puts the current one back. Only the
+ * dropdown and the note on the heading are touched, never a value.
+ */
+function refreshBoroughOptions_() {
+  [SHEETS.AMBASSADORS, SHEETS.PROSPECTIVE].forEach(function (name) {
+    const sheet = ss_().getSheetByName(name);
+    if (!sheet || col_(name, 'Borough') === -1) return;
+    dropdown_(sheet, Math.max(sheet.getLastRow(), 2), col_(name, 'Borough') + 1, BOROUGHS,
+      name === SHEETS.PROSPECTIVE);
+    note_(sheet, name, 'Borough', boroughKey_());
+  });
 }
 
 function ensureJobHourColumns_() {
