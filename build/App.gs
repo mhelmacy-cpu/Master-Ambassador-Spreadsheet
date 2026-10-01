@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-09-30 d';
+var BUILD_ = '2026-10-01 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -2874,11 +2874,19 @@ function setupWarnings_(all, visitors) {
       'Active column - a blank there means "not available", so nobody can be picked.');
     return w;
   }
+  /* Named, not counted. "3 active ambassadors have no Split" leaves her
+   * hunting down the sheet for which three, and somebody missing from a
+   * dropdown is usually one of them. */
   const missing = function (field, label) {
-    const n = active.filter(function (a) { return !a[field]; }).length;
-    if (n) w.push(n + ' active ambassador(s) have no ' + label + '.');
+    const who = active.filter(function (a) { return !a[field]; })
+      .map(function (a) { return a.name; });
+    if (!who.length) return;
+    const shown = who.slice(0, 8).join(', ') +
+      (who.length > 8 ? ' and ' + (who.length - 8) + ' more' : '');
+    w.push('No ' + label + ': ' + shown + '.');
   };
-  missing('presenting', 'Race (Presenting) - they are left out of the balancing');
+  // Race (Presenting) has its own line further down, which says what a
+  // blank there actually does, so it is not listed twice.
   const odd = {};
   active.forEach(function (a) {
     if (unrecognisedPresenting_(a.presenting)) odd[trim_(a.presenting)] = true;
@@ -3452,6 +3460,7 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
   /* Her own answer to "who takes this family to class", picked in the
    * dialog. It is written before the landing is worked out, because
    * working out the landing reads this column back. */
+  const wentFifth = {};              // visitor -> the 5th grader hosting them
   clearReadCache_();                 // the rows just written are what it reads
   if (toCol !== -1) {
     [].concat(handoffs || []).forEach(function (h) {
@@ -3461,6 +3470,59 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
         return norm_(x.name) === norm_(h.visitor);
       })[0];
       if (!v) return;
+
+      /* A 5th grader is not a hand-off at all: it is the class visit the
+       * script has always had, so it is written as one. The Class Visit
+       * column says which language class, a Class Buddy row says who is
+       * hosting, and Class Visit To and Pass Off are left empty, because
+       * from here on everything reads the buddy row. */
+      const fifth = buddies_().filter(function (b) {
+        return b.canHost && norm_(b.name) === norm_(h.to);
+      })[0];
+      if (!h.clear && fifth) {
+        const cvCol = optionalCol_(P, 'Class Visit');
+        if (cvCol !== -1) {
+          psheet.getRange(v.row, cvCol + 1).setValue('5th grade ' + fifth.language);
+        }
+        psheet.getRange(v.row, toCol + 1).setValue('');
+        if (passCol !== -1) psheet.getRange(v.row, passCol + 1).setValue('');
+        // Whoever was hosting this family before gives way to the one she
+        // has just picked, and a Pass Off left over from an earlier run
+        // goes with them.
+        const had = rows_(N);
+        for (let i = had.length - 1; i >= 0; i--) {
+          if (!sameDay_(toDate_(had[i][col_(N, 'Tour Date')]), dateVal)) continue;
+          const job = trim_(had[i][col_(N, 'Job')]);
+          if (job !== JOBS.BUDDY && job !== JOBS.PASSOFF) continue;
+          if (norm_(had[i][col_(N, 'Prospective Student(s)')]) !== norm_(v.name)) continue;
+          if (job === JOBS.BUDDY &&
+              norm_(had[i][col_(N, 'Ambassador')]) === norm_(fifth.name)) continue;
+          tracker.deleteRow(i + 2);
+        }
+        clearReadCache_();
+        const already = rows_(N).some(function (r) {
+          return sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal) &&
+            trim_(r[col_(N, 'Job')]) === JOBS.BUDDY &&
+            norm_(r[col_(N, 'Ambassador')]) === norm_(fifth.name) &&
+            norm_(r[col_(N, 'Prospective Student(s)')]) === norm_(v.name);
+        });
+        if (!already) {
+          const row = blankRow_(N);
+          row[col_(N, 'Tour Date')] = dateVal;
+          row[col_(N, 'Ambassador')] = fifth.name;
+          row[col_(N, 'Job')] = JOBS.BUDDY;
+          row[col_(N, 'Prospective Student(s)')] = v.name;
+          row[col_(N, 'Notes')] = buddyHandoff_({ visitor: { name: v.name } }, fifth,
+            setting_('Class Visit Handoff Time', '9:06'), setting_('Tour End Time', '9:25'));
+          tracker.getRange(tracker.getLastRow() + 1, 1, 1, row.length).setValues([row]);
+          tracker.getRange(2, col_(N, 'Tour Date') + 1, tracker.getLastRow() - 1, 1)
+            .setNumberFormat('yyyy-mm-dd');
+        }
+        clearReadCache_();
+        wentFifth[norm_(v.name)] = fifth;
+        return;
+      }
+
       // Called off: the column is emptied so nothing is read back as an
       // instruction, and the family goes to their own guide again.
       psheet.getRange(v.row, toCol + 1).setValue(h.clear ? '' : trim_(h.to));
@@ -3535,32 +3597,35 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
   plan.pairs.forEach(function (p) {
     psheet.getRange(p.visitor.row, col_(P, 'Route') + 1).setValue(p.route);
     const c = landing[norm_(p.visitor.name)];
+    const f5 = wentFifth[norm_(p.visitor.name)];
     if (toCol !== -1) {
       // Her name first, so it reads back as an instruction and the next
       // run takes it as one.
       psheet.getRange(p.visitor.row, toCol + 1).setValue(
-        p.buddy ? p.buddy.name + ' - ' + p.buddy.language + ' with ' +
+        f5 ? f5.name + ' - ' + f5.language + ' with ' + f5.teacher + ' in ' + f5.room
+        : (p.buddy ? p.buddy.name + ' - ' + p.buddy.language + ' with ' +
             p.buddy.teacher + ' in ' + p.buddy.room
           : (c && c.where
               ? c.takers.join(' and ') + ' - ' + c.where.label +
                 (c.where.teacher ? ' (' + c.where.teacher + ')' : '')
-              : ''));
+              : '')));
     }
     // Handed to somebody who was not guiding them, which is the thing
     // she needs to see down the sheet at a glance.
     if (passCol !== -1) {
-      const handedOn = p.buddy || !!(c && c.takers.length && c.takers.some(function (n) {
+      const handedOn = p.buddy || f5 || !!(c && c.takers.length && c.takers.some(function (n) {
         return (p.guideNames || []).indexOf(n) === -1;
       }));
       psheet.getRange(p.visitor.row, passCol + 1).setValue(
-        (c && c.where) || p.buddy ? (handedOn ? 'Yes' : 'No') : '');
+        (c && c.where) || p.buddy || f5 ? (handedOn ? 'Yes' : 'No') : '');
     }
     psheet.getRange(p.visitor.row, col_(P, 'Tour Guides') + 1)
       .setValue((p.guideNames || p.guides).join(', '));
     const bcol = optionalCol_(P, 'Class Buddy');
     if (bcol !== -1) {
+      const host = f5 || p.buddy;
       psheet.getRange(p.visitor.row, bcol + 1)
-        .setValue(p.buddy ? p.buddy.name + ' (' + p.buddy.room + ')' : '');
+        .setValue(host ? host.name + ' (' + host.room + ')' : '');
     }
   });
 
@@ -3766,8 +3831,17 @@ function handbackChoices_(dateVal) {
   return cached_('handback:' + dateKey_(dateVal), function () {
     const entries = [];
     const seen = {};
+    /* A family a 5th grader is hosting is settled already: the class
+     * visit takes them, the buddy walks them down, and none of the
+     * hand-off machinery applies. Leaving them in it gave their guide a
+     * class to take them to and the 5th grader a Pass Off row. */
+    const withBuddy = {};
+    assignmentsOn_(dateVal).forEach(function (a) {
+      if (a.job === JOBS.BUDDY && trim_(a.visitor)) withBuddy[norm_(a.visitor)] = true;
+    });
     assignmentsOn_(dateVal).forEach(function (a) {
       if (a.job !== JOBS.GUIDE || !trim_(a.visitor)) return;
+      if (withBuddy[norm_(a.visitor)]) return;
       const key = norm_(a.visitor);
       if (seen[key] === undefined) {
         seen[key] = entries.length;
@@ -3850,6 +3924,26 @@ function handbackAllocate_(dateVal, entries) {
     elsewhere.push(one);
   });
 
+  /* The 5th graders marked Can Host a Visitor, offered the same way.
+   * Sending a family to one of them is the class visit the script has
+   * always had, not a hand-off: they host in their own language class
+   * and walk the visitor down at the end. The list says which class, and
+   * they come after the middle school, since it is a different kind of
+   * answer. */
+  buddies_().forEach(function (b) {
+    if (!b.canHost || !b.name || !b.language) return;
+    const w = {
+      key: '5th ' + norm_(b.language),
+      label: b.language + (b.room ? ' in ' + b.room : ''),
+      teacher: b.teacher,
+      academic: false,
+      fifth: true
+    };
+    const one = { name: b.name, where: w, job: '', fifth: true, language: b.language };
+    handedTo[norm_(b.name)] = one;
+    elsewhere.push(one);
+  });
+
   /* What she has already said, by name, in Class Visit To.
    *
    * Pass Off is what makes it an instruction rather than a record. The
@@ -3863,6 +3957,9 @@ function handbackAllocate_(dateVal, entries) {
   const problems = [];
   if (optionalCol_(SHEETS.PROSPECTIVE, 'Class Visit To') !== -1) {
     prospectiveFor_(dateVal).forEach(function (v) {
+      // Going to a 5th grade class: the buddy has them, so nothing in
+      // this column is an instruction about who takes them.
+      if (classVisitLanguage_(v.classVisit)) return;
       const raw = trim_(String(v.classVisitTo || ''))
         .replace(/^\s*pass\s*off\s*:?\s*/i, '');
       const said = trim_(raw.split(' - ')[0]);
@@ -3999,11 +4096,14 @@ function handbackAllocate_(dateVal, entries) {
     mine.options = elsewhere.filter(function (o) {
       return !guiding[norm_(o.name)];
     }).sort(function (a, b) {
-      // The room the family is already going to comes last: it is a real
-      // answer, but rarely the one she wants. Then whoever is working the
-      // tour, since they are out of class anyway and know what the
-      // morning is, and then the emptiest room, so a class that is
-      // already full is not the easy pick.
+      // A 5th grade class visit is a different kind of answer, so it sits
+      // under the middle school. Then the room the family is already
+      // going to, which is real but rarely what she wants. Then whoever
+      // is working the tour, since they are out of class anyway and know
+      // what the morning is, and then the emptiest room.
+      const fa = a.fifth ? 1 : 0;
+      const fb = b.fifth ? 1 : 0;
+      if (fa !== fb) return fa - fb;
       const sa = a.where.key === hereKey ? 1 : 0;
       const sb = b.where.key === hereKey ? 1 : 0;
       if (sa !== sb) return sa - sb;
@@ -4019,7 +4119,8 @@ function handbackAllocate_(dateVal, entries) {
         name: o.name, where: o.where.label, teacher: o.where.teacher,
         job: o.job, count: load[o.where.key] || 0,
         full: (load[o.where.key] || 0) >= cap,
-        same: !!hereKey && o.where.key === hereKey
+        same: !!hereKey && o.where.key === hereKey,
+        fifth: !!o.fifth
       };
     });
   });
@@ -6407,7 +6508,8 @@ function showStaffDialog() {
     'o.forEach(function(c,k){h+="<option value=\'"+k+"\'>"+esc(c.name)+" - "+' +
     'esc(c.where)+(c.teacher?" ("+esc(c.teacher)+")":"")+", "+c.count+" there"+' +
     '(c.full?" - full":"")+(c.same?" - same room":"")+' +
-    '(c.job?"":" - not on this tour")+"</option>";});' +
+    '(c.fifth?" - 5th grade class visit":(c.job?"":" - not on this tour"))+' +
+    '"</option>";});' +
     'h+="</select>";return h;}' +
     'function handoffsPicked(){var out=[],pr=window.__pairs||[];' +
     'var sels=document.querySelectorAll("select.hsel");' +
@@ -6437,7 +6539,35 @@ function showStaffDialog() {
     'for(var i=0;i<all.length;i++){' +
     'if(Number(all[i].getAttribute("data-pair"))===key){' +
     'mine[Number(all[i].getAttribute("data-slot"))]=all[i];}}return mine;}' +
+    /* What a family's places say right now, which is not what the plan
+     * said: she has been changing them. */
+    'function namesNow(x){var sp=window.__spare||[],out=[];' +
+    'var mine=selsFor(x.order);' +
+    'for(var j=0;j<mine.length;j++){var v=mine[j]?mine[j].value:"";' +
+    'var raw=mine[j]?mine[j].getAttribute("data-slot"):"";' +
+    'if(v==="-"){continue;}' +
+    'if(v===""){if(raw!=="add"&&x.guideNames[Number(raw)]){out.push(x.guideNames[Number(raw)]);}' +
+    'continue;}' +
+    'var c=sp[Number(v)];if(c){out.push(c.name);}}' +
+    'return out;}' +
+    /* Every family's class visit, worked out again from what the
+     * dropdowns say now, so the line underneath and the hand-off list
+     * follow her as she switches people about. */
+    'function cvRefresh(){var pr=window.__pairs||[],fams=[];' +
+    'pr.forEach(function(x){if(x.buddy){return;}var n=namesNow(x);' +
+    'if(n.length){fams.push({visitor:x.visitor.name,guides:n});}});' +
+    'if(!fams.length){return;}' +
+    'google.script.run.withSuccessHandler(cvShow).withFailureHandler(function(){})' +
+    '.api_classVisitPreview(document.getElementById("d").value,fams);}' +
+    'function cvShow(r){var pr=window.__pairs||[];window.__cap=r.cap;' +
+    'pr.forEach(function(x){var one=(r.byVisitor||{})[x.visitor.name];' +
+    'var box=document.getElementById("cv"+x.order);if(!box){return;}' +
+    'if(!one){box.innerHTML="";return;}' +
+    'x.classVisit=one.classVisit;x.classOptions=one.classOptions||[];' +
+    'x.guideNames=namesNow(x).length?namesNow(x):x.guideNames;' +
+    'box.innerHTML=classVisitLine(x);});}' +
     'function relabel(key){var x=pairOf(key),sp=window.__spare||[];if(!x){return;}' +
+    'cvRefresh();' +
     'var mine=selsFor(key),now=[],solo=[];' +
     'for(var j=0;j<mine.length;j++){var v=mine[j]?mine[j].value:"";' +
     'if(v==="-"){now[j]=null;solo[j]=false;}' +
@@ -6498,7 +6628,7 @@ function showStaffDialog() {
     '" was used - check this pair</b>":"")+' +
     '(x.solo?"<br><b>"+esc(x.solo)+" is taking this family alone. Nobody was left ' +
     'to pair with, and they are marked Can Solo.</b>":"")+' +
-    'classVisitLine(x)+' +
+    '"<span id=\'cv"+x.order+"\'>"+classVisitLine(x)+"</span>"+' +
     '(x.buddy?"<br><span class=\'muted\'>class visit: "+esc(x.buddy.name)+' +
     '(x.buddy.gender?" ("+esc(x.buddy.gender)+")":"")+" - "+esc(x.buddy.language)+' +
     '", "+esc(x.buddy.teacher)+", "+esc(x.buddy.room)+"</span>":"")+' +
@@ -7408,6 +7538,38 @@ function api_saveByHand(dateStr, job, names) {
 }
 
 function api_planTour(dateStr, keep) { return planTour(dateStr, keep); }
+
+/**
+ * Where each family would end up at 9:06 if these were their guides.
+ *
+ * The dialog asks as she changes a place, so the class visit line and the
+ * hand-off list underneath follow her rather than showing what the
+ * command worked out before she touched it. Every family goes in the one
+ * question, because the limit per class is counted across the tour and a
+ * family on its own would not know about the others.
+ */
+function api_classVisitPreview(dateStr, families) {
+  clearReadCache_();
+  const dateVal = toDate_(dateStr);
+  if (!dateVal) throw new Error('Pick a tour date first.');
+  const landed = handbackAllocate_(dateVal, [].concat(families || [])
+    .filter(function (f) { return f && trim_(f.visitor) && (f.guides || []).length; })
+    .map(function (f) {
+      return { visitor: trim_(f.visitor), guides: [].concat(f.guides) };
+    }));
+  const out = {};
+  Object.keys(landed.byVisitor).forEach(function (key) {
+    const c = landed.byVisitor[key];
+    out[c.visitor] = {
+      classVisit: c.where ? {
+        takers: c.takers, where: c.where.label, teacher: c.where.teacher,
+        count: c.count, over: c.over
+      } : null,
+      classOptions: c.options || []
+    };
+  });
+  return { cap: landed.cap, byVisitor: out, problems: landed.problems || [] };
+}
 function api_commitTour(dateStr, keep, panelists, swaps, handoffs) {
   return commitTour(dateStr, keep, panelists, swaps, handoffs);
 }

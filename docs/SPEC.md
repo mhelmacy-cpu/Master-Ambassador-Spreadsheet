@@ -42,6 +42,12 @@ she can leave out by leaving it blank:
   rule that a pair is never two students of color still applies, because
   that one is about the pair, not about the visitor.
 - **Borough** blank: borough stops being a tiebreak for them.
+
+Every one of these is reported **by name** in the staffing dialog, not as
+a count. "3 active ambassadors have no Split" leaves her hunting down the
+sheet for which three, and somebody missing from the class visit list is
+usually one of them: their class cannot be worked out, so there is nowhere
+to hand a family to.
 - **Full Pay / Well Connected** blank: an ordinary family.
 - **Class Visit** blank: no class visit.
 
@@ -166,6 +172,12 @@ because she works down the tour changing her mind and the person she
 wants is often already somewhere else. Whoever is free comes first, then
 anyone already down for something that morning, each with what they are
 down for written beside them ("already Tour Guide for Sam Visitor").
+
+The class visit line under each family, and the hand-off list with it, are
+worked out again the moment she changes a place, so they follow her rather
+than showing what the command decided before she touched anything. All the
+families go in one question, because the limit per class is counted across
+the tour.
 
 Picking one of them **moves** them. They come off the place they were on,
 and the answer says so ("Mika Rivers comes off the Lobby Greeter crew,
@@ -376,6 +388,18 @@ list, bar the family's own two guides, who are its first option already.
 Nobody is filtered out of it and it is never cut short: a name she goes
 looking for has to be there, and a name missing with nothing on screen
 to say why is a bug, not a shortcut.
+
+The **5th graders marked Can Host a Visitor** are on that list too, under
+the middle school, each shown with the class they host in. Picking one is
+not a hand-off at all: it is the class visit the script has always had, so
+it writes one. The Class Visit column says which language class, a Class
+Buddy row says who is hosting, and Class Visit To and Pass Off are left as
+a record rather than an instruction. From there the ordinary class-visit
+path takes over: the guides hand the family over at the door, the 5th
+grader hosts and walks them down at the end, their teacher is emailed, and
+the 5th grader gets no email and no locker slip, because they are told in
+person. A family a 5th grader is hosting is out of the hand-off machinery
+altogether.
 
 The order is: a different room first, then whoever is working the tour,
 since they are out of class anyway and know how the morning runs, then
