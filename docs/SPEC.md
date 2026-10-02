@@ -608,6 +608,25 @@ morning before they reach the printer.
       Cafeteria 8:25 AM. Back in class by 9:25 AM.
       Bring everything you need for class with you to the cafeteria.
 
+## When the failure is not the script's
+
+Google answers a dialog's question with **"a server error occurred while
+reading from storage. Error code PERMISSION_DENIED"** when the browser is
+signed in to several Google accounts and the dialog is running as the
+wrong one, or when the script's permission has lapsed. Nothing in the
+script causes it and nothing in the script can fix it.
+
+Printed on its own it reads like the script is broken with nothing to be
+done, so every dialog recognises that message, and the two others of its
+kind, and prints what to try under it: reload the spreadsheet, then open
+it in a private window signed in only as the account that owns it, and
+failing that re-authorise from Extensions, Apps Script. Any other message
+is printed exactly as it arrives.
+
+**Check This Script** also says which account the script is running as and
+which file it is bound to, since that is where a wrong-account mix-up
+shows.
+
 ## The check in sheet
 
 **Make a Check In Sheet** takes what she copies out of Ravenna and gives

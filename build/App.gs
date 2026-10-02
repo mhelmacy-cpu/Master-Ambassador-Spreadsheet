@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-01 a';
+var BUILD_ = '2026-10-02 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -6218,10 +6218,10 @@ function showCheckInDialog() {
     '<div style="margin-top:10px;">' +
     '<button onclick="build()" id="go" disabled>Make the sheet</button>' +
     '</div><div id="out"></div>' +
-    '<script>' +
+    '<script>' + DIALOG_JS_ +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function fail(e){document.getElementById("out").innerHTML=' +
-    '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    '"<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";}' +
     'function look(){var t=document.getElementById("paste").value;' +
     'if(!t.trim()){document.getElementById("out").innerHTML="";' +
     'document.getElementById("go").disabled=true;return;}' +
@@ -6348,6 +6348,32 @@ function nextWednesday() {
   return dateKey_(d);
 }
 
+/**
+ * The one piece of script every dialog gets, beside the styles.
+ *
+ * Some failures are not this script's at all. Google answers a dialog's
+ * question with "a server error occurred while reading from storage,
+ * PERMISSION_DENIED" when the browser is signed in to several Google
+ * accounts and the dialog is running as the wrong one, or when the
+ * script's permission has lapsed. Printed on its own that reads like the
+ * script is broken and there is nothing to do about it, so where the
+ * message is one of those it is printed with what to try.
+ */
+var DIALOG_JS_ =
+  'function failText(m){m=String(m==null?"":m);' +
+  'var esc=function(x){return String(x==null?"":x).replace(/&/g,"&amp;")' +
+  '.replace(/</g,"&lt;");};' +
+  'if(!/PERMISSION_DENIED|reading from storage|Authorization is required|' +
+  'ScriptError/i.test(m)){return esc(m);}' +
+  'return esc(m)+"</b><br><br>That one comes from Google rather than from this ' +
+  'script, so there is nothing in the script to fix.<br><br>It almost always ' +
+  'means the browser is signed in to more than one Google account and this ' +
+  'dialog is running as the wrong one. Reload the spreadsheet and try again. ' +
+  'If it happens again, open the spreadsheet in a private window, signed in ' +
+  'only as the account that owns it.<br><br>If it still happens, the script\'s ' +
+  'permission has lapsed: Extensions, then Apps Script, press Run on any ' +
+  'function, and allow it again.<b>";}';
+
 var DIALOG_CSS_ =
   'body{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#222;margin:0;padding:16px;}' +
   'h2{font-size:15px;margin:0 0 4px;}' +
@@ -6415,7 +6441,7 @@ function showStaffDialog() {
     '<button id="preview" onclick="doPreview()">Preview</button>' +
     '<button id="save" class="ghost" onclick="doSave()" disabled>Save to Tour Tracker</button>' +
     '</div></div><div id="out"></div>' +
-    '<script>' +
+    '<script>' + DIALOG_JS_ +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function busy(b){document.getElementById("preview").disabled=b;}' +
     'function restart(){document.getElementById("step2").hidden=true;' +
@@ -6460,7 +6486,7 @@ function showStaffDialog() {
     '.api_planTour(document.getElementById("d").value,' +
     'document.getElementById("keep").checked);}' +
     'function fail(e){busy(false);document.getElementById("out").innerHTML=' +
-    '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    '"<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";}' +
     'function guidePicker(x){if(!x.guideNames||!x.guideNames.length){return "<b>none found</b>";}' +
     'var sp=window.__spare||[],h="";' +
     'x.guideNames.forEach(function(g,j){' +
@@ -6789,11 +6815,11 @@ function showTestEmailDialog() {
     '<button class="ghost" onclick="sample(\'students\')">Students</button>' +
     '<button class="ghost" onclick="sample(\'teachers\')">Teachers and advisors</button>' +
     '</div><div id="out"></div>' +
-    '<script>' +
+    '<script>' + DIALOG_JS_ +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function busy(m){document.getElementById("out").innerHTML="<p class=\'muted\'>"+m+"</p>";}' +
     'function fail(e){document.getElementById("out").innerHTML=' +
-    '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    '"<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";}' +
     'function wholeDay(day){busy("Sending every "+esc(day)+" email to you...");' +
     'google.script.run.withSuccessHandler(done).withFailureHandler(fail)' +
     '.api_sendEveryEmail(document.getElementById("d").value,day);}' +
@@ -6847,11 +6873,11 @@ function showEmailDialog() {
     '<div style="margin-top:12px;"><button id="look" onclick="look()">' +
     'Show me who would get these</button></div>' +
     '<div id="who"></div><div id="out"></div>' +
-    '<script>' +
+    '<script>' + DIALOG_JS_ +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function fail(e){document.getElementById("look").disabled=false;' +
     'document.getElementById("out").innerHTML=' +
-    '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    '"<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";}' +
     'function look(){document.getElementById("look").disabled=true;' +
     'document.getElementById("out").innerHTML="";' +
     'document.getElementById("who").innerHTML="<p class=\'muted\'>Working it out. ' +
@@ -6920,7 +6946,7 @@ function showRouteSheetDialog() {
     '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
     '<div style="margin-top:14px;"><button id="go" onclick="make()">Build the document</button></div>' +
     '<div id="out"></div>' +
-    '<script>' +
+    '<script>' + DIALOG_JS_ +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function make(){document.getElementById("go").disabled=true;' +
     'document.getElementById("out").innerHTML="<p class=\'muted\'>Building...</p>";' +
@@ -6932,7 +6958,7 @@ function showRouteSheetDialog() {
     '+((r.problems&&r.problems.length)?"<div class=\'warn\'><b>A hand-off did not ' +
     'take</b><ul><li>"+r.problems.map(esc).join("</li><li>")+"</li></ul></div>":"");})' +
     '.withFailureHandler(function(e){document.getElementById("go").disabled=false;' +
-    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";})' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";})' +
     '.api_buildRouteSheets(document.getElementById("d").value);}' +
     '<\/script>';
   dialog_(html, 'Print Tour Routes', 600, 460);
@@ -6954,10 +6980,10 @@ function showWriteDialog() {
     '</select>' +
     '<div id="who"></div>' +
     '<div id="out"></div>' +
-    '<script>' +
+    '<script>' + DIALOG_JS_ +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function fail(e){document.getElementById("out").innerHTML=' +
-    '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    '"<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";}' +
     'function load(){var k=document.getElementById("kind").value;' +
     'document.getElementById("out").innerHTML="";' +
     'if(!k){document.getElementById("who").innerHTML="";return;}' +
@@ -7021,14 +7047,14 @@ function showConfirmDialog() {
     '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
     '<div style="margin-top:12px;"><button id="load" onclick="load()">Load that tour</button></div>' +
     '<div id="out"></div>' +
-    '<script>' +
+    '<script>' + DIALOG_JS_ +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function load(){document.getElementById("load").disabled=true;' +
     'document.getElementById("out").innerHTML="<p class=\'muted\'>Loading...</p>";' +
     'google.script.run.withSuccessHandler(show).withFailureHandler(fail)' +
     '.api_loadConfirm(document.getElementById("d").value);}' +
     'function fail(e){document.getElementById("load").disabled=false;' +
-    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";}' +
     'function show(p){document.getElementById("load").disabled=false;window.__rows=p.rows;' +
     'var h="<div class=\'out\'><h3>"+esc(p.dateLabel)+"</h3><div class=\'panel\'>";' +
     'p.rows.forEach(function(r,i){' +
@@ -7072,7 +7098,7 @@ function showLockerSlipDialog() {
     '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
     '<div style="margin-top:14px;"><button id="go" onclick="make()">Build the document</button></div>' +
     '<div id="out"></div>' +
-    '<script>' +
+    '<script>' + DIALOG_JS_ +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function make(){document.getElementById("go").disabled=true;' +
     'document.getElementById("out").innerHTML="<p class=\'muted\'>Building...</p>";' +
@@ -7082,7 +7108,7 @@ function showLockerSlipDialog() {
     '" slip(s) ready.</b><br><a href=\'"+r.url+"\' target=\'_blank\'>Open "+esc(r.name)+' +
     '"</a><br><span class=\'muted\'>It is in your Drive. File &rsaquo; Print, then cut.</span></div>";})' +
     '.withFailureHandler(function(e){document.getElementById("go").disabled=false;' +
-    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";})' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";})' +
     '.api_buildLockerSlips(document.getElementById("d").value);}' +
     '<\/script>';
   dialog_(html, 'Print Locker Slips', 600, 460);
@@ -7110,7 +7136,7 @@ function showSwapDialog() {
     '<div style="margin-top:12px;"><button id="load" onclick="load()">Load that tour</button></div>' +
     '<div id="msg"></div>' +
     '<div id="out"></div>' +
-    '<script>' +
+    '<script>' + DIALOG_JS_ +
     'var PASSOFF="' + JOBS.PASSOFF + '";' +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function load(){document.getElementById("load").disabled=true;' +
@@ -7118,7 +7144,7 @@ function showSwapDialog() {
     'google.script.run.withSuccessHandler(show).withFailureHandler(fail)' +
     '.api_swapList(document.getElementById("d").value);}' +
     'function fail(e){document.getElementById("load").disabled=false;' +
-    'document.getElementById("msg").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";' +
+    'document.getElementById("msg").innerHTML="<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";' +
     'document.getElementById("out").innerHTML="";}' +
     'function show(p){document.getElementById("load").disabled=false;window.__rows=p.rows;' +
     'var h="<div class=\'out\'><h3>"+esc(p.dateLabel)+"</h3>";' +
@@ -7325,10 +7351,10 @@ function showMeetingDialog() {
     '<button class="ghost" onclick="tickAll(true)">Tick all</button>' +
     '<button class="ghost" onclick="tickAll(false)">Untick all</button>' +
     '</div><div id="out"></div>' +
-    '<script>' +
+    '<script>' + DIALOG_JS_ +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function fail(e){document.getElementById("go").disabled=false;' +
-    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";}' +
     'function people(p){window.__who=p.rows;' +
     'var h="<label class=\'opt\' style=\'margin-top:10px;\'><b>Who</b></label>' +
     '<div class=\'panel\' style=\'max-height:150px;overflow:auto;\'>";' +
@@ -7372,7 +7398,7 @@ function showMeetingDialog() {
     'google.script.run.withSuccessHandler(function(r){' +
     'document.getElementById("docout").innerHTML=" <a href=\'"+r.url+"\' target=\'_blank\'>Open "+' +
     'esc(r.name)+"</a>";}).withFailureHandler(function(e){' +
-    'document.getElementById("docout").innerHTML=" "+esc(e.message);})' +
+    'document.getElementById("docout").innerHTML=" "+failText(e.message);})' +
     '.api_buildMeetingDoc(document.getElementById("d").value,' +
     'document.getElementById("t1").value,document.getElementById("t2").value,picked());}' +
     'google.script.run.withSuccessHandler(people).withFailureHandler(fail).api_meetingPeople();' +
@@ -7403,6 +7429,13 @@ function api_checkScript() {
   return {
     build: BUILD_,
     dataBuild: typeof DATA_BUILD_ === 'string' ? DATA_BUILD_ : 'not found',
+    // Who the script thinks is running it, and which file it is bound to.
+    // A dialog that answers "PERMISSION_DENIED" is usually running as the
+    // wrong Google account, and this is where that shows.
+    runningAs: whoAmI_(),
+    file: (function () {
+      try { return ss_().getName(); } catch (err) { return 'cannot be read'; }
+    })(),
     tabs: tabs,
     expected: want.map(function (n) {
       return { name: n, rows: rowsIn(n), there: tabs.indexOf(n) !== -1 };
@@ -7422,11 +7455,12 @@ function showCheckDialog() {
     '<p class="sub">What is actually in the editor, and which tabs it can see. ' +
     'Read the build against the one you were told to paste.</p>' +
     '<div id="out"><p class="muted">Looking...</p></div>' +
-    '<script>' +
+    '<script>' + DIALOG_JS_ +
     'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
     'function show(p){var h="<div class=\'free\'><b>App.gs build "+esc(p.build)+"</b>' +
     '<br>Data.gs build "+esc(p.dataBuild)+"<br>Reading the schedule from "+esc(p.reading)+' +
-    '" ("+p.days+" day(s) found).</div>";' +
+    '" ("+p.days+" day(s) found).<br>Running as "+esc(p.runningAs)+", on "+esc(p.file)+' +
+    '".</div>";' +
     'var miss=p.expected.filter(function(x){return !x.there;});' +
     'if(miss.length){h+="<div class=\'warn\'><b>Tab(s) not there:</b> "+' +
     'esc(miss.map(function(x){return x.name;}).join(", "))+"<br>Run First-Time Setup. If they ' +
@@ -7440,7 +7474,7 @@ function showCheckDialog() {
     'h+="</div>";' +
     'document.getElementById("out").innerHTML=h;}' +
     'google.script.run.withSuccessHandler(show).withFailureHandler(function(e){' +
-    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+esc(e.message)+' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+failText(e.message)+' +
     '"</b><br>That is the error itself. Send it to me and I will trace it.</div>";})' +
     '.api_checkScript();' +
     '<\/script>';
