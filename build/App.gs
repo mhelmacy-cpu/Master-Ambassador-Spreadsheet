@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-05 e';
+var BUILD_ = '2026-10-05 f';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -183,6 +183,11 @@ var DEFAULT_SETTINGS = [
   ['Greeting Done By Panelists', 'Lobby Greeter'],
   ['Panelists Greeting', '2'],
   ['Tour Guides Per Visiting Student', '2'],
+  /* Who picks the guides. "No" leaves every place empty for her to
+   * choose from the dropdowns, which is how she wants it: the rules are
+   * still read and still reported, but nothing is decided for her. "Yes"
+   * puts the old suggestions back. */
+  ['Script Suggests Tour Guides', 'No'],
   ['Guide Grades for Rising 5', '6 and 6'],
   ['Guide Grades for Rising 6', '6 and 6 or 8'],
   ['Guide Grades for Rising 7', '6 and 7'],
@@ -2234,6 +2239,33 @@ function planTour(dateStr, keepExisting) {
   const byAmbName = {};
   all.forEach(function (a) { byAmbName[norm_(a.name)] = a; });
 
+  /* Does she pick the guides, or does this?
+   *
+   * Hers by default. The rules are still worked out and still reported
+   * against whoever she picks: what it stops doing is deciding. */
+  const suggestGuides = isYes_(setting_('Script Suggests Tour Guides', 'No'));
+
+  /* The next route to hand out, up to Max Families Per Route each. Once
+   * every route has had its share the list starts again at route 1
+   * rather than leaving somebody without one: two families on the same
+   * route is better than a blank where the route should be. */
+  const nextRoute = function () {
+    let route = '';
+    let shared = false;
+    for (let cap = maxPerRoute; !route && cap <= maxPerRoute * (visitors.length + 1);
+         cap += maxPerRoute) {
+      for (let i = 0; i < routes.length; i++) {
+        if ((routeUse[routes[i]] || 0) < cap) {
+          route = routes[i];
+          shared = cap > maxPerRoute;
+          routeUse[route] = (routeUse[route] || 0) + 1;
+          break;
+        }
+      }
+    }
+    return { route: route, shared: shared };
+  };
+
   // A family marked Full Pay or Well Connected is paired before the
   // others, so the High ambassadors are still there to give them. The
   // list is put back in sheet order afterwards.
@@ -2282,6 +2314,28 @@ function planTour(dateStr, keepExisting) {
         short: Math.max(0, perVisitor - asAmb.length), why: ''
       };
     }
+    /* Hers to fill.
+     *
+     * With Script Suggests Tour Guides set to No the places are left
+     * empty and the dropdowns are what fills them. Everything else about
+     * the family is still worked out: the grades to look for, the route,
+     * and the rules, which are reported against whoever she picks rather
+     * than used to pick for her.
+     */
+    if (!suggestGuides) {
+      return {
+        visitor: v, order: entry.i, yours: true,
+        guides: [], guideNames: [], guideSolo: [],
+        wantGrades: wantGrades, needsSoC: needsSoC, anyGrade: !v.grade,
+        guideMix: '', guideRead: '', strengths: '',
+        priority: priorityWhy_(v),
+        weakGuide: false, stretched: '',
+        route: nextRoute().route, routeShared: false,
+        socMet: '', genderMet: '', socShortfall: false, genderShortfall: false,
+        short: perVisitor, why: 'yours to pick'
+      };
+    }
+
     // Each guide comes from its own grade, so the places are filled one
     // at a time rather than taken off a single ranked list.
     const chosen = [];
@@ -2425,23 +2479,9 @@ function planTour(dateStr, keepExisting) {
       }
     });
 
-    // Routes go out in order, up to Max Families Per Route each. Once
-    // every route has had its share the list starts again at route 1
-    // rather than leaving somebody without one - two families on the
-    // same route is better than a blank where the route should be.
-    let route = '';
-    let routeShared = false;
-    for (let cap = maxPerRoute; !route && cap <= maxPerRoute * (visitors.length + 1);
-         cap += maxPerRoute) {
-      for (let i = 0; i < routes.length; i++) {
-        if ((routeUse[routes[i]] || 0) < cap) {
-          route = routes[i];
-          routeShared = cap > maxPerRoute;
-          routeUse[route] = (routeUse[route] || 0) + 1;
-          break;
-        }
-      }
-    }
+    const gotRoute = nextRoute();
+    const route = gotRoute.route;
+    const routeShared = gotRoute.shared;
 
     return {
       visitor: v,
@@ -3204,6 +3244,20 @@ function applySwaps_(plan, swaps, ignored) {
     if (!x.drop) {
       if (!who) throw new Error(trim_(x.to) + ' is not on the Ambassadors sheet.');
       if (!who.active) throw new Error(who.name + ' is not marked Active.');
+      /* Two empty places on one family and the same name chosen in both.
+       * Said and skipped, before anything tries to move them off the
+       * place they are already standing in, which is this one. */
+      if (x.add) {
+        const already = plan.pairs.filter(function (q) {
+          return norm_(q.visitor.name) === norm_(x.visitor);
+        })[0];
+        if (already && already.guideNames.some(function (g) {
+          return norm_(g) === norm_(who.name);
+        })) {
+          note(x, 'they are already walking that family');
+          return;
+        }
+      }
       // Already working this tour: they are moved, not refused.
       if (taken[norm_(who.name)]) moved = freeUp(who.name, x.visitor);
     }
@@ -3221,6 +3275,9 @@ function applySwaps_(plan, swaps, ignored) {
       if (pair.guideNames.length >= (plan.guidesPer || 2)) {
         throw new Error(pair.visitor.name + ' already has ' + pair.guideNames.length +
           ' guides. Press Preview again.');
+      }
+      if (pair.guideNames.some(function (g) { return norm_(g) === norm_(who.name); })) {
+        return note(x, 'they are already walking that family');
       }
       const clash = pair.guideNames.filter(function (g) { return keptApart_(who.name, g); });
       if (clash.length) {
@@ -6553,8 +6610,9 @@ function showStaffDialog() {
   const html =
     '<style>' + DIALOG_CSS_ + '</style>' +
     '<h2>Staff this Wednesday tour</h2>' +
-    '<p class="sub">Your panel first. Everything after it is assigned around whoever ' +
-    'you pick, so a panelist is never given a second job.</p>' +
+    '<p class="sub">Your panel first. Two of them greet downstairs, and the rest ' +
+    'is worked out around them. The tour guides are yours: every place comes up ' +
+    'empty for you to choose from the list.</p>' +
     '<label for="d">Tour date</label>' +
     '<input type="date" id="d" value="' + nextWednesday() + '" onchange="restart()">' +
     '<div class="byhand">' +
@@ -6564,8 +6622,9 @@ function showStaffDialog() {
     '</div>' +
     '<div class="byhand" id="step2" hidden>' +
     '<label><span class="step">2</span> Everything else</label>' +
-    '<p class="sub" style="margin:0 0 8px;">Tour guides, routes and the greeting crews, ' +
-    'assigned around your panel. Nothing is written until you save.</p>' +
+    '<p class="sub" style="margin:0 0 8px;">Routes and the greeting crews are worked ' +
+    'out for you. The guide places are empty: pick each one from its dropdown. ' +
+    'Nothing is written until you save.</p>' +
     '<label class="opt"><input type="checkbox" id="keep" checked>' +
     '<span><b>Keep what is already assigned.</b> Only students with no guides yet are ' +
     'staffed, for someone who signed up late. Untick to start this date over.' +
@@ -6620,8 +6679,13 @@ function showStaffDialog() {
     'document.getElementById("keep").checked);}' +
     'function fail(e){busy(false);document.getElementById("out").innerHTML=' +
     '"<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";}' +
-    'function guidePicker(x){if(!x.guideNames||!x.guideNames.length){return "<b>none found</b>";}' +
-    'var sp=window.__spare||[],h="";' +
+    /* The guide places for one family.
+     *
+     * One dropdown per guide on the pair, and one empty dropdown for
+     * every place still to fill. With nothing suggested that is all of
+     * them, which is the point: she picks each one. */
+    'function guidePicker(x){var sp=window.__spare||[],h="";' +
+    'if(!sp.length){return "<b>nobody on the Ambassadors sheet can guide</b>";}' +
     'x.guideNames.forEach(function(g,j){' +
     'h+="<select class=\'gsel\' data-pair=\'"+x.order+"\' data-slot=\'"+j+"\' ' +
     'onchange=\'relabel("+x.order+")\'>";' +
@@ -6640,13 +6704,14 @@ function showStaffDialog() {
     /* A family walking with one guide gets an empty place beside them, so
      * one can be put back without starting the date over. */
     'var per=window.__guidesPer||2;' +
-    'if(x.guideNames.length<per){' +
+    'for(var e=x.guideNames.length;e<per;e++){' +
     'h+="<select class=\'gsel\' data-pair=\'"+x.order+"\' data-slot=\'add\' ' +
     'onchange=\'relabel("+x.order+")\'>";' +
-    'h+="<option value=\'\'>nobody: "+esc(x.guideNames.join(" and "))+" alone ' +
-    '(as it is)</option>";' +
+    'h+="<option value=\'\'>"+(x.guideNames.length?"nobody: "+' +
+    'esc(x.guideNames.join(" and "))+" alone (as it is)":"choose a guide")+"</option>";' +
     'sp.forEach(function(c,k){if(c.jobs&&!c.jobs[GUIDE]){return;}' +
-    'h+="<option value=\'"+k+"\'>add "+esc(c.name)+" ("+esc(c.note)+")"+' +
+    'h+="<option value=\'"+k+"\'>"+(x.guideNames.length?"add ":"")+esc(c.name)+' +
+    '" ("+esc(c.note)+")"+' +
     '(c.busy?" - already "+esc(c.busy):"")+' +
     '(c.yellow?" - check first":"")+"</option>";});' +
     'h+="</select> ";}' +
@@ -6781,6 +6846,8 @@ function showStaffDialog() {
     'var key=Number(sels[i].getAttribute("data-pair")),x=null;' +
     'for(var j=0;j<pr.length;j++){if(pr[j].order===key){x=pr[j];}}' +
     'if(!x){continue;}' +
+    /* An empty place. There is one of these per place still to fill, so
+     * two of them send two names, and the save puts them both on. */
     'if(raw==="add"){var ac=sp[Number(v)];' +
     'if(ac){out.push({visitor:x.visitor.name,to:ac.name,add:true});}continue;}' +
     'if(!x.guideNames[slot]){continue;}' +

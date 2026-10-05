@@ -97,9 +97,18 @@ matrix of who can do which.
 
 One command, run once the prospective students are entered. It assigns:
 
-- **Tour Guides** - two per prospective student, matched on borough,
-  grade and gender. Grade and gender are requirements; borough is a
-  preference. The codes are M, B, Q, X, S, J and LI: Manhattan,
+- **Tour Guides** - **hers to pick.** Every place comes up empty with a
+  dropdown beside it, one per place, and she chooses each one. Nothing is
+  suggested and nothing is decided for her. What the command still does
+  for that family is everything else: the route, the grades to look for,
+  the class visit, and the rules, which are worked out and reported
+  against whoever she picks rather than used to pick for her. Picking the
+  same person in both places on one family is refused and says why.
+
+  **Script Suggests Tour Guides** on Settings puts the old behaviour
+  back: set it to Yes and the command staffs every pair itself, two per
+  prospective student, matched on borough, grade and gender. Grade and
+  gender are requirements; borough is a preference. The codes are M, B, Q, X, S, J and LI: Manhattan,
   Brooklyn, Queens, Bronx, Staten Island, New Jersey and Long Island.
   Setup puts the current list back on both dropdowns, so a sheet made
   before a code existed stops showing a warning triangle against it.
