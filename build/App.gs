@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-05 c';
+var BUILD_ = '2026-10-05 d';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -175,6 +175,13 @@ var DEFAULT_SETTINGS = [
   ['Visitors End In', 'the co-lab'],
   ['Lobby Greeters Needed', '3'],
   ['Table Greeters Needed', '2'],
+  /* The greeting job downstairs is not staffed from the roster any more:
+   * the panel covers it. Two of the panelists are given it as well, and
+   * since they are already out of class from 8:25 it costs nobody a
+   * lesson. Set the count to 0 to go back to staffing it from the
+   * roster, or name the other crew here to swap which one they cover. */
+  ['Greeting Done By Panelists', 'Lobby Greeter'],
+  ['Panelists Greeting', '2'],
   ['Tour Guides Per Visiting Student', '2'],
   ['Guide Grades for Rising 5', '6 and 6'],
   ['Guide Grades for Rising 6', '6 and 6 or 8'],
@@ -780,7 +787,8 @@ function setupJobs_() {
   if (!fresh) return;
   const rows = [
     [JOBS.PANELIST, 'Speaks on the student panel. Chosen by hand, not by the staffing command.', 'Yes'],
-    [JOBS.LOBBY, 'Greets visiting families as they arrive in the lobby.', 'Yes'],
+    [JOBS.LOBBY, 'Greets visiting families as they arrive in the lobby. Covered by ' +
+      'two of the panelists, who are downstairs from 8:25 anyway.', 'Yes'],
     [JOBS.TABLE, 'Staffs the welcome and sign-in table.', 'Yes'],
     [JOBS.GUIDE, 'Walks a prospective student round the building on a set route.', 'Yes'],
     [JOBS.BUDDY, 'A 5th grader hosting a visiting student in their own class after the tour.', 'Yes'],
@@ -2597,9 +2605,56 @@ function planTour(dateStr, keepExisting) {
       raceMix: traitMix_(chosen, pool, 'presenting')
     };
   };
+  /* ---- the greeting crews ----
+   *
+   * One of them is the panel's. Those two are standing downstairs from
+   * 8:25 anyway, so greeting costs them nothing, and it leaves two more
+   * of the roster free for a tour. The panel is picked first and saved
+   * before this runs, which is what makes it possible.
+   */
+  const panelJob = trim_(setting_('Greeting Done By Panelists', JOBS.LOBBY));
+  const panelGreeters = Number(setting_('Panelists Greeting', '2'));
+  const fromPanel = function (job, count) {
+    // Whoever she has put on the panel, in the order she picked them.
+    const onPanel = [];
+    assignmentsOn_(dateVal).forEach(function (a) {
+      if (a.job === JOBS.PANELIST && trim_(a.name)) onPanel.push(trim_(a.name));
+    });
+    // Anybody already on this crew from an earlier run keeps it.
+    const kept2 = ((kept && kept.crew[job]) || []).slice();
+    const chosen = kept2.slice();
+    onPanel.forEach(function (n) {
+      if (chosen.length >= count) return;
+      if (chosen.some(function (x) { return norm_(x) === norm_(n); })) return;
+      chosen.push(n);
+    });
+    chosen.forEach(function (n) {
+      // They keep Panelist as their first job, so the dropdowns still
+      // read "already Panelist" rather than the greeting.
+      if (!used[n]) used[n] = job;
+    });
+    let why = '';
+    if (chosen.length < count) {
+      why = onPanel.length
+        ? 'only ' + onPanel.length + ' on the panel, and this crew comes off it'
+        : 'no panel has been saved for this date yet, and this crew comes off it';
+    }
+    return {
+      job: job, chosen: chosen, needed: count, added: chosen.slice(kept2.length),
+      keptCount: kept2.length, fromPanel: true,
+      short: Math.max(0, count - chosen.length), why: why,
+      mix: genderMix_(chosen, pool),
+      raceMix: traitMix_(chosen, pool, 'presenting')
+    };
+  };
+  const crewFor = function (job, count) {
+    return (norm_(job) === norm_(panelJob) && panelGreeters > 0)
+      ? fromPanel(job, panelGreeters)
+      : crew(job, count);
+  };
   const greeters = [
-    crew(JOBS.LOBBY, Number(setting_('Lobby Greeters Needed', '3')) || 3),
-    crew(JOBS.TABLE, Number(setting_('Table Greeters Needed', '2')) || 2)
+    crewFor(JOBS.LOBBY, Number(setting_('Lobby Greeters Needed', '3')) || 3),
+    crewFor(JOBS.TABLE, Number(setting_('Table Greeters Needed', '2')) || 2)
   ];
 
   /* ---- the panel ----
@@ -3384,6 +3439,16 @@ function refreshClassVisits_(dateVal) {
 
 /** Writes a plan to the Tour Tracker and back onto Prospective Students. */
 function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
+  /* The panel is written before anything is worked out.
+   *
+   * The greeting crew downstairs comes off the panel, so the panel has to
+   * be on the tracker before the crews are picked. Saved afterwards, as
+   * it was, a panel submitted at the same moment as everything else only
+   * reached the crew on the next run.
+   */
+  const panelFirst = savePanel_(toDate_(dateStr) || nextTourDate_(), panelists, null);
+  if (panelFirst) clearReadCache_();
+
   const plan = planTour(dateStr, keepExisting);
   /* What the dialog asked for, and anything it asked for that could not
    * be done, both handed back so the answer can say so. */
@@ -3508,7 +3573,9 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
    * The landing is worked out below, after the guides are written, so
    * these rows go in there rather than here. */
 
-  const panel = savePanel_(dateVal, panelists, plan);
+  // Already written, before the plan was worked out, so the crew that
+  // comes off the panel could see it.
+  const panel = panelFirst;
   refreshCounts_();
 
   const P = SHEETS.PROSPECTIVE;
@@ -3707,8 +3774,14 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
  */
 function savePanel_(dateVal, names, plan) {
   if (!names) return null;
-  return saveByHand_(dateVal, JOBS.PANELIST, names,
-    (plan.free || []).map(function (f) { return f.name; }));
+  /* Whose rows are hers to lose: the people the dialog offered her. It
+   * offers everybody active and allowed the job, so where no plan is to
+   * hand that list is worked out the same way. */
+  const offered = plan && plan.free
+    ? plan.free.map(function (f) { return f.name; })
+    : api_handChoices(dateKey_(dateVal), JOBS.PANELIST).rows
+        .map(function (r) { return r.name; });
+  return saveByHand_(dateVal, JOBS.PANELIST, names, offered);
 }
 
 /**
@@ -6776,6 +6849,7 @@ function showStaffDialog() {
     'greeting crews below work the same way. Nothing is written until you press ' +
     'Save.</p>";' +
     'p.greeters.forEach(function(c,ci){h+="<h3>"+esc(c.job)+" ("+c.chosen.length+" of "+c.needed+")"+' +
+    '(c.fromPanel?" <span class=\'muted\'>- your panel covers this one</span>":"")+' +
     '(c.keptCount?" <span class=\'muted\'>"+c.keptCount+" already assigned</span>":"")+"</h3><div>"+' +
     'crewPicker(c,ci)+' +
     '(c.mix?" <span class=\'muted\'>("+esc(c.mix)+")</span>":"")+' +

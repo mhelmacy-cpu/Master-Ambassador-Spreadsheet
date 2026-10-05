@@ -211,7 +211,26 @@ dropdown ("add Mika Rivers"), and in Change Who Is Working as a block of
 its own ("Sam Visitor is walking with Aurelia Walker alone"). The added
 guide takes the family's own route, so the sheets and emails follow.
 
-Nobody is given two jobs in the same slot. Whoever has done fewest jobs
+**The panel covers the greeting downstairs.** The crew named in
+**Greeting Done By Panelists** is not staffed from the roster at all: the
+first **Panelists Greeting** of the panel, in the order she picked them,
+are given that job as well. They are standing down there from 8:25 either
+way, so it costs them no more class than the panel already does, and it
+leaves two more of the roster free to walk a family.
+
+It follows them everywhere. The Tour Tracker carries both rows, their own
+email and locker slip list both jobs, and the hour on all of it is the
+panel's: back in class by 9:05, not 8:45. Their advisor and their class
+teacher see both jobs in the row.
+
+The panel is written to the tracker before the crews are picked, so a
+panel submitted in the same save still covers the door that run. Where no
+panel is saved the crew is empty and says why. Setting **Panelists
+Greeting** to 0 hands the crew back to the roster and **Lobby Greeters
+Needed**; naming the other crew in **Greeting Done By Panelists** swaps
+which one they cover.
+
+Nobody else is given two jobs in the same slot. Whoever has done fewest jobs
 so far is offered first, so the work spreads evenly across the year.
 
 ### Changing a guide before it is saved
