@@ -177,7 +177,23 @@ The class visit line under each family, and the hand-off list with it, are
 worked out again the moment she changes a place, so they follow her rather
 than showing what the command decided before she touched anything. All the
 families go in one question, because the limit per class is counted across
-the tour.
+the tour. That redraw reads the dropdowns and changes nothing else: the
+plan the command made has to stay as it was, because saving works out what
+changed by reading the dropdowns against it.
+
+The list comes up for every family, including the two cases where it used
+to disappear and leave her nothing to click:
+
+- **Where the class cannot be worked out**, which is what happens the
+  moment she swaps in somebody whose Homeroom or Split is blank. There is
+  nothing to say about where that family is going, which is exactly when
+  she needs to send them somewhere else, so the line says what is missing
+  and the list is offered anyway.
+- **Where a 5th grader is hosting them.** The line above already says who
+  and which class, so this is only the list, with "Aeon Anjargolian hosts
+  them (as it is)" first. A hosted family is asked about with no guides
+  named, so nothing is counted against their guides' rooms, which they are
+  not going to.
 
 Picking one of them **moves** them. They come off the place they were on,
 and the answer says so ("Mika Rivers comes off the Lobby Greeter crew,

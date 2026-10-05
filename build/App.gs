@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-02 a';
+var BUILD_ = '2026-10-05 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -2688,11 +2688,21 @@ function planTour(dateStr, keepExisting) {
    * see any teacher who has been given too many. Nothing is moved: a
    * class over the limit is reported and left as it is. A family going
    * to a 5th grade language class is settled already and is left out. */
-  const landing = handbackAllocate_(dateVal, pairs.filter(function (p) {
-    return !p.buddy && p.guideNames.length;
-  }).map(function (p) {
-    return { visitor: p.visitor.name, guides: p.guideNames };
-  }));
+  /* Where each family ends up, and who else could take them.
+   *
+   * A family a 5th grader is hosting goes in with no guides named. That
+   * asks the question without answering it: nothing is counted against
+   * their guides' rooms, which is right because they are not going
+   * there, and the list of who else could take them still comes back, so
+   * a class visit can be changed in the dialog like anything else. */
+  const landing = handbackAllocate_(dateVal, pairs
+    .filter(function (p) { return p.buddy || p.guideNames.length; })
+    .map(function (p) {
+      return {
+        visitor: p.visitor.name,
+        guides: p.buddy ? [] : p.guideNames
+      };
+    }));
   pairs.forEach(function (p) {
     const c = landing.byVisitor[norm_(p.visitor.name)];
     if (!c) return;
@@ -6518,18 +6528,41 @@ function showStaffDialog() {
     '(c.yellow?" - check first":"")+"</option>";});' +
     'h+="</select> ";}' +
     'return h;}' +
-    'function classVisitLine(x){if(x.buddy||!x.classVisit){return "";}' +
-    'var v=x.classVisit,pass=v.takers.some(function(n){' +
+    /* The class visit, and the list of who else could take them.
+     *
+     * The list is drawn even where the class itself cannot be worked out,
+     * which is what happens the moment she swaps in somebody whose
+     * Homeroom or Split is blank: there is nothing to say about where
+     * they are going, and that is exactly when she needs to send the
+     * family somewhere else. It used to disappear instead. */
+    'function classVisitLine(x){' +
+    'var v=x.classVisit,o=x.classOptions||[];' +
+    /* Hosted by a 5th grader: where they are going is already said on the
+     * line above, so this is only the list, to change it by. */
+    'if(x.buddy){if(!o.length){return "";}' +
+    'var hb="<br><select class=\'hsel\' data-pair=\'"+x.order+"\'>";' +
+    'hb+="<option value=\'\'>"+esc(x.buddy.name)+" hosts them (as it is)</option>";' +
+    'o.forEach(function(c,k){hb+="<option value=\'"+k+"\'>"+esc(c.name)+" - "+' +
+    'esc(c.where)+(c.teacher?" ("+esc(c.teacher)+")":"")+", "+c.count+" there"+' +
+    '(c.full?" - full":"")+(c.fifth?" - 5th grade class visit":' +
+    '(c.job?"":" - not on this tour"))+"</option>";});' +
+    'return hb+"</select>";}' +
+    'if(!v&&!o.length){return "";}' +
+    'var pass=!!v&&v.takers.some(function(n){' +
     'return (x.guideNames||[]).indexOf(n)===-1;});' +
-    'var h="<br>"+(pass?"<b>PASS OFF</b> ":"")+"<span class=\'muted\'>class visit: "+' +
+    'var h=v?("<br>"+(pass?"<b>PASS OFF</b> ":"")+"<span class=\'muted\'>class visit: "+' +
     'esc(v.takers.join(" and "))+" takes them to "+esc(v.where)+' +
-    '(v.teacher?" ("+esc(v.teacher)+")":"")+"</span>";' +
-    'if(v.over){h+="<br><b class=\'yel\'>that class has "+v.count+' +
+    '(v.teacher?" ("+esc(v.teacher)+")":"")+"</span>")' +
+    ':"<br><b>where this family goes at 9:06 cannot be worked out. Their guide ' +
+    'needs Homeroom, Split and Grade on the Ambassadors sheet, or send the family ' +
+    'to somebody below.</b>";' +
+    'if(v&&v.over){h+="<br><b class=\'yel\'>that class has "+v.count+' +
     '" visitors, more than the limit of "+window.__cap+". Hand this family to ' +
     'somebody in another class below.</b>";}' +
-    'var o=x.classOptions||[];if(!o.length){return h;}' +
+    'if(!o.length){return h;}' +
     'h+="<br><select class=\'hsel\' data-pair=\'"+x.order+"\'>";' +
-    'h+="<option value=\'\'>"+esc(v.takers.join(" and "))+" takes them (as it is)</option>";' +
+    'h+="<option value=\'\'>"+(v?esc(v.takers.join(" and "))+" takes them (as it is)"' +
+    ':"nobody yet: choose who takes them")+"</option>";' +
     'if(pass){h+="<option value=\'none\'>No hand-off: back to their own guide</option>";}' +
     'o.forEach(function(c,k){h+="<option value=\'"+k+"\'>"+esc(c.name)+" - "+' +
     'esc(c.where)+(c.teacher?" ("+esc(c.teacher)+")":"")+", "+c.count+" there"+' +
@@ -6580,18 +6613,29 @@ function showStaffDialog() {
      * dropdowns say now, so the line underneath and the hand-off list
      * follow her as she switches people about. */
     'function cvRefresh(){var pr=window.__pairs||[],fams=[];' +
-    'pr.forEach(function(x){if(x.buddy){return;}var n=namesNow(x);' +
+    'pr.forEach(function(x){if(x.buddy){' +
+    'fams.push({visitor:x.visitor.name,guides:[]});return;}' +
+    'var n=namesNow(x);' +
     'if(n.length){fams.push({visitor:x.visitor.name,guides:n});}});' +
     'if(!fams.length){return;}' +
     'google.script.run.withSuccessHandler(cvShow).withFailureHandler(function(){})' +
     '.api_classVisitPreview(document.getElementById("d").value,fams);}' +
+    /* Drawn from what the dropdowns say, and nothing else is touched.
+     *
+     * x.guideNames is what the command planned, and saving works out what
+     * changed by reading the dropdowns against it. Writing the new names
+     * into it made every place look unchanged, so the save sent no
+     * changes at all and the tour went back to the plan. The names she
+     * has chosen go into a copy, for drawing the line only. */
     'function cvShow(r){var pr=window.__pairs||[];window.__cap=r.cap;' +
     'pr.forEach(function(x){var one=(r.byVisitor||{})[x.visitor.name];' +
     'var box=document.getElementById("cv"+x.order);if(!box){return;}' +
-    'if(!one){box.innerHTML="";return;}' +
+    'if(!one){return;}' +
     'x.classVisit=one.classVisit;x.classOptions=one.classOptions||[];' +
-    'x.guideNames=namesNow(x).length?namesNow(x):x.guideNames;' +
-    'box.innerHTML=classVisitLine(x);});}' +
+    'var view={};for(var k in x){if(Object.prototype.hasOwnProperty.call(x,k)){' +
+    'view[k]=x[k];}}' +
+    'var now=namesNow(x);if(now.length){view.guideNames=now;}' +
+    'box.innerHTML=classVisitLine(view);});}' +
     'function relabel(key){var x=pairOf(key),sp=window.__spare||[];if(!x){return;}' +
     'cvRefresh();' +
     'var mine=selsFor(key),now=[],solo=[];' +
