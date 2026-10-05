@@ -211,12 +211,13 @@ dropdown ("add Mika Rivers"), and in Change Who Is Working as a block of
 its own ("Sam Visitor is walking with Aurelia Walker alone"). The added
 guide takes the family's own route, so the sheets and emails follow.
 
-**The panel covers the greeting downstairs.** The crew named in
-**Greeting Done By Panelists** is not staffed from the roster at all: the
-first **Panelists Greeting** of the panel, in the order she picked them,
-are given that job as well. They are standing down there from 8:25 either
-way, so it costs them no more class than the panel already does, and it
-leaves two more of the roster free to walk a family.
+**The panel covers two of the places downstairs.** The crew named in
+**Greeting Done By Panelists** is still the size **Lobby Greeters Needed**
+asks for, three: the first **Panelists Greeting** of the panel, in the
+order she picked them, take two of those places, and the roster fills the
+third around them. They are standing down there from 8:25 either way, so
+it costs them no more class than the panel already does, and it leaves two
+of the roster free to walk a family instead.
 
 It follows them everywhere. The Tour Tracker carries both rows, their own
 email and locker slip list both jobs, and the hour on all of it is the
@@ -225,7 +226,8 @@ teacher see both jobs in the row.
 
 The panel is written to the tracker before the crews are picked, so a
 panel submitted in the same save still covers the door that run. Where no
-panel is saved the crew is empty and says why. Setting **Panelists
+panel is saved, or it is shorter than the places it owes, the roster fills
+what it can and the crew says what the panel still owes. Setting **Panelists
 Greeting** to 0 hands the crew back to the roster and **Lobby Greeters
 Needed**; naming the other crew in **Greeting Done By Panelists** swaps
 which one they cover.

@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-05 d';
+var BUILD_ = '2026-10-05 e';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -2553,15 +2553,29 @@ function planTour(dateStr, keepExisting) {
    * out 2-1 rather than 3-0, and two places come out 1-1. Where only one
    * gender is left the crew simply fills from it rather than going short.
    */
-  const crew = function (job, count) {
+  /**
+   * A crew, filled to the number she asks for.
+   *
+   * `seed` is for people who are on it by her decision rather than this
+   * one's: the panelists who cover the greeting downstairs. They go on
+   * first and the rest of the crew is filled around them, so the balance
+   * of the crew is worked out knowing they are already standing there.
+   */
+  const crew = function (job, count, seed) {
     const available = pool.filter(function (a) {
       return !used[a.name] && canDo(a, job) && !apartClash_(a.name, job, used);
     }).sort(fairness);
     // Whoever is on this crew already stays on it, and only the gap is filled.
-    const picked = ((kept && kept.crew[job]) || []).map(function (n) {
+    const named = ((kept && kept.crew[job]) || []).slice();
+    [].concat(seed || []).forEach(function (n) {
+      if (!trim_(n)) return;
+      if (named.some(function (x) { return norm_(x) === norm_(n); })) return;
+      named.push(n);
+    });
+    const picked = named.map(function (n) {
       return byAmbName[norm_(n)] || { name: n, grade: '', gender: '', presenting: '' };
     });
-    const keptCount = picked.length;
+    const keptCount = ((kept && kept.crew[job]) || []).length;
     while (picked.length < count) {
       let best = null;
       let bestKey = null;
@@ -2614,43 +2628,27 @@ function planTour(dateStr, keepExisting) {
    */
   const panelJob = trim_(setting_('Greeting Done By Panelists', JOBS.LOBBY));
   const panelGreeters = Number(setting_('Panelists Greeting', '2'));
-  const fromPanel = function (job, count) {
-    // Whoever she has put on the panel, in the order she picked them.
+  const crewFor = function (job, count) {
+    if (norm_(job) !== norm_(panelJob) || panelGreeters <= 0) return crew(job, count);
+    // Whoever she put on the panel, in the order she picked them. The
+    // first two of them are on this crew; the crew is still the size she
+    // asks for, so the rest comes off the roster as usual.
     const onPanel = [];
     assignmentsOn_(dateVal).forEach(function (a) {
       if (a.job === JOBS.PANELIST && trim_(a.name)) onPanel.push(trim_(a.name));
     });
-    // Anybody already on this crew from an earlier run keeps it.
-    const kept2 = ((kept && kept.crew[job]) || []).slice();
-    const chosen = kept2.slice();
-    onPanel.forEach(function (n) {
-      if (chosen.length >= count) return;
-      if (chosen.some(function (x) { return norm_(x) === norm_(n); })) return;
-      chosen.push(n);
-    });
-    chosen.forEach(function (n) {
-      // They keep Panelist as their first job, so the dropdowns still
-      // read "already Panelist" rather than the greeting.
-      if (!used[n]) used[n] = job;
-    });
-    let why = '';
-    if (chosen.length < count) {
-      why = onPanel.length
-        ? 'only ' + onPanel.length + ' on the panel, and this crew comes off it'
-        : 'no panel has been saved for this date yet, and this crew comes off it';
+    const seed = onPanel.slice(0, panelGreeters);
+    const c = crew(job, count, seed);
+    c.fromPanel = seed.length;
+    if (seed.length < panelGreeters) {
+      c.panelShort = panelGreeters - seed.length;
+      c.why = (onPanel.length
+        ? 'the panel owes ' + c.panelShort + ' of these places and only ' +
+          onPanel.length + ' are on it'
+        : 'the panel covers ' + panelGreeters + ' of these places and no panel ' +
+          'has been saved for this date yet') + (c.why ? '; ' + c.why : '');
     }
-    return {
-      job: job, chosen: chosen, needed: count, added: chosen.slice(kept2.length),
-      keptCount: kept2.length, fromPanel: true,
-      short: Math.max(0, count - chosen.length), why: why,
-      mix: genderMix_(chosen, pool),
-      raceMix: traitMix_(chosen, pool, 'presenting')
-    };
-  };
-  const crewFor = function (job, count) {
-    return (norm_(job) === norm_(panelJob) && panelGreeters > 0)
-      ? fromPanel(job, panelGreeters)
-      : crew(job, count);
+    return c;
   };
   const greeters = [
     crewFor(JOBS.LOBBY, Number(setting_('Lobby Greeters Needed', '3')) || 3),
@@ -6849,7 +6847,8 @@ function showStaffDialog() {
     'greeting crews below work the same way. Nothing is written until you press ' +
     'Save.</p>";' +
     'p.greeters.forEach(function(c,ci){h+="<h3>"+esc(c.job)+" ("+c.chosen.length+" of "+c.needed+")"+' +
-    '(c.fromPanel?" <span class=\'muted\'>- your panel covers this one</span>":"")+' +
+    '(c.fromPanel?" <span class=\'muted\'>- "+c.fromPanel+" of them from your ' +
+    'panel</span>":"")+' +
     '(c.keptCount?" <span class=\'muted\'>"+c.keptCount+" already assigned</span>":"")+"</h3><div>"+' +
     'crewPicker(c,ci)+' +
     '(c.mix?" <span class=\'muted\'>("+esc(c.mix)+")</span>":"")+' +
