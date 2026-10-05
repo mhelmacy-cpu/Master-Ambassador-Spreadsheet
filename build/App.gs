@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-05 g';
+var BUILD_ = '2026-10-05 h';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -694,7 +694,10 @@ function setupProspective_() {
     'Filled in by the script: who walks this family into class at the end, ' +
     'the class it is, and the teacher whose room that is.\n\n' +
     'Type a different ambassador\'s name here and they take the family ' +
-    'instead. That is the last word, over anything the script worked out.');
+    'instead. That is the last word, over anything the script worked out.\n\n' +
+    '"Your pick: " in front means you chose this one yourself, in the ' +
+    'staffing dialog or in this column, and the script leaves it alone. ' +
+    'Two names mean both of them walk the family down together.');
   note_(s, SHEETS.PROSPECTIVE, 'Pass Off',
     'Yes where the family is handed to somebody who was not guiding them, ' +
     'so the guide goes back to their own class at the door.\n\n' +
@@ -2806,6 +2809,8 @@ function planTour(dateStr, keepExisting) {
       count: c.count, over: c.over
     } : null;
     p.classOptions = (c.options || []).slice();
+    // Whether "both of them take them" is one of the answers on offer.
+    p.classBoth = !!c.canBoth;
   });
 
   const everyone = [];
@@ -3781,24 +3786,33 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
     psheet.getRange(p.visitor.row, col_(P, 'Route') + 1).setValue(p.route);
     const c = landing[norm_(p.visitor.name)];
     const f5 = wentFifth[norm_(p.visitor.name)];
+    // Handed to somebody who was not guiding them, which is the thing
+    // she needs to see down the sheet at a glance.
+    const handedOn = p.buddy || f5 || !!(c && c.takers.length && c.takers.some(function (n) {
+      return (p.guideNames || []).indexOf(n) === -1;
+    }));
     if (toCol !== -1) {
-      // Her name first, so it reads back as an instruction and the next
-      // run takes it as one.
+      /* Her name first, so it reads back as an instruction and the next
+       * run takes it as one.
+       *
+       * "Your pick: " goes in front of an answer she chose herself and
+       * that nothing else would mark. A hand-off to somebody who was not
+       * guiding the family has the Pass Off column for that; one of the
+       * family's own guides has nothing, and without a word to say so
+       * the line is indistinguishable from the script's own record and
+       * was being overruled by it on the next save. */
+      const own = !!(c && c.hers && c.where && !handedOn);
       psheet.getRange(p.visitor.row, toCol + 1).setValue(
         f5 ? f5.name + ' - ' + f5.language + ' with ' + f5.teacher + ' in ' + f5.room
         : (p.buddy ? p.buddy.name + ' - ' + p.buddy.language + ' with ' +
             p.buddy.teacher + ' in ' + p.buddy.room
           : (c && c.where
-              ? c.takers.join(' and ') + ' - ' + c.where.label +
+              ? (own ? 'Your pick: ' : '') + c.takers.join(' and ') + ' - ' +
+                c.where.label +
                 (c.where.teacher ? ' (' + c.where.teacher + ')' : '')
               : '')));
     }
-    // Handed to somebody who was not guiding them, which is the thing
-    // she needs to see down the sheet at a glance.
     if (passCol !== -1) {
-      const handedOn = p.buddy || f5 || !!(c && c.takers.length && c.takers.some(function (n) {
-        return (p.guideNames || []).indexOf(n) === -1;
-      }));
       psheet.getRange(p.visitor.row, passCol + 1).setValue(
         (c && c.where) || p.buddy || f5 ? (handedOn ? 'Yes' : 'No') : '');
     }
@@ -4157,7 +4171,6 @@ function handbackAllocate_(dateVal, entries) {
    * Tracker would quietly put them back in charge of the family. A name
    * that still belongs to one of the visitor's own guides is honoured
    * either way, because there is nothing stale about it. */
-  const chosenBy = {};
   const told = {};
   const problems = [];
   if (optionalCol_(SHEETS.PROSPECTIVE, 'Class Visit To') !== -1) {
@@ -4165,34 +4178,47 @@ function handbackAllocate_(dateVal, entries) {
       // Going to a 5th grade class: the buddy has them, so nothing in
       // this column is an instruction about who takes them.
       if (classVisitLanguage_(v.classVisit)) return;
-      const raw = trim_(String(v.classVisitTo || ''))
-        .replace(/^\s*pass\s*off\s*:?\s*/i, '');
+      const whole = trim_(String(v.classVisitTo || ''));
+      /* "Your pick: " in front says she chose this one herself, and the
+       * script wrote it back in her words rather than as its own record.
+       * Without it there is no telling her answer from the script's,
+       * and a guide she picked was replaced on the next save by the one
+       * the script would have chosen. */
+      const herPrefix = /^\s*your\s*pick\s*:/i.test(whole);
+      const raw = whole.replace(/^\s*(?:pass\s*off|your\s*pick)\s*:?\s*/i, '');
       const said = trim_(raw.split(' - ')[0]);
       if (!said) return;
+      /* One name, or two walking the family down together, which is how
+       * a pair who share a class is written. */
+      const saidNames = said.split(/\s+and\s+/)
+        .map(function (n) { return trim_(n); }).filter(Boolean);
       // The script always writes "Name - Class (Teacher)". A bare name is
       // therefore hers, typed in to say who should take the family, and
       // is followed at once. The long form is only a record of what was
       // decided, so it is followed only where Pass Off says it is meant,
-      // or where it still names one of the visitor's own guides. That is
-      // what stops a name left over from a guide she has since swapped
-      // out putting them quietly back in charge.
-      const hers = raw.indexOf(' - ') === -1;
+      // or where it still names the visitor's own guides. That is what
+      // stops a name left over from a guide she has since swapped out
+      // putting them quietly back in charge.
+      const hers = herPrefix || raw.indexOf(' - ') === -1;
       const theirs = (byVisitor[norm_(v.name)] || { guides: [] }).guides;
-      const stillGuiding = theirs.some(function (g) { return norm_(g) === norm_(said); });
+      const stillGuiding = saidNames.every(function (n) {
+        return theirs.some(function (g) { return norm_(g) === norm_(n); });
+      });
       if (!(hers || v.passOff || stillGuiding)) return;
-      chosenBy[norm_(v.name)] = said;
-      // Hers, or flagged as a hand-off: an instruction, and it outranks
-      // everything, a pair who share a class included. The long form on
-      // a family she has not touched is only the script's own record of
-      // what it worked out last time, so it settles nothing.
-      if (hers || v.passOff) told[norm_(v.name)] = said;
+      /* An instruction, and it outranks everything below, a pair who
+       * share a class included. The long form with nothing in front of
+       * it is only the script's own record of what it worked out last
+       * time, so it settles nothing: a homeroom she has since corrected
+       * has to be able to change the answer. */
+      if (hers || v.passOff) told[norm_(v.name)] = saidNames;
       // A name it cannot act on is said out loud rather than dropped.
       // Being quietly ignored is how an afternoon gets wasted.
-      if (!handedTo[norm_(said)]) {
+      saidNames.forEach(function (one) {
+        if (handedTo[norm_(one)]) return;
         const known = ambassadors_().filter(function (a) {
-          return norm_(a.name) === norm_(said);
+          return norm_(a.name) === norm_(one);
         })[0];
-        problems.push('"' + said + '" is in Class Visit To for ' + v.name + ', but ' +
+        problems.push('"' + one + '" is in Class Visit To for ' + v.name + ', but ' +
           (!known
             ? 'nobody by that name is on the Ambassadors sheet. Check the spelling.'
             : (!known.active
@@ -4200,7 +4226,7 @@ function handbackAllocate_(dateVal, entries) {
                 : 'their class at that time cannot be worked out - they need ' +
                   'Homeroom, Split and Grade on the Ambassadors sheet.')) +
           ' The family is staying with their own guide.');
-      }
+      });
     });
   }
 
@@ -4211,28 +4237,15 @@ function handbackAllocate_(dateVal, entries) {
     });
     const known = options.filter(function (o) { return !!o.where; });
 
-    /* Her own answer, typed into Class Visit To or picked in the dialog,
-     * beats everything below it, including a pair who share a class. */
-    const said = chosenBy[norm_(entry.visitor)];
-    const instruction = told[norm_(entry.visitor)];
-    if (instruction && handedTo[norm_(instruction)]) {
-      const hers = handedTo[norm_(instruction)];
-      load[hers.where.key] = (load[hers.where.key] || 0) + 1;
-      classes[hers.where.key] = hers.where;
-      out[key] = {
-        visitor: entry.visitor, takers: [hers.name],
-        others: entry.guides.filter(function (n) { return norm_(n) !== norm_(hers.name); }),
-        where: hers.where, classKey: hers.where.key,
-        over: load[hers.where.key] > cap, count: load[hers.where.key]
-      };
-      return;
-    }
-
     /* The pair are in the same class, so they both stay with the family
      * and walk them down together at the end. Two ways of knowing
      * it: the block at 9:06 reads the same for both of them, or they are
      * in the same grade, homeroom and split, which puts them in the same
-     * room even when the block itself cannot be read. */
+     * room even when the block itself cannot be read.
+     *
+     * Worked out before her own answer is read, because "both of them"
+     * is one of the answers she can give, and the dialog has to know
+     * whether to offer it. */
     const together = options.length > 1 && (
       (known.length === options.length && known.every(function (o) {
         return o.where.key === known[0].where.key;
@@ -4240,6 +4253,41 @@ function handbackAllocate_(dateVal, entries) {
       (!!options[0].group && options.every(function (o) {
         return o.group === options[0].group;
       })));
+
+    /* Her own answer, typed into Class Visit To or picked in the dialog,
+     * beats everything below it, including a pair who share a class. It
+     * can name one of the family's own guides, which is how she says
+     * which of the two takes them, or both, which is how a pair who
+     * share a class is written. */
+    const instruction = told[norm_(entry.visitor)] || [];
+    const takers = instruction.map(function (n) { return handedTo[norm_(n)]; })
+      .filter(Boolean);
+    const oneRoom = takers.length > 0 && takers.every(function (t) {
+      return t.where.key === takers[0].where.key;
+    });
+    if (instruction.length && takers.length === instruction.length && oneRoom) {
+      const w = takers[0].where;
+      const names = takers.map(function (t) { return t.name; });
+      load[w.key] = (load[w.key] || 0) + 1;
+      classes[w.key] = w;
+      out[key] = {
+        visitor: entry.visitor, takers: names,
+        others: entry.guides.filter(function (n) {
+          return !names.some(function (t) { return norm_(t) === norm_(n); });
+        }),
+        where: w, classKey: w.key, canBoth: together, hers: true,
+        over: load[w.key] > cap, count: load[w.key]
+      };
+      return;
+    }
+    /* Two names in two different rooms cannot both walk the family down,
+     * so it is said rather than half done. */
+    if (instruction.length > 1 && takers.length === instruction.length && !oneRoom) {
+      problems.push(instruction.join(' and ') + ' are in Class Visit To for ' +
+        entry.visitor + ', but they are not in the same room at that time, so ' +
+        'they cannot both take the family. Pick one of them.');
+    }
+
     if (together) {
       const w = known.length ? known[0].where : null;
       if (w) {
@@ -4248,7 +4296,7 @@ function handbackAllocate_(dateVal, entries) {
       }
       out[key] = { visitor: entry.visitor,
         takers: entry.guides.slice(), others: [],
-        where: w, classKey: w ? w.key : '',
+        where: w, classKey: w ? w.key : '', canBoth: together,
         over: w ? load[w.key] > cap : false, count: w ? load[w.key] : 0 };
       return;
     }
@@ -4257,7 +4305,8 @@ function handbackAllocate_(dateVal, entries) {
     // and the sheet says "class" because it has no room to name.
     if (!known.length) {
       out[key] = { visitor: entry.visitor, takers: entry.guides.slice(0, 1),
-        others: entry.guides.slice(1), where: null, classKey: '', over: false, count: 0 };
+        others: entry.guides.slice(1), where: null, classKey: '',
+        canBoth: together, over: false, count: 0 };
       return;
     }
 
@@ -4276,15 +4325,21 @@ function handbackAllocate_(dateVal, entries) {
       others: entry.guides.filter(function (n) { return n !== pick.name; }),
       where: pick.where,
       classKey: pick.where.key,
+      canBoth: together,
       over: load[pick.where.key] > cap,
       count: load[pick.where.key]
     };
   });
 
-  /* For each family, who else could take them and where that would be.
+  /* For each family, who could take them and where that would be.
    *
-   * Everybody active whose class can be worked out is on this list, bar
-   * the family's own guides, who are the list's first option already.
+   * Everybody active whose class can be worked out is on this list, the
+   * family's own guides first. They used to be left off it, on the
+   * grounds that the answer above already named one of them: that was
+   * no good the moment the two guides sit in different rooms, because
+   * the script picks the academic one and she had no way of saying she
+   * wanted the other. Picking a guide is not a hand-off, and nothing on
+   * the tracker or in the emails treats it as one.
    * Somebody sitting in the room the family is walking into used to be
    * left off it, on the grounds that handing them over would not empty
    * the room out. That went wrong in the one way a list must not: a name
@@ -4298,9 +4353,13 @@ function handbackAllocate_(dateVal, entries) {
     (byVisitor[key] || { guides: [] }).guides.forEach(function (n) {
       guiding[norm_(n)] = true;
     });
-    mine.options = elsewhere.filter(function (o) {
-      return !guiding[norm_(o.name)];
-    }).sort(function (a, b) {
+    mine.options = elsewhere.slice().sort(function (a, b) {
+      // The family's own guides first: they are the likeliest answer of
+      // all, and the only reason the list is open to her at all when the
+      // two of them sit in different rooms.
+      const ga = guiding[norm_(a.name)] ? 0 : 1;
+      const gb = guiding[norm_(b.name)] ? 0 : 1;
+      if (ga !== gb) return ga - gb;
       // A 5th grade class visit is a different kind of answer, so it sits
       // under the middle school. Then the room the family is already
       // going to, which is real but rarely what she wants. Then whoever
@@ -4324,7 +4383,8 @@ function handbackAllocate_(dateVal, entries) {
         name: o.name, where: o.where.label, teacher: o.where.teacher,
         job: o.job, count: load[o.where.key] || 0,
         full: (load[o.where.key] || 0) >= cap,
-        same: !!hereKey && o.where.key === hereKey,
+        same: !guiding[norm_(o.name)] && !!hereKey && o.where.key === hereKey,
+        own: !!guiding[norm_(o.name)],
         fifth: !!o.fifth
       };
     });
@@ -6747,8 +6807,9 @@ function showStaffDialog() {
     'hb+="<option value=\'\'>"+esc(x.buddy.name)+" hosts them (as it is)</option>";' +
     'o.forEach(function(c,k){hb+="<option value=\'"+k+"\'>"+esc(c.name)+" - "+' +
     'esc(c.where)+(c.teacher?" ("+esc(c.teacher)+")":"")+", "+c.count+" there"+' +
-    '(c.full?" - full":"")+(c.fifth?" - 5th grade class visit":' +
-    '(c.job?"":" - not on this tour"))+"</option>";});' +
+    '(c.full?" - full":"")+(c.own?" - their own guide":"")+' +
+    '(c.fifth?" - 5th grade class visit":' +
+    '(c.job||c.own?"":" - not on this tour"))+"</option>";});' +
     'return hb+"</select>";}' +
     'if(!v&&!o.length){return "";}' +
     'var pass=!!v&&v.takers.some(function(n){' +
@@ -6770,10 +6831,18 @@ function showStaffDialog() {
     'h+="<option value=\'\'>"+(v?esc(v.takers.join(" and "))+" takes them (as it is)"' +
     ':"nobody yet: choose who takes them")+"</option>";' +
     'if(pass){h+="<option value=\'none\'>No hand-off: back to their own guide</option>";}' +
+    /* Both of them walk the family down, which is what happens of itself
+     * when the two share a class. It is on the list so she can ask for
+     * it back after picking one of them. */
+    'if(x.classBoth&&(x.guideNames||[]).length>1&&' +
+    '(!v||v.takers.length<2)){' +
+    'h+="<option value=\'both\'>Both of them: "+' +
+    'esc((x.guideNames||[]).join(" and "))+" take them together</option>";}' +
     'o.forEach(function(c,k){h+="<option value=\'"+k+"\'>"+esc(c.name)+" - "+' +
     'esc(c.where)+(c.teacher?" ("+esc(c.teacher)+")":"")+", "+c.count+" there"+' +
     '(c.full?" - full":"")+(c.same?" - same room":"")+' +
-    '(c.fifth?" - 5th grade class visit":(c.job?"":" - not on this tour"))+' +
+    '(c.own?" - their own guide":"")+' +
+    '(c.fifth?" - 5th grade class visit":(c.job||c.own?"":" - not on this tour"))+' +
     '"</option>";});' +
     'h+="</select>";return h;}' +
     'function handoffsPicked(){var out=[],pr=window.__pairs||[];' +
@@ -6783,6 +6852,8 @@ function showStaffDialog() {
     'for(var j=0;j<pr.length;j++){if(pr[j].order===key){x=pr[j];}}' +
     'if(!x){continue;}' +
     'if(v==="none"){out.push({visitor:x.visitor.name,to:"",clear:true});continue;}' +
+    'if(v==="both"){out.push({visitor:x.visitor.name,' +
+    'to:(x.guideNames||[]).join(" and ")});continue;}' +
     'var c=(x.classOptions||[])[Number(v)];if(!c){continue;}' +
     'out.push({visitor:x.visitor.name,to:c.name});}' +
     'return out;}' +
@@ -6837,6 +6908,7 @@ function showStaffDialog() {
     'var box=document.getElementById("cv"+x.order);if(!box){return;}' +
     'if(!one){return;}' +
     'x.classVisit=one.classVisit;x.classOptions=one.classOptions||[];' +
+    'x.classBoth=!!one.classBoth;' +
     'var view={};for(var k in x){if(Object.prototype.hasOwnProperty.call(x,k)){' +
     'view[k]=x[k];}}' +
     'var now=namesNow(x);if(now.length){view.guideNames=now;}' +
@@ -7923,7 +7995,8 @@ function api_classVisitPreview(dateStr, families) {
         takers: c.takers, where: c.where.label, teacher: c.where.teacher,
         count: c.count, over: c.over
       } : null,
-      classOptions: c.options || []
+      classOptions: c.options || [],
+      classBoth: !!c.canBoth
     };
   });
   return { cap: landed.cap, byVisitor: out, problems: landed.problems || [] };

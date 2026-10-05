@@ -439,10 +439,35 @@ family and also has a real job on the tour keeps both lines, read off
 that job's own hours.
 
 Every active ambassador whose class can be worked out is on the hand-off
-list, bar the family's own two guides, who are its first option already.
-Nobody is filtered out of it and it is never cut short: a name she goes
-looking for has to be there, and a name missing with nothing on screen
-to say why is a bug, not a shortcut.
+list, the family's own guides included and first, marked "their own
+guide". Nobody is filtered out of it and it is never cut short: a name
+she goes looking for has to be there, and a name missing with nothing on
+screen to say why is a bug, not a shortcut.
+
+**Picking one of their own guides is how she says which of the two takes
+the family.** Where the two sit in different rooms the command takes the
+academic one, and that is a preference, not a decision: she picks the
+other off the same list. It is not a hand-off and nothing treats it as
+one, so Pass Off stays No, nobody gets a Pass Off row, and the other
+guide goes back to their own class at the door as usual.
+
+Where the two of them share a class the list also offers **"Both of them:
+Avery Griffiths and Mika Rivers take them together"**, which is what
+happens of itself in that case and so is how she asks for it back after
+picking one.
+
+Her answer has to survive the save, and that is what the words **"Your
+pick: "** in front of Class Visit To are for. The command writes its own
+answer into that column after every save, in the same shape, so without
+a word to tell the two apart the guide she picked was quietly replaced
+on the next save by the one the command would have chosen. A line with
+nothing in front of it is only the command's record of what it worked
+out last time and settles nothing, which is what lets a homeroom she has
+since corrected change the answer. A hand-off to somebody who was not
+guiding the family has the Pass Off column to say the same thing. Two
+names in that column, hers or the command's, mean both of them walk the
+family down; two names in two different rooms cannot, and that is
+reported rather than half done.
 
 The **5th graders marked Can Host a Visitor** are on that list too, under
 the middle school, each shown with the class they host in. Picking one is
@@ -495,7 +520,8 @@ schedule.
 - **The test** shows that email too, on both days.
 
 Where the two guides go to different rooms, only one of them walks the
-family to class, and that is the one in an academic class: Humanities,
+family to class, and unless she has said otherwise that is the one in an
+academic class: Humanities,
 Maths, Science, English, History or a world language. Anything else,
 Art, Music, PE, Band, counts as the other kind. Where both or neither
 are academic it stays with the first guide, and where they share a class
