@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-05 b';
+var BUILD_ = '2026-10-05 c';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -3025,13 +3025,24 @@ function setupWarnings_(all, visitors) {
  * beside. Everything else goes through, and what it does to the pair is
  * handed back so it can be said out loud.
  */
-function applySwaps_(plan, swaps) {
+function applySwaps_(plan, swaps, ignored) {
+  /* Nothing is dropped in silence. Every change the dialog asks for that
+   * cannot be done says why, and the answer prints it: a save that looks
+   * like it worked and changed nothing is the one thing this must never
+   * do again. */
+  const note = function (x, why) {
+    if (ignored) {
+      ignored.push((trim_(x.to) || trim_(x.from) || 'a change') +
+        (trim_(x.visitor) ? ' for ' + trim_(x.visitor) : '') + ': ' + why);
+    }
+    return false;
+  };
   const list = [].concat(swaps || []).filter(function (x) {
     if (!x) return false;
     // A place added to a family that has fewer guides than it should.
     if (x.add) return !!trim_(x.to) && !!trim_(x.visitor);
     if (x.drop) return !!trim_(x.from);      // this place taken off altogether
-    if (!trim_(x.to)) return false;
+    if (!trim_(x.to)) return note(x, 'nobody was chosen for it');
     /* Nothing to do only where the plan's own name for that place is the
      * one she picked. Comparing the two names alone threw away every
      * change if anything had already written her pick into the plan, so
@@ -3041,10 +3052,17 @@ function applySwaps_(plan, swaps) {
         return norm_(q.visitor.name) === norm_(x.visitor);
       })[0];
       const standing = p ? p.guideNames[Number(x.slot)] : '';
-      if (standing) return norm_(x.to) !== norm_(standing);
+      if (standing) {
+        if (norm_(x.to) === norm_(standing)) {
+          return note(x, 'they are already on that place');
+        }
+        return true;
+      }
+      if (!p) return note(x, 'that family is not on this tour any more');
     }
-    if (!trim_(x.from)) return false;
-    return norm_(x.to) !== norm_(x.from);
+    if (!trim_(x.from)) return note(x, 'the dialog did not say which place it was');
+    if (norm_(x.to) === norm_(x.from)) return note(x, 'they are already on that place');
+    return true;
   });
   if (!list.length) return [];
 
@@ -3367,7 +3385,16 @@ function refreshClassVisits_(dateVal) {
 /** Writes a plan to the Tour Tracker and back onto Prospective Students. */
 function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
   const plan = planTour(dateStr, keepExisting);
-  const swapped = applySwaps_(plan, swaps);
+  /* What the dialog asked for, and anything it asked for that could not
+   * be done, both handed back so the answer can say so. */
+  const asked = [].concat(swaps || []).filter(function (x) { return !!x; })
+    .map(function (x) {
+      return (x.drop ? trim_(x.from) + ' off'
+        : (x.add ? 'add ' + trim_(x.to) : trim_(x.from) + ' to ' + trim_(x.to))) +
+        (trim_(x.visitor) ? ' (' + trim_(x.visitor) + ')' : '');
+    });
+  const ignored = [];
+  const swapped = applySwaps_(plan, swaps, ignored);
   clearReadCache_();               // the tracker is about to change
   const dateVal = toDate_(plan.date);
   const N = SHEETS.TRACKER;
@@ -3661,7 +3688,10 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
     }
   });
 
-  return { written: out.length, panel: panel, plan: plan, swapped: swapped };
+  return {
+    written: out.length, panel: panel, plan: plan, swapped: swapped,
+    asked: asked, ignored: ignored
+  };
 }
 
 /**
@@ -6801,7 +6831,17 @@ function showStaffDialog() {
     '(w.solo?", "+esc(w.solo)+" alone":"")))+' +
     '(w.visitor?" for "+esc(w.visitor):(w.job?" on "+esc(w.job):""))+' +
     '(w.problems&&w.problems.length?" (worth a look: "+esc(w.problems.join("; "))+")":"");' +
-    '}).join("<br>"):"")+"</div>";})' +
+    '}).join("<br>"):"")' +
+    /* What the dropdowns actually sent, and anything that could not be
+     * done. A save that quietly changed nothing is the one thing this
+     * dialog must never look like again. */
+    '+((r.asked&&r.asked.length)?"<br><span class=\'muted\'>You changed "+' +
+    'r.asked.length+" place(s) in the dialog: "+esc(r.asked.join("; "))+"</span>":' +
+    '"<br><b>No changes came from the dropdowns.</b> If you did change one, the ' +
+    'editor is running an older copy of this script: run Check This Script.")' +
+    '+((r.ignored&&r.ignored.length)?"<div class=\'warn\'><b>Not done:</b> "+' +
+    'esc(r.ignored.join(" / "))+"</div>":"")' +
+    '+"</div>";})' +
     '.withFailureHandler(fail).api_commitTour(document.getElementById("d").value,' +
     'document.getElementById("keep").checked,panelPicked(),swapsPicked(),' +
     'handoffsPicked());}' +
