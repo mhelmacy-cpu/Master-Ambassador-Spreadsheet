@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-05 a';
+var BUILD_ = '2026-10-05 b';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -3030,9 +3030,21 @@ function applySwaps_(plan, swaps) {
     if (!x) return false;
     // A place added to a family that has fewer guides than it should.
     if (x.add) return !!trim_(x.to) && !!trim_(x.visitor);
+    if (x.drop) return !!trim_(x.from);      // this place taken off altogether
+    if (!trim_(x.to)) return false;
+    /* Nothing to do only where the plan's own name for that place is the
+     * one she picked. Comparing the two names alone threw away every
+     * change if anything had already written her pick into the plan, so
+     * where the dialog says which place it means, that is read instead. */
+    if (x.slot !== undefined && x.slot !== null && trim_(x.visitor)) {
+      const p = plan.pairs.filter(function (q) {
+        return norm_(q.visitor.name) === norm_(x.visitor);
+      })[0];
+      const standing = p ? p.guideNames[Number(x.slot)] : '';
+      if (standing) return norm_(x.to) !== norm_(standing);
+    }
     if (!trim_(x.from)) return false;
-    if (x.drop) return true;                 // this place taken off altogether
-    return trim_(x.to) && norm_(x.to) !== norm_(x.from);
+    return norm_(x.to) !== norm_(x.from);
   });
   if (!list.length) return [];
 
@@ -3192,8 +3204,18 @@ function applySwaps_(plan, swaps) {
       throw new Error('Nobody called ' + trim_(x.visitor) + ' is visiting that day any more. ' +
         'Press Preview again.');
     }
+    /* Which of the family's places this is about.
+     *
+     * The name is looked for first, since that is what she saw. Where it
+     * is not there any more the place she pointed at is used instead: a
+     * change must never be dropped for a name that has moved on, which
+     * is how a whole afternoon of changes once saved as the plan. */
     let at = -1;
     pair.guideNames.forEach(function (g, i) { if (norm_(g) === norm_(x.from)) at = i; });
+    if (at === -1 && x.slot !== undefined && x.slot !== null &&
+        pair.guideNames[Number(x.slot)]) {
+      at = Number(x.slot);
+    }
     if (at === -1) {
       throw new Error(trim_(x.from) + ' is not guiding ' + pair.visitor.name +
         ' any more. Press Preview again.');
@@ -6661,9 +6683,10 @@ function showStaffDialog() {
     'if(raw==="add"){var ac=sp[Number(v)];' +
     'if(ac){out.push({visitor:x.visitor.name,to:ac.name,add:true});}continue;}' +
     'if(!x.guideNames[slot]){continue;}' +
-    'if(v==="-"){out.push({visitor:x.visitor.name,from:x.guideNames[slot],drop:true});continue;}' +
+    'if(v==="-"){out.push({visitor:x.visitor.name,from:x.guideNames[slot],' +
+    'slot:slot,drop:true});continue;}' +
     'var c=sp[Number(v)];if(!c){continue;}' +
-    'out.push({visitor:x.visitor.name,from:x.guideNames[slot],to:c.name});}' +
+    'out.push({visitor:x.visitor.name,from:x.guideNames[slot],slot:slot,to:c.name});}' +
     'var crews=window.__greeters||[];' +
     'var cs=document.querySelectorAll("select.csel");' +
     'for(var i=0;i<cs.length;i++){var v=cs[i].value;if(!v){continue;}' +
@@ -7458,6 +7481,52 @@ function showMeetingDialog() {
  * says which build is in the editor and which tabs it found, so there is
  * nothing to guess at.
  */
+/**
+ * Whether the code in the editor is the code it says it is.
+ *
+ * A build stamp only says what the last line of the paste said. If an
+ * older copy of App.gs is still in the project, in another file or
+ * pasted below this one, Apps Script keeps whichever definition it reads
+ * last, so the stamp can be new while the thing that runs is old. That
+ * is invisible from the outside and it has cost her a morning's work.
+ *
+ * So each piece of the script is asked to show its own source, and
+ * checked for something only the current version of it contains. A line
+ * reading "old copy" means the paste did not take, whatever the stamp
+ * says.
+ */
+var LIVE_MARKERS_ = [
+  { what: 'Saving your changes from the staffing dialog',
+    fn: 'showStaffDialog', has: 'view[k]=x[k]' },
+  { what: 'The class visit list, when the class cannot be worked out',
+    fn: 'showStaffDialog', has: 'cannot be worked out' },
+  { what: 'Moving somebody who is already working the tour',
+    fn: 'applySwaps_', has: 'freeUp' },
+  { what: 'Adding a second guide back to a family',
+    fn: 'applySwaps_', has: 'x.add' },
+  { what: 'The 5th graders on the class visit list',
+    fn: 'handbackAllocate_', has: 'canHost' },
+  { what: 'Where visitors finish', fn: 'endPlace_', has: 'Visitors End In' },
+  { what: 'The check in sheet', fn: 'buildCheckInDoc', has: 'setPageWidth' }
+];
+
+function liveCheck_() {
+  return LIVE_MARKERS_.map(function (m) {
+    let src = '';
+    try {
+      const fn = this[m.fn] || eval(m.fn);
+      src = typeof fn === 'function' ? String(fn) : '';
+    } catch (err) {
+      src = '';
+    }
+    return {
+      what: m.what,
+      there: !!src,
+      current: !!src && src.indexOf(m.has) !== -1
+    };
+  });
+}
+
 function api_checkScript() {
   clearReadCache_();
   const want = Object.keys(SHEETS).map(function (k) { return SHEETS[k]; })
@@ -7477,6 +7546,7 @@ function api_checkScript() {
     // A dialog that answers "PERMISSION_DENIED" is usually running as the
     // wrong Google account, and this is where that shows.
     runningAs: whoAmI_(),
+    live: liveCheck_(),
     file: (function () {
       try { return ss_().getName(); } catch (err) { return 'cannot be read'; }
     })(),
@@ -7505,6 +7575,19 @@ function showCheckDialog() {
     '<br>Data.gs build "+esc(p.dataBuild)+"<br>Reading the schedule from "+esc(p.reading)+' +
     '" ("+p.days+" day(s) found).<br>Running as "+esc(p.runningAs)+", on "+esc(p.file)+' +
     '".</div>";' +
+    /* The part that matters most when a paste has gone wrong: not what
+     * the stamp says, but what the code actually does. */
+    'var live=p.live||[];var old=live.filter(function(x){return !x.current;});' +
+    'if(old.length){h+="<div class=\'warn\'><b>The editor is running an older copy ' +
+    'of this script.</b><br>These parts are not the ones in the build above:<ul>"+' +
+    'old.map(function(x){return "<li>"+esc(x.what)+(x.there?"":" (missing altogether)")+' +
+    '"</li>";}).join("")+"</ul>Apps Script keeps whichever copy it reads last, so an ' +
+    'old copy still in the project wins even after you paste a new one.<br><br>In the ' +
+    'Apps Script editor: if there is any file other than App.gs and Data.gs, delete it. ' +
+    'Then click inside App.gs, press Ctrl+A to select everything in it, paste over it, ' +
+    'and save. Reload the spreadsheet and check here again.</div>";}' +
+    'else{h+="<div class=\'free\'>Every part of this script is the version in the ' +
+    'build above.</div>";}' +
     'var miss=p.expected.filter(function(x){return !x.there;});' +
     'if(miss.length){h+="<div class=\'warn\'><b>Tab(s) not there:</b> "+' +
     'esc(miss.map(function(x){return x.name;}).join(", "))+"<br>Run First-Time Setup. If they ' +

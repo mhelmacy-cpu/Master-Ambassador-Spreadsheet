@@ -624,6 +624,25 @@ morning before they reach the printer.
       Cafeteria 8:25 AM. Back in class by 9:25 AM.
       Bring everything you need for class with you to the cafeteria.
 
+## Is the editor running this script?
+
+A build stamp only says what the last line of the paste said. If an older
+copy of App.gs is still in the project, in another file or pasted below
+this one, Apps Script keeps whichever definition it reads last, so the
+stamp can read new while the code that runs is old. Nothing about that is
+visible from the outside, and it has cost a morning's work.
+
+**Check This Script** therefore asks each part of the script for its own
+source and looks in it for something only the current version contains.
+Where any part comes back old it says so, lists which parts, and gives the
+cure: delete every file in the editor but App.gs and Data.gs, click inside
+App.gs, select all of it, paste over it, save, reload the spreadsheet.
+
+Saving is built not to depend on it. The dialog sends which place it means
+as well as who was standing in it, and the place wins where the name has
+moved on, so a change cannot be dropped over a name that no longer
+matches.
+
 ## When the failure is not the script's
 
 Google answers a dialog's question with **"a server error occurred while
