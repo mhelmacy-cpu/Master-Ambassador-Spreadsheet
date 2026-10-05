@@ -190,8 +190,17 @@ the tour. That redraw reads the dropdowns and changes nothing else: the
 plan the command made has to stay as it was, because saving works out what
 changed by reading the dropdowns against it.
 
-The list comes up for every family, including the two cases where it used
-to disappear and leave her nothing to click:
+The list comes up for every family, including the three cases where it
+used to disappear and leave her nothing to click:
+
+- **Where nobody is walking them yet**, which is now every family until
+  she picks their guides. The line says the class visit goes with their
+  guide once she has picked one, and offers the list in the same breath,
+  because a family can be sent to somebody else before anybody is
+  walking them. Such a family is asked about with no guides named, so
+  nothing is counted against anybody's room, and a name she picks there
+  is honoured and kept: it reaches the Tour Tracker as a Pass Off row and
+  is still on Class Visit To after she picks the guides.
 
 - **Where the class cannot be worked out**, which is what happens the
   moment she swaps in somebody whose Homeroom or Split is blank. There is

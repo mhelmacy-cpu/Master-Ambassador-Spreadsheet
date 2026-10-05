@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-05 f';
+var BUILD_ = '2026-10-05 g';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -2788,14 +2788,16 @@ function planTour(dateStr, keepExisting) {
    * their guides' rooms, which is right because they are not going
    * there, and the list of who else could take them still comes back, so
    * a class visit can be changed in the dialog like anything else. */
-  const landing = handbackAllocate_(dateVal, pairs
-    .filter(function (p) { return p.buddy || p.guideNames.length; })
-    .map(function (p) {
-      return {
-        visitor: p.visitor.name,
-        guides: p.buddy ? [] : p.guideNames
-      };
-    }));
+  const landing = handbackAllocate_(dateVal, pairs.map(function (p) {
+    /* No guides named asks the question without answering it: nothing is
+     * counted against anybody's room, and the list of who could take the
+     * family still comes back. That is what a family she has not staffed
+     * yet needs, and a family a 5th grader is hosting too. */
+    return {
+      visitor: p.visitor.name,
+      guides: (p.buddy || !p.guideNames.length) ? [] : p.guideNames
+    };
+  }));
   pairs.forEach(function (p) {
     const c = landing.byVisitor[norm_(p.visitor.name)];
     if (!c) return;
@@ -4038,6 +4040,19 @@ function handbackChoices_(dateVal) {
         entries.push({ visitor: trim_(a.visitor), guides: [] });
       }
       entries[seen[key]].guides.push(a.name);
+    });
+    /* A family with nobody walking them yet is asked about too, with no
+     * guides named. Nothing is counted against anybody's room, and
+     * without an answer in Class Visit To nothing comes back, which is
+     * what the whole of the rest of the script already expects. But if
+     * she has picked who takes them, that answer is honoured, so a class
+     * visit can be chosen before the guides are. Left out, it was
+     * written straight back out as blank the next time she saved. */
+    prospectiveFor_(dateVal).forEach(function (v) {
+      const key = norm_(v.name);
+      if (!key || withBuddy[key] || seen[key] !== undefined) return;
+      seen[key] = entries.length;
+      entries.push({ visitor: trim_(v.name), guides: [] });
     });
     return handbackAllocate_(dateVal, entries);
   });
@@ -6741,9 +6756,12 @@ function showStaffDialog() {
     'var h=v?("<br>"+(pass?"<b>PASS OFF</b> ":"")+"<span class=\'muted\'>class visit: "+' +
     'esc(v.takers.join(" and "))+" takes them to "+esc(v.where)+' +
     '(v.teacher?" ("+esc(v.teacher)+")":"")+"</span>")' +
+    ':(!(x.guideNames||[]).length' +
+    '?"<br><span class=\'muted\'>class visit: with their guide, once you have ' +
+    'picked one. Or send them to somebody here.</span>"' +
     ':"<br><b>where this family goes at 9:06 cannot be worked out. Their guide ' +
     'needs Homeroom, Split and Grade on the Ambassadors sheet, or send the family ' +
-    'to somebody below.</b>";' +
+    'to somebody below.</b>");' +
     'if(v&&v.over){h+="<br><b class=\'yel\'>that class has "+v.count+' +
     '" visitors, more than the limit of "+window.__cap+". Hand this family to ' +
     'somebody in another class below.</b>";}' +
@@ -6803,8 +6821,7 @@ function showStaffDialog() {
     'function cvRefresh(){var pr=window.__pairs||[],fams=[];' +
     'pr.forEach(function(x){if(x.buddy){' +
     'fams.push({visitor:x.visitor.name,guides:[]});return;}' +
-    'var n=namesNow(x);' +
-    'if(n.length){fams.push({visitor:x.visitor.name,guides:n});}});' +
+    'fams.push({visitor:x.visitor.name,guides:namesNow(x)});});' +
     'if(!fams.length){return;}' +
     'google.script.run.withSuccessHandler(cvShow).withFailureHandler(function(){})' +
     '.api_classVisitPreview(document.getElementById("d").value,fams);}' +
@@ -7894,9 +7911,9 @@ function api_classVisitPreview(dateStr, families) {
   const dateVal = toDate_(dateStr);
   if (!dateVal) throw new Error('Pick a tour date first.');
   const landed = handbackAllocate_(dateVal, [].concat(families || [])
-    .filter(function (f) { return f && trim_(f.visitor) && (f.guides || []).length; })
+    .filter(function (f) { return f && trim_(f.visitor); })
     .map(function (f) {
-      return { visitor: trim_(f.visitor), guides: [].concat(f.guides) };
+      return { visitor: trim_(f.visitor), guides: [].concat(f.guides || []) };
     }));
   const out = {};
   Object.keys(landed.byVisitor).forEach(function (key) {
