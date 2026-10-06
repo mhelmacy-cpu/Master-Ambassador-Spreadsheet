@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-06 b';
+var BUILD_ = '2026-10-06 c';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -5553,6 +5553,11 @@ function tourRoster_(dateVal) {
   return Object.keys(grouped).sort().map(function (name) {
     const jobs = grouped[name];
     const who = amb[norm_(name)];
+    /* Somebody who is only being handed a family at the end needs no name
+     * tag of their own: the guide hands them theirs at the door along
+     * with the route and the clock. So they get a line on the roster like
+     * everybody else, and no box to tick. */
+    const needsTag = jobs.some(function (j) { return j.job !== JOBS.PASSOFF; });
     const role = jobs.map(function (j) {
       return j.job + (j.visitor ? ' for ' + j.visitor : '') +
         (j.route ? ' (route ' + j.route + ')' : '');
@@ -5581,10 +5586,14 @@ function tourRoster_(dateVal) {
       name: name,
       role: role,
       teacher: teacher,
+      needsTag: needsTag,
       advisor: who ? who.advisor : ''
     };
   });
 }
+
+/** An empty box on a printout, to be ticked with a pen. */
+var TICK_BOX_ = '[    ]';
 
 function buildTourRoster(dateStr) {
   clearReadCache_();
@@ -5598,13 +5607,21 @@ function buildTourRoster(dateStr) {
   const body = doc.getBody();
   body.clear();
   body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING1);
-  body.appendParagraph(rows.length + ' ambassadors on duty.');
+  const tags = rows.filter(function (r) { return r.needsTag; }).length;
+  body.appendParagraph(rows.length + ' ambassadors on duty. ' + tags +
+    ' name tag' + (tags === 1 ? '' : 's') + ' to count out.');
 
-  const table = [['Student', 'Role', 'Class teacher', 'Advisor']];
+  /* A box against each name for their name tag, because the tags are
+   * counted out by hand the afternoon before and the roster is the one
+   * sheet that already lists everybody on duty, in one line each and in
+   * alphabetical order. It prints empty, to be ticked with a pen. */
+  const table = [['Student', 'Name tag', 'Role', 'Class teacher', 'Advisor']];
   rows.forEach(function (r) {
-    table.push([r.name, r.role, r.teacher, r.advisor]);
+    table.push([r.name, r.needsTag ? TICK_BOX_ : '', r.role, r.teacher, r.advisor]);
   });
-  body.appendTable(table);
+  const grid = body.appendTable(table);
+  // Narrow, since it holds a tick and nothing else.
+  if (grid.setColumnWidth) grid.setColumnWidth(1, 54);
 
   doc.saveAndClose();
   return { url: doc.getUrl(), name: title, rows: rows.length };

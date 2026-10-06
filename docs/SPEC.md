@@ -937,13 +937,24 @@ would do without filling her inbox with the same message thirty times.
 Every send, test or real, and the automatic teacher send on Tuesday and
 Wednesday morning, also builds a Google Doc and mails her the link:
 
-    Student                Role                        Class teacher       Advisor
-    Afia-Kusiwaa Twumasi   Lobby Greeter               Lila, Eliza         Eliza
-    Aurelia Walker         Tour Guide for Sam Visitor  Jeremiah            Marco
+    7 ambassadors on duty. 6 name tags to count out.
+
+    Student                Name tag  Role                        Class teacher   Advisor
+    Afia-Kusiwaa Twumasi   [    ]    Lobby Greeter               Lila, Eliza     Eliza
+    Aurelia Walker         [    ]    Tour Guide for Sam Visitor  Jeremiah        Marco
+    Camille Bedeau                   Pass Off for Sam Visitor    Oliver          Oliver
 
 One line per ambassador on duty, so the office has in one place what the
 emails only say one person at a time. The 5th grade buddies are not on
 it, the same as the emails.
+
+**A box for their name tag** against each name, printed empty to be
+ticked with a pen, because the tags are counted out by hand the afternoon
+before and this is the one sheet that already lists everybody on duty, in
+one line each and in alphabetical order. The heading says how many to
+count out. Somebody who is only being handed a family at the end gets a
+line but no box: the guide hands them their own tag at the door, with the
+route and the clock.
 
 The redirect works inside `mailOptions_`, which every message is built
 by, so a send cannot get past it - and it is cleared in a `finally`, so
