@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-06 a';
+var BUILD_ = '2026-10-06 b';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -100,12 +100,15 @@ var JOB_HOURS_WAS_ = {};
 
 var JOB_HOURS_ = {};
 JOB_HOURS_[JOBS.PANELIST] = ['8:25 AM', '9:05 AM'];
-JOB_HOURS_[JOBS.LOBBY] = ['8:25 AM', '8:45 AM'];
-JOB_HOURS_[JOBS.TABLE] = ['8:25 AM', '8:45 AM'];
+JOB_HOURS_[JOBS.LOBBY] = ['8:15 AM', '8:45 AM'];
+JOB_HOURS_[JOBS.TABLE] = ['8:15 AM', '8:45 AM'];
 JOB_HOURS_[JOBS.GUIDE] = ['8:25 AM', '9:05 AM'];
 JOB_HOURS_[JOBS.BUDDY] = ['9:05 AM', '9:25 AM'];
-JOB_HOURS_WAS_[JOBS.LOBBY] = { to: ['9:05 AM', '8:55 AM'] };
-JOB_HOURS_WAS_[JOBS.TABLE] = { to: ['9:05 AM', '8:55 AM'] };
+/* The greeting crews are downstairs before anybody else: the first
+ * families are at the door at 8:15, ten minutes before the ambassadors
+ * meet in the cafeteria. */
+JOB_HOURS_WAS_[JOBS.LOBBY] = { from: ['8:25 AM'], to: ['9:05 AM', '8:55 AM'] };
+JOB_HOURS_WAS_[JOBS.TABLE] = { from: ['8:25 AM'], to: ['9:05 AM', '8:55 AM'] };
 /* Nothing for Pass Off on purpose. Being handed a family does not take
  * that student out of anything: they are sitting in their own class and
  * the family comes to them. So no teacher is told they are missing. */
@@ -4798,8 +4801,14 @@ function lockerSlipData_(dateVal) {
         // Same as the email: the route is on the sheet they are handed.
         return j.job + (j.visitor ? ' for ' + j.visitor : '');
       }),
-      // When this one is actually finished, which is their own job's
-      // hours and not the end of the tour. A greeter is back at 8:45.
+      // When this one starts and when they are actually finished, which
+      // is their own job's hours and not the tour's. A greeter is at the
+      // door at 8:15 and back in class at 8:45.
+      comeAt: (function () {
+        if (!working.length) return '';
+        const w = awayMinutes_(working.map(function (j) { return j.job; }));
+        return w ? timeLabel_(w.from) : '';
+      })(),
       backBy: (function () {
         if (!working.length) return tourEnd;
         const w = awayMinutes_(working.map(function (j) { return j.job; }));
@@ -4844,8 +4853,8 @@ function buildLockerSlips(dateStr) {
     cell.appendParagraph(longDate_(dateVal));
     slip.jobs.forEach(function (j) { cell.appendParagraph(j); });
     if (slip.working) {
-      cell.appendParagraph(capitalize_(reportTo) + ' ' + reportAt + '. Back in class by ' +
-        (slip.backBy || endTime) + '.');
+      cell.appendParagraph(capitalize_(reportTo) + ' ' + (slip.comeAt || reportAt) +
+        '. Back in class by ' + (slip.backBy || endTime) + '.');
       // They go straight from the tour to their own class, so whatever
       // they need for it has to come downstairs with them.
       cell.appendParagraph('Bring everything you need for class with you to the ' +
@@ -5850,6 +5859,13 @@ function sendStudentEmails(dateStr) {
       if (m != null && (backAt === null || m > backAt)) backAt = m;
     });
     const backBy = backAt === null ? timeLabelOrRaw_(endTime) : timeLabel_(backAt);
+    /* And down when their own first job starts, for the same reason. The
+     * greeting crews are at the door before the ambassadors meet, so a
+     * greeter told to come at the meeting time arrives after the first
+     * family does. Everybody else starts when the tour starts, and their
+     * email is unchanged. */
+    const startWindow = awayMinutes_(working.map(function (j) { return j.job; }));
+    const comeAt = startWindow ? timeLabel_(startWindow.from) : timeLabelOrRaw_(reportAt);
 
     // No route number here. They are given their route on paper on the
     // morning, and a number in an email the day before only confuses them.
@@ -5875,7 +5891,7 @@ function sendStudentEmails(dateStr) {
           '<ul>' + items + '</ul>' +
           (working.length
             ? '<p><b>Please come to ' + escapeHtml_(reportTo) + ' at ' +
-              escapeHtml_(reportAt) + '.</b></p>' +
+              escapeHtml_(comeAt) + '.</b></p>' +
               '<p>You will be back in class by ' + escapeHtml_(backBy) + '. ' +
               'Your teachers already know you are out.</p>'
             : '')

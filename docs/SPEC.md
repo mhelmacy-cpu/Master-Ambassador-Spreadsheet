@@ -233,8 +233,9 @@ guide takes the family's own route, so the sheets and emails follow.
 **Greeting Done By Panelists** is still the size **Lobby Greeters Needed**
 asks for, three: the first **Panelists Greeting** of the panel, in the
 order she picked them, take two of those places, and the roster fills the
-third around them. They are standing down there from 8:25 either way, so
-it costs them no more class than the panel already does, and it leaves two
+third around them. The door opens before the panel does, so those two go
+down at 8:15 and stay until the panel finishes at 9:05, which is said on
+their email, their slip and in their teachers' email. It still leaves two
 of the roster free to walk a family instead.
 
 It follows them everywhere. The Tour Tracker carries both rows, their own
@@ -323,10 +324,19 @@ each job really keeps somebody away, which is not the length of the
 period they are missing. A greeter is back before the bell.
 
     Panelist        8:25 AM - 9:05 AM
-    Lobby Greeter   8:25 AM - 8:45 AM
-    Table Greeter   8:25 AM - 8:45 AM
+    Lobby Greeter   8:15 AM - 8:45 AM
+    Table Greeter   8:15 AM - 8:45 AM
     Tour Guide      8:25 AM - 9:05 AM
     Class Buddy     9:05 AM - 9:25 AM
+
+**The greeting crews go down at 8:15**, ten minutes before anybody else:
+the first families are at the door before the ambassadors meet in the
+cafeteria. That hour is theirs, not the tour's, so their own email and
+their locker slip say 8:15 while everybody else's still says 8:25. Each
+student is told the start of their own earliest job, falling back to
+**Ambassadors Report At** where a job has no hours of its own, which is
+how somebody on the door and on the panel is asked for 8:15 and kept
+until 9:05.
 
 The first block of the day starts at 8:45, so a greeter finishing then
 misses no class at all. Their teacher is told anyway, because a teacher
@@ -419,7 +429,8 @@ had a job that morning.
 
 **Where the morning ends** is the setting **Visitors End In**, and it is
 not where it starts. Ambassadors report to the cafeteria at 8:25
-(**Ambassadors Report To**); a visiting family is taken to **the co-lab**
+(**Ambassadors Report To**), bar the greeting crews, who are down at
+8:15; a visiting family is taken to **the co-lab**
 at 9:25 and left with her there. Every sentence about the end of the
 morning reads it from that one setting: the students' emails, the
 teachers' emails, the locker slips, the route sheets and the Tour Tracker
@@ -801,7 +812,8 @@ Three rounds go out together each time:
     Tuesday   12:00 PM
     Wednesday  7:45 AM
 
-One round: the student's own job, and to be in the cafeteria at 8:25.
+One round: the student's own job, and to be in the cafeteria at 8:25,
+or 8:15 where they are on a greeting crew.
 No route number: they are handed their route on paper on the morning,
 and a number in an email the day before only confuses them. The locker
 slips leave it out for the same reason.
