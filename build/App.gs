@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-05 h';
+var BUILD_ = '2026-10-06 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -4677,7 +4677,18 @@ function buildRouteSheets(dateStr) {
       shout_(body, 'Take ' + page.visitor.name + ' to ' +
         (handoff.landing || 'class') + ' with you. ' + handoffReceive_(page));
     } else if (sheet.guide) {
-      shout_(body, handoffAt + '   ' + handbackFor_(page, sheet.guide, dateVal));
+      /* The guide who takes the family into their own class walks out of
+       * the tour and straight into a period, and their bag, their books
+       * and their coat are all still where they left them at 8:25. So
+       * that comes first, in the same large type as the rest of it, and
+       * the class visit follows: one instruction, then the next. */
+      if (takes) {
+        shout_(body, handoffAt + '   Bring your visitor back to ' + reportTo +
+          ' to get your things, then go to class.');
+        shout_(body, handbackFor_(page, sheet.guide, dateVal));
+      } else {
+        shout_(body, handoffAt + '   ' + handbackFor_(page, sheet.guide, dateVal));
+      }
     }
   });
 

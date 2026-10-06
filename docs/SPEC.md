@@ -670,6 +670,15 @@ morning before they reach the printer.
   they are taking, who is with them, the walk itself, and what to do at
   9:06 - which differs between the two guides, so each is told only
   their own part.
+
+  A guide who takes their visitor into their own class is told first, in
+  the same large type, to **"Bring your visitor back to the cafeteria to
+  get your things, then go to class."** They have been walking since 8:25
+  and their bag, their books and their coat are still where they left
+  them, and the next thing that happens to them is a lesson. Then the
+  class visit line. A guide whose family goes to somebody else is not
+  told it, because they go straight back to the class they came from, and
+  neither is whoever receives the family, who never left theirs.
 - **Print Locker Slips** - one slip per ambassador, several to a page in
   bordered boxes so the page cuts into strips. They go up on lockers on
   Tuesday morning, so each one is a handful of lines and no more: name
