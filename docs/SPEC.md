@@ -10,12 +10,18 @@ Seeded with the 31 student names and nothing else - every other column
 is entered by the office.
 
     First Name | Last Name | Homeroom | Split | Grade | Advisor | Borough |
-    Gender | Race (Presenting) | Light | Strength | Can Solo |
+    Gender | Race (Presenting) | Strength | Can Solo |
     Active (Yes/No dropdown)
 
 - `Split` is A/B/C and is load-bearing: it decides which class a student
   is missing on any lettered period. See "Reading the schedule" below.
 - `Grade` is needed to pair guides with visiting students of the same grade.
+- No Light column either. The green/yellow light held a name back at the
+  point of saving, for a second look, and the tour could not be saved
+  until she had ticked a box to say each of them was fine. She picks
+  every guide herself now, so the second look is the picking. Nothing
+  reads the column, setup does not add it, and an older sheet that still
+  has one is ignored (delete it by hand if you like).
 - No Language column - dropped. The only language block inside an
   8:30-9:25 tour window all week is MMS (5th grade) on Wednesday, and
   there are no 5th grade ambassadors.
@@ -148,7 +154,11 @@ One command, run once the prospective students are entered. It assigns:
 It does **not** assign **Panelists**. Those are chosen by hand, and they
 are chosen **first**: the staffing dialog opens on the panel, and only
 once she has submitted it (or said there is no panel this week) does the
-rest appear. Everything after that is assigned around her panel, so a
+rest appear. It appears by itself at that point, and again whenever the
+date or "keep what is already assigned" changes it. There is no Preview
+button: one button, **Save to Tour Tracker**, which is out of reach
+until the list is on the screen and goes out of reach again if working
+the plan out fails. Everything after that is assigned around her panel, so a
 panelist is never handed a second job - including when she unticks
 "keep what is already assigned" and starts the date over, because the
 panel is hers and a re-run never clears it.
@@ -160,7 +170,7 @@ that job is ("already Tour Guide for Sam Visitor"). Offering only the
 ones left over made the list a record of what the command had done, and
 the panel is where she changes her mind: somebody down as a guide is
 exactly who she may want to move onto it. Anyone already on the panel is
-there too, ticked. Yellow lights are marked. Whoever is ticked when she
+there too, ticked. Whoever is ticked when she
 saves is written to the Tour Tracker as a Panelist, which is what puts
 them in the Tuesday and Wednesday emails with everybody else.
 
