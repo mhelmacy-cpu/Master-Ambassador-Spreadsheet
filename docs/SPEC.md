@@ -329,6 +329,17 @@ sees what she has done.
 Bell Schedule 5, Bell Schedule 6, Bell Schedule 7, Bell Schedule 8,
 Teachers, Tour Routes, Settings.
 
+**Tour Routes** holds the seven walks, one itinerary per route, and it is
+seeded once and never rewritten, because she edits it. **The Co-Lab is
+not a stop on any of them.** Changing that in the script alone would do
+nothing to a sheet that already has rows, so setup takes the line off her
+own sheet and says so ("the Co-Lab stop came off route 1"). Only that one
+line goes: every other stop, and anything she has typed herself, is left
+exactly as it is, and the stop cannot come back, because setup looks every
+time. The last line of every route is the end of the morning, which is
+still the co-lab, and a line that names the old place is brought up to
+date from **Visitors End In** at the same time.
+
 Jobs also carries `Out of Class From` and `Out of Class To` - how long
 each job really keeps somebody away, which is not the length of the
 period they are missing. A greeter is back before the bell.
@@ -810,9 +821,12 @@ Every ambassador on the Tour Tracker is treated the same, whatever the
 job - a panelist gets their own email, their advisor hears, and so does
 the teacher whose class they walk out of.
 
-Three rounds go out together each time:
+Three things are covered each time, and a person who is more than one of
+them hears once:
 
-- the advisor - "your advisee(s) are out"
+- the advisor - "your advisee(s) are out", with the job and the hour
+  they have them back, which is that job's own end and not the tour's: a
+  greeter is back at 8:45, a guide at 9:05
 - the teacher whose class the student is missing - worked out from the
   student's split, not their homeroom
 - the teacher whose class is receiving visitors
@@ -856,21 +870,36 @@ A double period is the ordinary case: the same teacher loses a student
 at 8:25 and gains a visiting family at 9:06, and hearing about it twice,
 under two subject lines, is how a teacher stops reading these.
 
-One email carries whichever of three sections apply: students walking
-out, a visiting family walking in with an ambassador, and a visiting
-family joining a 5th grade language class. The subject follows suit:
+One email carries whichever of four sections apply: students walking
+out, that teacher's own advisees, a visiting family walking in with an
+ambassador, and a visiting family joining a 5th grade language class.
+The subject follows suit:
 
     out only    Student Out of Your Class - Wednesday, October 7
     in only     Student Visitor in Your Class - Wednesday, October 7
     both        Your Class and the Middle School Tour - Wednesday, October 7
+    advisee     Advisee on Tour Duty - Wednesday, October 7
 
 The out-of-class email no longer says "please expect a visitor as
 well". It was telling the wrong teacher: the guide is pulled out of the
 8:25 class and walks the family into the 9:06 one, which is usually a
 different room. Only the teacher who actually receives them is told.
 
-The advisor email stays separate. It is about an advisee being on duty,
-not about that teacher's own class.
+**Advisees are a section of that one email, not a second email.** A
+teacher who also advises somebody on the tour was getting two, off two
+subject lines, often with the same name in both. Now the advisee section
+sits in the same email, under the subject about their own class, because
+what they have to plan around is the class. An advisee the email already
+names, because that teacher is losing them from a class, is not tabled
+twice: a line says "Camille Bedeau is your advisee as well." An advisor
+who teaches none of their advisees that morning still gets an email of
+their own, under the subject that email always had, because there is
+nothing to join it to.
+
+The summary counts it the way it counts a visitor arriving: the merged
+email is one class teacher's email, and "3 of those with an advisee in
+it" says how many carried the section. Only emails that are one message
+each are added into the total, so the number always matches what went.
 
 **A pass off is not an absence.** Being handed a family does not take
 that student out of anything: they are sitting in their own class and

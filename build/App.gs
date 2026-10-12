@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-12 a';
+var BUILD_ = '2026-10-12 b';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -531,6 +531,8 @@ function setupSpreadsheet() {
     const hours = refreshJobHours_();
     if (hours.length) added.push(hours.join(', '));
   }
+  const stops = refreshRouteStops_();
+  if (stops.length) added.push(stops.join(', '));
   if (ensureColumn_(SHEETS.AMBASSADORS, 'Strength', STRENGTH_OPTIONS)) {
     added.push('Strength on Ambassadors');
   }
@@ -1276,6 +1278,61 @@ function setupBellSchedules_() {
     ss_().setActiveSheet(built[0]);
   }
   return made;
+}
+
+/**
+ * Takes the Co-Lab off the routes on her own Tour Routes sheet.
+ *
+ * The itinerary is seeded once and never written again, because she
+ * edits it: changing it in the script does nothing to a sheet that
+ * already has rows. So the one line is taken out, and only that line.
+ * Everything else in the cell is left exactly as she has it, and the
+ * stop cannot come back, because setup looks every time.
+ *
+ * The last line of every route is the end of the morning, and that is
+ * still the co-lab: a line that names the old place is brought up to
+ * date from Visitors End In at the same time.
+ */
+function refreshRouteStops_() {
+  const N = SHEETS.ROUTES;
+  const col = col_(N, 'Itinerary');
+  if (col === -1) return [];
+  const s = sheet_(N);
+  const said = [];
+  const ends = endPlace_();
+  rows_(N).forEach(function (r, i) {
+    const was = String(r[col] || '');
+    if (!was) return;
+    const kept = [];
+    let dropped = 0;
+    was.split('\n').forEach(function (line) {
+      // A stop is a time and a place. Only the Co-Lab's own line goes.
+      if (/^\s*\d{1,2}:\d{2}\s*-?\s*co-?\s?lab\b\s*$/i.test(line)) {
+        dropped++;
+        return;
+      }
+      kept.push(line);
+    });
+    let text = kept.join('\n');
+    /* Where the morning ends, which is not where it used to end. Only
+     * the last line is touched, and only where it still says the old
+     * place, so a sentence she has written herself is left alone. */
+    const moved = text.replace(
+      /(Bring visitors? down to )(?:the )?cafeteria\b/i,
+      '$1' + ends);
+    const endMoved = moved !== text;
+    if (endMoved) text = moved;
+    if (!dropped && !endMoved) return;
+    s.getRange(i + 2, col + 1).setValue(text);
+    const route = trim_(r[col_(N, 'Route')]) || String(i + 1);
+    if (dropped) {
+      said.push('the Co-Lab stop came off route ' + route);
+    }
+    if (endMoved) {
+      said.push('route ' + route + ' now ends in ' + ends);
+    }
+  });
+  return said;
 }
 
 function setupRoutes_() {
@@ -6008,6 +6065,14 @@ function sendTeacherEmails(dateStr) {
       if (j.job === JOBS.GUIDE && v && visiting.indexOf(v) === -1) visiting.push(v);
     });
 
+    /* When this one is finished and back in their own class, which is
+     * their own job's hours and not the end of the tour: a greeter is
+     * back at 8:45. The advisor is told it as well as the class teacher,
+     * because the question an advisor asks is when they have their
+     * advisee back. */
+    const mine = awayMinutes_(jobs.map(function (j) { return j.job; }));
+    const backBy = timeLabel_(mine ? mine.to : endMin);
+
     /* advisor */
     if (who.advisor) {
       // An advisory shared by two people is written "Eliza/Lila". Both hear.
@@ -6017,7 +6082,7 @@ function sendTeacherEmails(dateStr) {
         const t = teacherByName[norm_(one)];
         if (t && t.email) {
           if (!byAdvisor[t.email]) byAdvisor[t.email] = { name: t.name, rows: [] };
-          byAdvisor[t.email].rows.push({ student: name, job: jobText });
+          byAdvisor[t.email].rows.push({ student: name, job: jobText, back: backBy });
         } else {
           needsYou.push(name + "'s advisor (" + one + ') has no email on the Teachers sheet.');
         }
@@ -6034,8 +6099,7 @@ function sendTeacherEmails(dateStr) {
     // Which class they miss depends on how long their own job keeps them
     // out. A panelist is back at 9:05 and should not be reported absent
     // from a period that starts after that.
-    const win = awayMinutes_(jobs.map(function (j) { return j.job; })) ||
-      { from: startMin, to: endMin };
+    const win = mine || { from: startMin, to: endMin };
     const blocks = classesMissed_(who.pod, who.split, who.grade, dateVal, win.from, win.to);
 
     /* Nothing missed, which is what a greeter finishing before the first
@@ -6097,23 +6161,7 @@ function sendTeacherEmails(dateStr) {
   });
 
   let advisorsSent = 0;
-  Object.keys(byAdvisor).forEach(function (email) {
-    const e = byAdvisor[email];
-    const body = e.rows.map(function (r) {
-      return '<tr><td style="' + TD_ + '">' + escapeHtml_(r.student) + '</td>' +
-        '<td style="' + TD_ + '">' + escapeHtml_(r.job) + '</td></tr>';
-    }).join('');
-    const html = '<div style="' + MAIL_STYLE_ + '">' +
-      '<p>Hi ' + escapeHtml_(e.name) + ',</p>' +
-      '<p>Your advisee(s) will be out on a Middle School tour ' + escapeHtml_(when.body) + ':</p>' +
-      '<table style="' + TABLE_STYLE_ + '"><tr><th style="' + TH_ + '">Advisee</th>' +
-      '<th style="' + TH_ + '">Job</th></tr>' + body + '</table>' +
-      '<p>Thank you!<br>' + escapeHtml_(senderName) + '</p></div>';
-    if (!sampleAllowsJobs_('advisor', e.rows.map(function (r) { return r.job; }))) return;
-    sendMail_(email, 'Advisee on Tour Duty - ' + when.subject, html);
-    advisorsSent++;
-  });
-
+  let adviseeSent = 0;
   let teachersSent = 0;
   let landingSent = 0;
   let hostsSent = 0;
@@ -6126,9 +6174,15 @@ function sendTeacherEmails(dateStr) {
    * about it twice, from two different subject lines, is how a teacher
    * stops reading these.
    *
-   * Three things can be in it: students walking out, a visiting family
-   * walking in with an ambassador, and a visiting family joining a 5th
-   * grade language class. A teacher gets whichever of the three apply. */
+   * Their own advisees are in it too. An advisor who teaches the student
+   * they advise was getting a second email with the same name in it, off
+   * a second subject line, which is the same way a teacher stops reading
+   * these. An advisor who teaches none of them still gets an email of
+   * their own, because for them there is nothing to join it to.
+   *
+   * So four things can be in it: students walking out, their advisees, a
+   * visiting family walking in with an ambassador, and a visiting family
+   * joining a 5th grade language class. A teacher gets whichever apply. */
   const every = {};
   const bucket = function (holder, key) {
     Object.keys(holder).forEach(function (email) {
@@ -6138,6 +6192,7 @@ function sendTeacherEmails(dateStr) {
   };
   bucket(byTeacher, 'out');
   bucket(byOnDuty, 'onduty');
+  bucket(byAdvisor, 'advisees');
   bucket(byLanding, 'arriving');
   bucket(byHost, 'hosting');
 
@@ -6145,6 +6200,7 @@ function sendTeacherEmails(dateStr) {
     const e = every[email];
     const out = e.out || [];
     const onDuty = e.onduty || [];
+    const advisees = e.advisees || [];
     const arriving = e.arriving || [];
     const hosting = e.hosting || [];
     const parts = [];
@@ -6178,6 +6234,35 @@ function sendTeacherEmails(dateStr) {
             '<td style="' + TD_ + '">' + escapeHtml_(r.what) + '</td>' +
             '<td style="' + TD_ + '">' + escapeHtml_(r.job) + '</td></tr>';
         }).join('') + '</table>');
+    }
+
+    /* Their advisees. One a section above has already named, because
+     * the same teacher is losing them from a class, is not listed twice:
+     * a line says they are an advisee as well, which is the thing the
+     * second email used to say. */
+    if (advisees.length) {
+      const named = {};
+      out.concat(onDuty).forEach(function (r) { named[norm_(r.student)] = true; });
+      const fresh = advisees.filter(function (r) { return !named[norm_(r.student)]; });
+      const already = advisees.filter(function (r) { return named[norm_(r.student)]; })
+        .map(function (r) { return r.student; });
+      if (fresh.length) {
+        parts.push('<p>Your advisee(s) will be out on a Middle School tour ' +
+          escapeHtml_(when.body) + ':</p>' +
+          '<table style="' + TABLE_STYLE_ + '"><tr><th style="' + TH_ + '">Advisee</th>' +
+          '<th style="' + TH_ + '">Job</th>' +
+          '<th style="' + TH_ + '">Back in class by</th></tr>' +
+          fresh.map(function (r) {
+            return '<tr><td style="' + TD_ + '">' + escapeHtml_(r.student) + '</td>' +
+              '<td style="' + TD_ + '">' + escapeHtml_(r.job) + '</td>' +
+              '<td style="' + TD_ + '">' + escapeHtml_(r.back || '') + '</td></tr>';
+          }).join('') + '</table>');
+      }
+      if (already.length) {
+        parts.push('<p>' + escapeHtml_(already.join(' and ')) +
+          (already.length > 1 ? ' are your advisees as well.' : ' is your advisee as well.') +
+          '</p>');
+      }
     }
 
     if (arriving.length) {
@@ -6227,40 +6312,57 @@ function sendTeacherEmails(dateStr) {
     const visitorsToo = arriving.length || hosting.length;
     const html = '<div style="' + MAIL_STYLE_ + '">' +
       '<p>Hi ' + escapeHtml_(e.name) + ',</p>' + parts.join('') +
-      (visitorsToo && !out.length && !onDuty.length
+      (visitorsToo && !out.length && !onDuty.length && !advisees.length
         ? '<p>Nothing is needed from you beyond a seat.<br>'
         : '<p>Thank you!<br>') +
       escapeHtml_(senderName) + '</p></div>';
 
-    /* One subject line for whichever of the four this is. A class that
+    /* One subject line for whichever of these this is. A class that
      * only has a student on duty is not losing anybody, so saying so
-     * would be wrong: it says they are working the tour. */
+     * would be wrong: it says they are working the tour. An advisor with
+     * nothing else in the email keeps the subject that email always had.
+     * Advisees never change a subject line, because what the teacher has
+     * to plan around is their own class. */
     const subject = ((out.length || onDuty.length) && visitorsToo)
       ? 'Your Class and the Middle School Tour - ' + when.subject
       : (out.length
           ? 'Student Out of Your Class - ' + when.subject
           : (onDuty.length
               ? 'Your Student Is on Tour Duty - ' + when.subject
-              : 'Student Visitor in Your Class - ' + when.subject));
+              : (visitorsToo
+                  ? 'Student Visitor in Your Class - ' + when.subject
+                  : 'Advisee on Tour Duty - ' + when.subject)));
 
     // A test shows one of each shape rather than one in total: a class
     // losing a student, one whose student is on duty without missing it,
     // a class gaining a visitor, and one doing both.
     const shape = (out.length ? 'out' : '') + (onDuty.length ? '+duty' : '') +
+      (advisees.length ? '+adv' : '') +
       (arriving.length ? '+in' : '') + (hosting.length ? '+host' : '');
     if (!sampleAllowsJobs_('class teacher',
       out.map(function (r) { return r.job; })
         .concat(onDuty.map(function (r) { return r.job; }))
+        .concat(advisees.map(function (r) { return r.job; }))
         .concat([shape]))) return;
     sendMail_(email, subject, html);
-    teachersSent++;
+    /* Counted by what the email is. One that only tells somebody about
+     * their advisees is the advisor email, as it always was. One that
+     * also has their own class in it is the class teacher's email, and
+     * the advisee part of it is counted as a part rather than as a
+     * second message, the same way an arriving visitor is. */
+    if (out.length || onDuty.length || visitorsToo) {
+      teachersSent++;
+      if (advisees.length) adviseeSent++;
+    } else {
+      advisorsSent++;
+    }
     if (arriving.length) landingSent++;
     if (hosting.length) hostsSent++;
   });
 
   return {
     advisorsSent: advisorsSent, teachersSent: teachersSent, hostsSent: hostsSent,
-    landingSent: landingSent,
+    landingSent: landingSent, adviseeSent: adviseeSent,
     needsYou: needsYou, date: longDate_(dateVal)
   };
 }
@@ -7164,6 +7266,7 @@ function showTestEmailDialog() {
     'if(r.note){h+="<br>"+esc(r.note);}' +
     'else if(r.sent!=null){h+="<br>"+r.sent+" student email(s).";}' +
     'else{h+="<br>"+r.advisorsSent+" advisor, "+r.teachersSent+" class teacher"+' +
+    '(r.adviseeSent?", "+r.adviseeSent+" of those with an advisee in it":"")+' +
     '(r.landingSent?", "+r.landingSent+" receiving class":"")+' +
     '(r.hostsSent?", "+r.hostsSent+" host teacher":"")+".";}}' +
     'h+="</div>";' +
@@ -7244,6 +7347,7 @@ function showEmailDialog() {
     'if(r.note){h+=esc(r.note);}' +
     'else if(r.sent!=null){h+=r.sent+" student email(s) went out for "+esc(r.date)+".";}' +
     'else{h+=r.advisorsSent+" advisor, "+r.teachersSent+" class teacher"+' +
+    '(r.adviseeSent?", "+r.adviseeSent+" of those with an advisee in it":"")+' +
     '(r.landingSent?", "+r.landingSent+" receiving class":"")+' +
     '(r.hostsSent?", "+r.hostsSent+" host teacher":"")+" for "+esc(r.date)+".";}' +
     'h+="</div>";' +
@@ -8076,7 +8180,8 @@ function api_sendEmails(which, dateStr, test, everyone, skipRoster, onlyDay) {
       if (!out) {
         out = r;
       } else {
-        ['sent', 'advisorsSent', 'teachersSent', 'hostsSent', 'landingSent']
+        ['sent', 'advisorsSent', 'teachersSent', 'hostsSent', 'landingSent',
+          'adviseeSent']
           .forEach(function (k) {
           if (typeof r[k] === 'number') out[k] = (out[k] || 0) + r[k];
         });
@@ -8121,6 +8226,9 @@ function api_sendEveryEmail(dateStr, onlyDay) {
   say(tea.teachersSent, 'to class teachers');
   // These two are not messages of their own: a teacher hears once, and
   // these say how many of those emails also covered a visitor arriving.
+  if (tea.adviseeSent) {
+    lines.push('(' + tea.adviseeSent + ' of those also cover an advisee)');
+  }
   if (tea.landingSent) {
     lines.push('(' + tea.landingSent + ' of those also cover a visitor coming in)');
   }
