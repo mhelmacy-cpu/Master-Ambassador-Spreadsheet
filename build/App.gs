@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-12 b';
+var BUILD_ = '2026-10-12 c';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -5613,6 +5613,63 @@ function tourRoster_(dateVal) {
 /** An empty box on a printout, to be ticked with a pen. */
 var TICK_BOX_ = '[    ]';
 
+/**
+ * Where every visiting family goes at 9:06, one line each.
+ *
+ * The roster is per ambassador, so the class visits are only on it a
+ * student at a time, scattered down the Role column. This is the other
+ * way round: by family, which is how she reads the morning out to
+ * somebody, and which classes to expect visitors in.
+ *
+ * Three shapes, and they are all in the one list: a family walking in
+ * with their own guide, a family handed to somebody else at the door,
+ * and a family joining a 5th grade language class with the buddy who is
+ * hosting them. A family nobody has been picked for yet is on it too,
+ * saying so, because that is the one she needs to see.
+ */
+function classVisitRows_(dateVal) {
+  const landed = handbackChoices_(dateVal).byVisitor;
+  const buddyIndex = {};
+  buddies_().forEach(function (b) { buddyIndex[norm_(b.name)] = b; });
+  const hosted = {};
+  const guidesOf = {};
+  assignmentsOn_(dateVal).forEach(function (a) {
+    const v = norm_(a.visitor);
+    if (!v) return;
+    if (a.job === JOBS.BUDDY) hosted[v] = a.name;
+    if (a.job === JOBS.GUIDE) (guidesOf[v] = guidesOf[v] || []).push(a.name);
+  });
+
+  return prospectiveFor_(dateVal).map(function (v) {
+    const key = norm_(v.name);
+    const host = hosted[key];
+    if (host) {
+      const b = buddyIndex[norm_(host)] || {};
+      return {
+        visitor: v.name, takers: host,
+        where: (b.language || 'a 5th grade class') + (b.room ? ' in ' + b.room : ''),
+        teacher: b.teacher || '', fifth: true, passOff: false
+      };
+    }
+    const c = landed[key];
+    if (c && c.where) {
+      const mine = guidesOf[key] || [];
+      // Handed to somebody who was not walking them round, which is the
+      // thing she wants to see at a glance.
+      const passed = c.takers.some(function (n) {
+        return !mine.some(function (g) { return norm_(g) === norm_(n); });
+      });
+      return {
+        visitor: v.name, takers: c.takers.join(' and '),
+        where: c.where.label, teacher: c.where.teacher || '',
+        fifth: false, passOff: passed
+      };
+    }
+    return { visitor: v.name, takers: '', where: '', teacher: '',
+      fifth: false, passOff: false };
+  });
+}
+
 function buildTourRoster(dateStr) {
   clearReadCache_();
   const dateVal = dateStr instanceof Date ? dateStr : toDate_(dateStr);
@@ -5641,8 +5698,36 @@ function buildTourRoster(dateStr) {
   // Narrow, since it holds a tick and nothing else.
   if (grid.setColumnWidth) grid.setColumnWidth(1, 54);
 
+  /* And the same morning the other way round: every visiting family and
+   * the class they are walked into at the end. The roster above has it a
+   * student at a time, down the Role column; this is by family, which is
+   * how the 9:06 handover is read out. */
+  const visits = classVisitRows_(dateVal);
+  if (visits.length) {
+    const handoffAt = timeLabelOrRaw_(setting_('Class Visit Handoff Time', '9:06'));
+    body.appendParagraph('');
+    body.appendParagraph('Class visits at ' + handoffAt)
+      .setHeading(DocumentApp.ParagraphHeading.HEADING3);
+    const settled = visits.filter(function (r) { return !!r.where; }).length;
+    body.appendParagraph(settled + ' of ' + visits.length + ' visiting ' +
+      (visits.length === 1 ? 'family is' : 'families are') + ' settled.');
+    const rows2 = [['Visiting student', 'Goes with', 'Class', 'Teacher']];
+    visits.forEach(function (r) {
+      rows2.push([
+        r.visitor,
+        r.takers
+          ? r.takers + (r.fifth ? ' (5th grade)' : (r.passOff ? ' (pass off)' : ''))
+          : 'nobody yet',
+        r.where || '-',
+        r.teacher || ''
+      ]);
+    });
+    body.appendTable(rows2);
+  }
+
   doc.saveAndClose();
-  return { url: doc.getUrl(), name: title, rows: rows.length };
+  return { url: doc.getUrl(), name: title, rows: rows.length,
+    visits: visits.length };
 }
 
 /**

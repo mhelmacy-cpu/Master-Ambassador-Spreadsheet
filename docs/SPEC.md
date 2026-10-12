@@ -987,6 +987,21 @@ One line per ambassador on duty, so the office has in one place what the
 emails only say one person at a time. The 5th grade buddies are not on
 it, the same as the emails.
 
+**The class visits are at the bottom of it**, the same morning the other
+way round: by family rather than by ambassador, because that is how the
+9:06 handover is read out and how she sees which rooms to expect visitors
+in. All three shapes are in the one list, and so is a family nobody has
+been picked for yet, which is the line she needs to see:
+
+    Class visits at 9:06 AM
+    3 of 4 visiting families are settled.
+
+    Visiting student  Goes with                     Class               Teacher
+    Sam Visitor       Blake Glenn                   Humanities in M107  ES/SdB
+    Lee Visitor       Aksel Ozturk (pass off)       PE in TSAC          BR
+    Kit Visitor       Alexander Rogoff (5th grade)  Spanish in M209     Mary Katherine
+    Nia Visitor       nobody yet                    -
+
 **A box for their name tag** against each name, printed empty to be
 ticked with a pen, because the tags are counted out by hand the afternoon
 before and this is the one sheet that already lists everybody on duty, in
