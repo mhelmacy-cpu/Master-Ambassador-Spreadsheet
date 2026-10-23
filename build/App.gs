@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-12 c';
+var BUILD_ = '2026-10-23 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -187,6 +187,10 @@ var DEFAULT_SETTINGS = [
    * still read and still reported, but nothing is decided for her. "Yes"
    * puts the old suggestions back. */
   ['Script Suggests Tour Guides', 'No'],
+  /* And the same for the two greeting crews. The places come up empty
+   * with a dropdown each, bar the ones her panel covers, which are hers
+   * already. "Yes" fills them from the roster the way it used to. */
+  ['Script Suggests Greeters', 'No'],
   ['Guide Grades for Rising 5', '6 and 6'],
   ['Guide Grades for Rising 6', '6 and 6 or 8'],
   ['Guide Grades for Rising 7', '6 and 7'],
@@ -2294,6 +2298,8 @@ function planTour(dateStr, keepExisting) {
    * Hers by default. The rules are still worked out and still reported
    * against whoever she picks: what it stops doing is deciding. */
   const suggestGuides = isYes_(setting_('Script Suggests Tour Guides', 'No'));
+  // The greeting crews, the same way: hers to pick unless she says not.
+  const suggestGreeters = isYes_(setting_('Script Suggests Greeters', 'No'));
 
   /* The next route to hand out, up to Max Families Per Route each. Once
    * every route has had its share the list starts again at route 1
@@ -2662,11 +2668,19 @@ function planTour(dateStr, keepExisting) {
       if (named.some(function (x) { return norm_(x) === norm_(n); })) return;
       named.push(n);
     });
+    /* Never more on the crew than the places it has. Whoever is on it
+     * already comes first, because those are her own picks, and the
+     * panel's two fill only what is left: she can staff the whole crew
+     * herself and the panel then takes nothing. */
+    if (named.length > count) named.length = count;
     const picked = named.map(function (n) {
       return byAmbName[norm_(n)] || { name: n, grade: '', gender: '', presenting: '' };
     });
     const keptCount = ((kept && kept.crew[job]) || []).length;
-    while (picked.length < count) {
+    /* Whoever is on the crew already stays on it, and so do the panel's
+     * two, because she picked the panel. Every other place comes up
+     * empty with a dropdown, the same as a guide place. */
+    while (suggestGreeters && picked.length < count) {
       let best = null;
       let bestKey = null;
       available.forEach(function (a) {
@@ -2700,6 +2714,7 @@ function planTour(dateStr, keepExisting) {
     if (chosen.length < count) {
       if (!all.length) why = 'the Ambassadors sheet is empty';
       else if (!pool.length) why = 'nobody is marked Active - put Yes in the Active column';
+      else if (!suggestGreeters) why = 'yours to pick';
       else why = 'everyone eligible is already on another job';
     }
     return {
@@ -2729,8 +2744,14 @@ function planTour(dateStr, keepExisting) {
     });
     const seed = onPanel.slice(0, panelGreeters);
     const c = crew(job, count, seed);
-    c.fromPanel = seed.length;
-    if (seed.length < panelGreeters) {
+    // How many of them are really on it, which is not the same as how
+    // many were offered: her own picks can have filled the crew first.
+    c.fromPanel = seed.filter(function (n) {
+      return c.chosen.some(function (x) { return norm_(x) === norm_(n); });
+    }).length;
+    /* The panel owes places it has nobody for. A crew she has filled
+     * herself owes nothing, so that is not a shortage and is not said. */
+    if (seed.length < panelGreeters && c.chosen.length < count) {
       c.panelShort = panelGreeters - seed.length;
       c.why = (onPanel.length
         ? 'the panel owes ' + c.panelShort + ' of these places and only ' +
@@ -3156,14 +3177,17 @@ function applySwaps_(plan, swaps, ignored) {
   const note = function (x, why) {
     if (ignored) {
       ignored.push((trim_(x.to) || trim_(x.from) || 'a change') +
-        (trim_(x.visitor) ? ' for ' + trim_(x.visitor) : '') + ': ' + why);
+        (trim_(x.visitor) ? ' for ' + trim_(x.visitor)
+          : (trim_(x.job) ? ' on the ' + trim_(x.job) + ' crew' : '')) + ': ' + why);
     }
     return false;
   };
   const list = [].concat(swaps || []).filter(function (x) {
     if (!x) return false;
-    // A place added to a family that has fewer guides than it should.
-    if (x.add) return !!trim_(x.to) && !!trim_(x.visitor);
+    /* An empty place being filled: one on a family that has fewer guides
+     * than it should, or one on a greeting crew, which says which crew
+     * rather than which family. */
+    if (x.add) return !!trim_(x.to) && (!!trim_(x.visitor) || !!trim_(x.job));
     if (x.drop) return !!trim_(x.from);      // this place taken off altogether
     if (!trim_(x.to)) return note(x, 'nobody was chosen for it');
     /* Nothing to do only where the plan's own name for that place is the
@@ -3277,7 +3301,7 @@ function applySwaps_(plan, swaps, ignored) {
       /* Two empty places on one family and the same name chosen in both.
        * Said and skipped, before anything tries to move them off the
        * place they are already standing in, which is this one. */
-      if (x.add) {
+      if (x.add && !x.job) {
         const already = plan.pairs.filter(function (q) {
           return norm_(q.visitor.name) === norm_(x.visitor);
         })[0];
@@ -3288,13 +3312,27 @@ function applySwaps_(plan, swaps, ignored) {
           return;
         }
       }
+      /* The same thing on a crew: the same name chosen in two of its
+       * empty places. Said and skipped before anything moves them off
+       * the place they are already standing in, which is this one. */
+      if (x.add && x.job) {
+        const already = plan.greeters.filter(function (c) {
+          return c.job === x.job;
+        })[0];
+        if (already && already.chosen.some(function (n) {
+          return norm_(n) === norm_(who.name);
+        })) {
+          note(x, 'they are already on that crew');
+          return;
+        }
+      }
       // Already working this tour: they are moved, not refused.
       if (taken[norm_(who.name)]) moved = freeUp(who.name, x.visitor);
     }
     /* A second guide put back on a family that is walking with one.
      * The other way round from a drop, and the same in reverse: the
      * family has a pair again and nothing else about them changes. */
-    if (x.add) {
+    if (x.add && !x.job) {
       const pair = plan.pairs.filter(function (p) {
         return norm_(p.visitor.name) === norm_(x.visitor);
       })[0];
@@ -3334,6 +3372,28 @@ function applySwaps_(plan, swaps, ignored) {
     if (x.job && x.job !== JOBS.GUIDE) {
       const cr = plan.greeters.filter(function (c) { return c.job === x.job; })[0];
       if (!cr) throw new Error('There is no ' + trim_(x.job) + ' crew on this tour.');
+      /* An empty place on the crew. With the crews hers to pick this is
+       * how they are staffed at all, so it is the ordinary case rather
+       * than the exception. */
+      if (x.add) {
+        if (cr.chosen.length >= cr.needed) {
+          throw new Error('The ' + cr.job + ' crew already has ' + cr.chosen.length +
+            ' on it. Close this and run Staff This Wednesday Tour again.');
+        }
+        const clash = cr.chosen.filter(function (n) { return keptApart_(who.name, n); });
+        if (clash.length) {
+          throw new Error(who.name + ' and ' + clash.join(' and ') +
+            ' are on the Keep Apart list, so they cannot work the same crew.');
+        }
+        taken[norm_(who.name)] = true;
+        standing[norm_(who.name)] = { kind: 'crew', job: cr.job };
+        cr.chosen.push(who.name);
+        cr.short = Math.max(0, cr.needed - cr.chosen.length);
+        cr.swapped = true;
+        out.push({ visitor: '', job: cr.job, from: '', to: who.name, added: true,
+          problems: moved ? [moved] : [] });
+        return;
+      }
       let where = -1;
       cr.chosen.forEach(function (n, i) { if (norm_(n) === norm_(x.from)) where = i; });
       if (where === -1) {
@@ -6886,8 +6946,9 @@ function showStaffDialog() {
     '</div>' +
     '<div class="byhand" id="step2" hidden>' +
     '<label><span class="step">2</span> Everything else</label>' +
-    '<p class="sub" style="margin:0 0 8px;">Routes and the greeting crews are worked ' +
-    'out for you. The guide places are empty: pick each one from its dropdown. ' +
+    '<p class="sub" style="margin:0 0 8px;">The routes are worked out for you. ' +
+    'The guide places and the greeting crews are empty: pick each one from its ' +
+    'dropdown. Your panel covers two of the places downstairs already. ' +
     'Nothing is written until you save.</p>' +
     '<label class="opt"><input type="checkbox" id="keep" checked>' +
     '<span><b>Keep what is already assigned.</b> Only students with no guides yet are ' +
@@ -7045,17 +7106,27 @@ function showStaffDialog() {
     'var c=(x.classOptions||[])[Number(v)];if(!c){continue;}' +
     'out.push({visitor:x.visitor.name,to:c.name});}' +
     'return out;}' +
+    /* The crew, one dropdown per place.
+     *
+     * The places she has not filled come up empty, which with the crews
+     * hers to pick is most of them: whoever is already on it, then an
+     * empty dropdown for every place still open. */
     'function crewPicker(c,ci){var sp=window.__spare||[],h="";' +
-    'if(!c.chosen.length){return "<b>none available</b>";}' +
-    'c.chosen.forEach(function(n,j){' +
-    'h+="<select class=\'csel\' data-crew=\'"+ci+"\' data-slot=\'"+j+"\'>";' +
-    'h+="<option value=\'\'>"+esc(n)+"</option>";' +
-    'h+="<option value=\'-\'>nobody: leave this place empty</option>";' +
+    'var able=0;' +
+    'sp.forEach(function(x){if(!x.jobs||x.jobs[c.job]){able++;}});' +
+    'if(!able&&!c.chosen.length){' +
+    'return "<b>nobody on the Ambassadors sheet can do this job</b>";}' +
+    'var one=function(n,slot){' +
+    'var h2="<select class=\'csel\' data-crew=\'"+ci+"\' data-slot=\'"+slot+"\'>";' +
+    'h2+="<option value=\'\'>"+(n?esc(n):"choose a greeter")+"</option>";' +
+    'if(n){h2+="<option value=\'-\'>nobody: leave this place empty</option>";}' +
     'sp.forEach(function(x,k){if(x.jobs&&!x.jobs[c.job]){return;}' +
-    'h+="<option value=\'"+k+"\'>"+esc(x.name)+" ("+esc(x.note)+")"+' +
+    'h2+="<option value=\'"+k+"\'>"+esc(x.name)+" ("+esc(x.note)+")"+' +
     '(x.busy?" - already "+esc(x.busy):"")+' +
     '"</option>";});' +
-    'h+="</select> ";});' +
+    'return h2+"</select> ";};' +
+    'c.chosen.forEach(function(n,j){h+=one(n,j);});' +
+    'for(var g=c.chosen.length;g<c.needed;g++){h+=one("","add");}' +
     'return h;}' +
     'function pairOf(key){var pr=window.__pairs||[];' +
     'for(var i=0;i<pr.length;i++){if(pr[i].order===key){return pr[i];}}return null;}' +
@@ -7136,8 +7207,14 @@ function showStaffDialog() {
     'var cs=document.querySelectorAll("select.csel");' +
     'for(var i=0;i<cs.length;i++){var v=cs[i].value;if(!v){continue;}' +
     'var cr=crews[Number(cs[i].getAttribute("data-crew"))];' +
-    'var slot=Number(cs[i].getAttribute("data-slot"));' +
-    'if(!cr||!cr.chosen[slot]){continue;}' +
+    'if(!cr){continue;}' +
+    'var craw=cs[i].getAttribute("data-slot");' +
+    /* An empty place on the crew. One of these per place still open, so
+     * three of them send three names and the save puts all three on. */
+    'if(craw==="add"){var cadd=sp[Number(v)];' +
+    'if(cadd){out.push({job:cr.job,to:cadd.name,add:true});}continue;}' +
+    'var slot=Number(craw);' +
+    'if(!cr.chosen[slot]){continue;}' +
     'if(v==="-"){out.push({job:cr.job,from:cr.chosen[slot],drop:true});continue;}' +
     'var c2=sp[Number(v)];if(!c2){continue;}' +
     'out.push({job:cr.job,from:cr.chosen[slot],to:c2.name});}' +
@@ -7188,8 +7265,8 @@ function showStaffDialog() {
     'h+="</table>";' +
     'h+="<p class=\'muted\'>Each guide is a dropdown: swap in anyone still free, or pick ' +
     '<i>nobody</i> to drop that place and send the family out with one guide. The ' +
-    'greeting crews below work the same way. Nothing is written until you press ' +
-    'Save.</p>";' +
+    'greeting crews below work the same way, and their places are yours to pick ' +
+    'too. Nothing is written until you press Save.</p>";' +
     'p.greeters.forEach(function(c,ci){h+="<h3>"+esc(c.job)+" ("+c.chosen.length+" of "+c.needed+")"+' +
     '(c.fromPanel?" <span class=\'muted\'>- "+c.fromPanel+" of them from your ' +
     'panel</span>":"")+' +

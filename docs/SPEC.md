@@ -148,8 +148,20 @@ One command, run once the prospective students are entered. It assigns:
   per route, seven routes available), for the Wednesday morning slot.
   With more families than routes, the list starts again at route 1 and
   the sharing is flagged in the dialog.
-- **Lobby Greeters** - three.
-- **Table Greeters** - two.
+- **Lobby Greeters** - three, and **Table Greeters** - two, both **hers
+  to pick** as well. Nothing is filled from the roster: every place comes
+  up empty with a dropdown beside it, the same as a guide place, and the
+  crew says how it stands ("Lobby Greeter (1 of 3) - yours to pick").
+
+  The two places her panel covers downstairs are the one exception, and
+  they are hers already, because she picked the panel. They yield to her
+  own picks rather than stacking on top of them: a crew she has filled
+  herself takes nothing from the panel, and a crew is never larger than
+  the number of places it has.
+
+  **Script Suggests Greeters** on Settings puts the old behaviour back:
+  set it to Yes and both crews fill themselves from the roster, as evenly
+  split by gender and by presenting as the people free allow.
 
 It does **not** assign **Panelists**. Those are chosen by hand, and they
 are chosen **first**: the staffing dialog opens on the panel, and only
@@ -1024,6 +1036,21 @@ Reply-To are both set on the Settings sheet.
 A tour that has not been staffed yet is skipped rather than mailed to
 nobody, so staff the tour before Tuesday morning for the first send to
 go out.
+
+## The tests
+
+    sh tests/run.sh
+
+Node only, no browser and no Google account: `tests/mock.js` stands in for
+the Apps Script services and records what the script did, and each test
+loads `build/Data.gs` and `build/App.gs` as they are, so what is tested is
+the text that gets pasted into the editor. `tests/README.md` says what the
+mock records.
+
+They lived in `/tmp` until a container restart wiped them, which cost most
+of the suite: what the transcript still held was recovered, the mock was
+rebuilt, and all of it is in the repository now, which is the only place
+it survives. A change and the test that covers it are committed together.
 
 ## Still needed from the office
 
