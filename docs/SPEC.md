@@ -356,6 +356,20 @@ Jobs also carries `Out of Class From` and `Out of Class To` - how long
 each job really keeps somebody away, which is not the length of the
 period they are missing. A greeter is back before the bell.
 
+**Her sheet wins over the script, and brings itself up to date.** The
+hours are on the Jobs sheet so she can change them, which means changing
+them in the script reaches nothing on its own: her sheet keeps saying
+what it says. A cell still holding one of this script's own older answers
+is therefore rewritten, and a time she has typed is left exactly alone.
+That used to happen only when setup ran, so her locker slips went on
+saying 8:25 for the greeters after the script had moved them to 8:15.
+Everything that prints or sends does it now, so the first slip, email,
+roster or staffing run after a paste is enough.
+
+**Check This Script** prints the two side by side, job by job, with
+anything she has changed in bold, because a printout showing an hour she
+did not expect is answered on that sheet and not in this script.
+
     Panelist        8:25 AM - 9:05 AM
     Lobby Greeter   8:15 AM - 8:45 AM
     Table Greeter   8:15 AM - 8:45 AM

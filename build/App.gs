@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-27 a';
+var BUILD_ = '2026-10-27 b';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -1501,7 +1501,11 @@ function ensureBellGrade_() {
  */
 function refreshJobHours_() {
   const N = SHEETS.JOBS;
-  if (col_(N, 'Out of Class From') === -1 || col_(N, 'Out of Class To') === -1) return [];
+  // optionalCol_, not col_: a sheet made before those columns existed
+  // has nothing to bring up to date, and asking must not throw. This is
+  // called from everything that prints or sends now, not only setup.
+  if (optionalCol_(N, 'Out of Class From') === -1 ||
+      optionalCol_(N, 'Out of Class To') === -1) return [];
   const s = sheet_(N);
   const fromCol = col_(N, 'Out of Class From') + 1;
   const toCol = col_(N, 'Out of Class To') + 1;
@@ -1525,6 +1529,10 @@ function refreshJobHours_() {
       said.push(job + ' ' + (c.at === fromCol ? 'starts' : 'finishes') + ' at ' + c.want);
     });
   });
+  // The cached read of this sheet is now a run behind the sheet itself,
+  // and the hours are read again a moment later to build the thing that
+  // asked for them.
+  if (said.length) clearReadCache_();
   return said;
 }
 
@@ -2232,6 +2240,15 @@ function buddyHandoff_(p, buddy, handoff, tourEnd) {
 
 function planTour(dateStr, keepExisting) {
   clearReadCache_();
+  /* The hours these jobs keep somebody out of class live on her Jobs
+   * sheet, which wins over the script so she can change them. That also
+   * means a change in the script reaches nothing until a cell still
+   * holding the script's own older answer is brought up to date, which
+   * setup does. She should not have to run setup for a greeter's slip to
+   * say 8:15, so it is done here too: it writes only a cell that still
+   * holds an answer this script used to give, and never a time she has
+   * typed. */
+  refreshJobHours_();
   const dateVal = toDate_(dateStr);
   if (!dateVal) throw new Error('Pick a tour date first.');
 
@@ -4903,6 +4920,7 @@ function lockerSlipData_(dateVal) {
 
 function buildLockerSlips(dateStr) {
   clearReadCache_();
+  refreshJobHours_();
   const dateVal = toDate_(dateStr);
   if (!dateVal) throw new Error('Pick a tour date first.');
   const slips = lockerSlipData_(dateVal);
@@ -5737,6 +5755,7 @@ function classVisitRows_(dateVal) {
 
 function buildTourRoster(dateStr) {
   clearReadCache_();
+  refreshJobHours_();
   const dateVal = dateStr instanceof Date ? dateStr : toDate_(dateStr);
   if (!dateVal) throw new Error('Pick a tour date first.');
   const rows = tourRoster_(dateVal);
@@ -5992,6 +6011,7 @@ var TD_ = 'padding:6px 10px;border:1px solid #ddd;';
 
 function sendStudentEmails(dateStr) {
   clearReadCache_();
+  refreshJobHours_();
   const dateVal = dateStr ? toDate_(dateStr) : nextTourDate_();
   if (!dateVal) return { sent: 0, skipped: [], note: 'No tour on the Tour Tracker yet.' };
 
@@ -6106,6 +6126,7 @@ function timeLabelOrRaw_(v) {
 
 function sendTeacherEmails(dateStr) {
   clearReadCache_();
+  refreshJobHours_();
   const dateVal = dateStr ? toDate_(dateStr) : nextTourDate_();
   if (!dateVal) return { advisorsSent: 0, teachersSent: 0, needsYou: [], note: 'No tour on the Tour Tracker yet.' };
 
@@ -8087,6 +8108,22 @@ function api_checkScript() {
     expected: want.map(function (n) {
       return { name: n, rows: rowsIn(n), there: tabs.indexOf(n) !== -1 };
     }),
+    /* What the Jobs sheet says each job's hours are, which is what a
+      * slip and an email are built from. Hers beats the script's, so
+      * when a printout says an hour she did not expect, this is where
+      * the answer is. */
+    hours: (function () {
+      const h = jobHours_();
+      return Object.keys(JOB_HOURS_).map(function (job) {
+        const now = h[norm_(job)] || { from: '', to: '' };
+        return {
+          job: job, from: now.from, to: now.to,
+          script: JOB_HOURS_[job][0] + ' - ' + JOB_HOURS_[job][1],
+          hers: norm_(now.from) !== norm_(JOB_HOURS_[job][0]) ||
+            norm_(now.to) !== norm_(JOB_HOURS_[job][1])
+        };
+      });
+    })(),
     oldBell: rowsIn(SHEETS.BELL),
     reading: sched.expanded ? 'the per-grade sheets' :
       (rowsIn(SHEETS.BELL) > 0 ? 'the old single Bell Schedule sheet' :
@@ -8110,6 +8147,18 @@ function showCheckDialog() {
     '".</div>";' +
     /* The part that matters most when a paste has gone wrong: not what
      * the stamp says, but what the code actually does. */
+    /* The hours, because a slip saying the wrong time is read off the
+     * Jobs sheet and not off this script. Anything she has changed is
+     * marked, since that is the whole reason the two can differ. */
+    'var hrs=p.hours||[];' +
+    'if(hrs.length){h+="<h3>Out of class</h3><table><tr><th>Job</th>' +
+    '<th>On the Jobs sheet</th><th>In the script</th></tr>";' +
+    'hrs.forEach(function(x){h+="<tr><td>"+esc(x.job)+"</td><td>"+' +
+    '(x.hers?"<b>":"")+esc(x.from)+" - "+esc(x.to)+(x.hers?"</b>":"")+' +
+    '"</td><td>"+esc(x.script)+"</td></tr>";});' +
+    'h+="</table><span class=\'muted\'>The Jobs sheet is what the slips and ' +
+    'the emails are built from. Where the two differ, the sheet wins, which is ' +
+    'what lets you set an hour yourself.</span>";}' +
     'var live=p.live||[];var old=live.filter(function(x){return !x.current;});' +
     'if(old.length){h+="<div class=\'warn\'><b>The editor is running an older copy ' +
     'of this script.</b><br>These parts are not the ones in the build above:<ul>"+' +
