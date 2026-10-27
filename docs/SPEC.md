@@ -716,22 +716,24 @@ morning before they reach the printer.
   their own part.
 
   A guide who takes their visitor into their own class is told first, in
-  the same large type, to **"Bring your visitor back to the cafeteria to
-  get your things, then go to class."** They have been walking since 8:25
-  and their bag, their books and their coat are still where they left
-  them, and the next thing that happens to them is a lesson. Then the
-  class visit line. A guide whose family goes to somebody else is not
-  told it, because they go straight back to the class they came from, and
-  neither is whoever receives the family, who never left theirs.
+  the same large type, to **"Stop at your locker with your visitor if you
+  need anything, then go to class."** The next thing that happens to them
+  is a lesson, and their books are upstairs. Then the class visit line. A
+  guide whose family goes to somebody else is not told it, because they
+  go straight back to the class they came from, and neither is whoever
+  receives the family, who never left theirs.
+
+  It used to send them to the cafeteria instead, which was right while
+  they brought everything down with them at 8:25. They do not.
 - **Print Locker Slips** - one slip per ambassador, several to a page in
   bordered boxes so the page cuts into strips. They go up on lockers on
   Tuesday morning, so each one is a handful of lines and no more: name
   (with homeroom and advisor, for sorting the pile), the date in full, the
   job with the visitor and route, where to be and when they are back, and
-  to bring everything they need for class down with them, since they go
-  straight from the tour to their own lesson. Somebody who is only being
-  handed a visitor at the end stays in their class all morning, so their
-  slip says that instead and has nothing to bring.
+  that there is **nothing to bring down**: they can go to their locker
+  once the tour is over. Somebody who is only being handed a visitor at
+  the end stays in their class all morning, so their slip says that
+  instead.
   The 5th grade class visit buddies are left out, the same as the emails
   - they are told in person, and their instructions print on the
   visitor's route sheet.
@@ -739,8 +741,8 @@ morning before they reach the printer.
       AURELIA WALKER   (CCM - Marco)
       Wednesday, October 7
       Tour Guide for Visitor 1 - route 1
-      Cafeteria 8:25 AM. Back in class by 9:25 AM.
-      Bring everything you need for class with you to the cafeteria.
+      Cafeteria 8:25 AM. Back in class by 9:05 AM.
+      Nothing to bring down. You can go to your locker after the tour.
 
 ## Is the editor running this script?
 
@@ -849,7 +851,14 @@ them hears once:
     Wednesday  7:45 AM
 
 One round: the student's own job, and to be in the cafeteria at 8:25,
-or 8:15 where they are on a greeting crew.
+or 8:15 where they are on a greeting crew. A greeter reads 8:15 whatever
+else they are down for, because the hour each student is told is the
+start of their own earliest job: somebody on the door and on the panel
+comes at 8:15 and stays until 9:05.
+
+It also says **"You do not need to bring anything downstairs. You can go
+to your locker after the tour."** which is the slip's line in full.
+
 No route number: they are handed their route on paper on the morning,
 and a number in an email the day before only confuses them. The locker
 slips leave it out for the same reason.

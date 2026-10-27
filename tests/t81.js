@@ -1,7 +1,10 @@
 // A guide who takes their visitor into their own class at 9:06 walks
-// straight from the tour into a period, with their bag, their books and
-// their coat still in the cafeteria where they left them at 8:25. The
-// route sheet says so first, in the same large type as the rest of it.
+// straight from the tour into a period, and needs their books. The route
+// sheet says so first, in the same large type as the rest of it: stop at
+// your locker, then go to class. It used to send them to the cafeteria
+// for them, which was right while they brought everything down at 8:25.
+// They do not bring anything down any more, so nothing on a slip, in an
+// email or on a route sheet asks them to.
 const fs=require('fs'); const {makeMock}=require(__dirname+'/mock.js');
 const m=makeMock();
 const G=s=>s.replace(/^(?:const|var|let)\s+(\w+)\s*=/gm,'global.$1 =').replace(/^function\s+(\w+)\s*\(/gm,'global.$1 = function $1(');
@@ -39,7 +42,7 @@ const pagesOf=()=>{ global.__doc=[]; buildRouteSheets('2026-10-07');
     now.lines.push({t:t,big:!!o.size}); });
   return out; };
 const lineOf=(pg,re)=>pg.lines.filter(l=>re.test(l.t))[0];
-const things=/get your things/;
+const things=/Stop at your locker/;
 
 console.log('the guide who takes the family into class');
 let pages=pagesOf();
@@ -49,9 +52,9 @@ ok(pages.length===2,'a page each: '+pages.map(p=>p.who).join(' and '));
 let mine=pages.filter(p=>p.who===takes.toUpperCase())[0];
 ok(!!mine,takes+' has a page');
 const line=lineOf(mine,things);
-ok(!!line,'and is told about their things: "'+(line||{}).t+'"');
-ok(line.t.indexOf('Bring your visitor back to the cafeteria to get your things, ' +
-  'then go to class.')!==-1,'in her words, after the time');
+ok(!!line,'and is told where their books are: "'+(line||{}).t+'"');
+ok(line.t.indexOf('Stop at your locker with your visitor if you need anything, ' +
+  'then go to class.')!==-1,'in those words, after the time');
 ok(line.big===true,'in the large text, like the rest of the end of the sheet');
 const at=mine.lines.indexOf(line);
 const next=mine.lines[at+1];
@@ -64,7 +67,7 @@ ok(mine.lines.slice(0,at).every(l=>!things.test(l.t)),
 console.log('\nthe other guide, who goes back to their own class');
 let other=pages.filter(p=>p.who===back.toUpperCase())[0];
 ok(!!other,back+' has a page');
-ok(!lineOf(other,things),'and is not told to fetch anything: they never left class');
+ok(!lineOf(other,things),'and is not sent to their locker: they are going back to class');
 ok(/Go back to your own class/.test(lineOf(other,/takes Sam Visitor/).t),
    'their line is the one they had: "'+lineOf(other,/takes Sam Visitor/).t.slice(0,70)+'"');
 
@@ -74,11 +77,11 @@ commitTour('2026-10-07',true,[],[],[{visitor:'Sam Visitor',to:away}]);
 clearReadCache_();
 pages=pagesOf();
 ok(pages.every(p=>!lineOf(p,things)),
-   'neither guide is told to fetch their things: both go back to class as they are');
+   'neither guide is sent to their locker: both go back to the class they left');
 ok(pages.some(p=>p.lines.some(l=>new RegExp('FOR '+away.toUpperCase()).test(l.t))),
    'and '+away+' gets their own block');
 ok(pages.every(p=>p.lines.every(l=>!(new RegExp('FOR '+away.toUpperCase()).test(l.t)&&
-   things.test(l.t)))),'which says nothing about the cafeteria either');
+   things.test(l.t)))),'which says nothing about a locker either');
 
 console.log('\nwhere the two of them share a class, both are told');
 const put=(name,pod,split)=>rows_(A).forEach((r,i)=>{
@@ -93,17 +96,37 @@ clearReadCache_();
 const c=handbackChoices_(wed).byVisitor[norm_('Sam Visitor')];
 ok(c.takers.length===2,'both of them take the family: '+c.takers.join(' and '));
 pages=pagesOf();
-ok(pages.every(p=>!!lineOf(p,things)),'both pages say to fetch their things');
+ok(pages.every(p=>!!lineOf(p,things)),'both pages send them to their locker');
 ok(pages.every(p=>/You and .* take Sam Visitor/
    .test((p.lines[p.lines.indexOf(lineOf(p,things))+1]||{}).t||'')),
    'each followed by the two of them taking the family in together');
 
-console.log('\nand the place is whatever Settings says');
-const at2=rows_(S).findIndex(r=>norm_(r[0])===norm_('Ambassadors Report To'))+2;
-m.sheets[S].getRange(at2,2).setValue('the co-lab');
-clearReadCache_();
-pages=pagesOf();
-ok(pages.every(p=>/back to the co-lab to get your things/.test(lineOf(p,things).t)),
-   'it reads: "'+lineOf(pages[0],things).t+'"');
+console.log('\nand nothing asks them to bring anything down');
+{
+  // The three places it was ever said: the route sheet, the locker slip
+  // and their own email. None of them says it now.
+  // Told to bring it, which is the old line. "You do not need to bring
+  // anything downstairs" is the new one and must not trip this.
+  const down=/bring (everything|anything) (you need|with you)/i;
+  ok(pages.every(p=>p.lines.every(l=>!down.test(l.t))),
+     'not on a route sheet');
+  global.__doc=[];
+  buildLockerSlips('2026-10-07');
+  const slips=global.__doc.map(o=>String(o.t||''));
+  ok(!slips.some(t=>down.test(t)),'not on a locker slip');
+  ok(slips.some(t=>/Nothing to bring down\. You can go to your locker after the tour\./
+     .test(t)),'which says the opposite: "'+
+     slips.filter(t=>/Nothing to bring down/.test(t))[0]+'"');
+  global.__sent.length=0;
+  sendStudentEmails('2026-10-07');
+  const mail=global.__sent.map(x=>String(x.htmlBody||'')
+    .replace(/<[^>]*>/g,' ').replace(/\s+/g,' '));
+  ok(mail.length>0,mail.length+' student email(s)');
+  ok(!mail.some(t=>down.test(t)),'and not in an email either');
+  const said=/You do not need to bring anything downstairs\. You can go to your locker after the tour\./;
+  ok(mail.every(t=>!/on the tour schedule/.test(t)||said.test(t)),
+     'every ambassador with a job is told so: "'+
+     ((mail.filter(t=>said.test(t))[0]||'').match(/You do not need[^.]*\.[^.]*\./)||[''])[0]+'"');
+}
 
-console.log('\ntheir things come with them.');
+console.log('\ntheir books stay in their locker.');

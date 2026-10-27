@@ -114,4 +114,32 @@ ok(theirs.length>0,theirs.length+' teacher email(s) name them');
 ok(theirs.some(x=>/8:15 AM - 8:45 AM/.test(String(x.htmlBody))),
    'with the window on the row');
 
+console.log('\nany greeter reads 8:15, whatever else they are down for');
+{
+  /* Nobody is given two jobs by the command, bar the panel covering the
+   * door, so the other way it happens is her own hand on the Tour
+   * Tracker: a second row against somebody who is already a guide. The
+   * earlier hour wins there too, on the slip and in their email. */
+  const t=m.sheets[T];
+  const row=blankRow_(T);
+  row[col_(T,'Tour Date')]=wed;
+  row[col_(T,'Ambassador')]='Blake Glenn';
+  row[col_(T,'Job')]=JOBS.LOBBY;
+  t.getRange(t.getLastRow()+1,1,1,row.length).setValues([row]);
+  clearReadCache_();
+  const two=lockerSlipData_(wed).filter(s=>s.name==='Blake Glenn')[0];
+  ok(two.jobs.length===2,'Blake Glenn is down for '+two.jobs.join(' and '));
+  ok(two.comeAt==='8:15 AM','their slip says come at '+two.comeAt);
+  ok(two.backBy==='9:05 AM','and back at '+two.backBy+', the later of the two');
+  global.__sent.length=0;
+  sendStudentEmails('2026-10-07');
+  const theirMail=mailTo('Blake Glenn');
+  ok(/come to the cafeteria at 8:15 AM/.test(theirMail),
+     'and their email says 8:15 AM as well');
+  ok(/back in class by 9:05 AM/.test(theirMail),'back at 9:05 AM');
+  ok(awayWindow_([JOBS.GUIDE,JOBS.LOBBY])==='8:15 AM - 9:05 AM',
+     'which is the window their teachers are given: '+
+     awayWindow_([JOBS.GUIDE,JOBS.LOBBY]));
+}
+
 console.log('\nthe door is covered before the first family is through it.');

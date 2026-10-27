@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-23 a';
+var BUILD_ = '2026-10-27 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -4761,13 +4761,16 @@ function buildRouteSheets(dateStr) {
         (handoff.landing || 'class') + ' with you. ' + handoffReceive_(page));
     } else if (sheet.guide) {
       /* The guide who takes the family into their own class walks out of
-       * the tour and straight into a period, and their bag, their books
-       * and their coat are all still where they left them at 8:25. So
-       * that comes first, in the same large type as the rest of it, and
-       * the class visit follows: one instruction, then the next. */
+       * the tour and straight into a period, so their books come first,
+       * in the same large type as the rest of it, and the class visit
+       * follows: one instruction, then the next.
+       *
+       * It used to send them to the cafeteria for them, because they
+       * brought everything down at 8:25. They do not bring anything down
+       * any more, so it is their locker they stop at, with the visitor. */
       if (takes) {
-        shout_(body, handoffAt + '   Bring your visitor back to ' + reportTo +
-          ' to get your things, then go to class.');
+        shout_(body, handoffAt + '   Stop at your locker with your visitor ' +
+          'if you need anything, then go to class.');
         shout_(body, handbackFor_(page, sheet.guide, dateVal));
       } else {
         shout_(body, handoffAt + '   ' + handbackFor_(page, sheet.guide, dateVal));
@@ -4935,10 +4938,12 @@ function buildLockerSlips(dateStr) {
     if (slip.working) {
       cell.appendParagraph(capitalize_(reportTo) + ' ' + (slip.comeAt || reportAt) +
         '. Back in class by ' + (slip.backBy || endTime) + '.');
-      // They go straight from the tour to their own class, so whatever
-      // they need for it has to come downstairs with them.
-      cell.appendParagraph('Bring everything you need for class with you to the ' +
-        reportTo + '.');
+      /* They used to be told to bring everything for class down with
+       * them, because they went straight from the tour into a lesson.
+       * They can go to their locker on the way instead, which is one
+       * less thing to carry round a tour. */
+      cell.appendParagraph('Nothing to bring down. You can go to your locker ' +
+        'after the tour.');
     } else {
       cell.appendParagraph('Stay in your class until the time below.');
     }
@@ -6072,6 +6077,8 @@ function sendStudentEmails(dateStr) {
           (working.length
             ? '<p><b>Please come to ' + escapeHtml_(reportTo) + ' at ' +
               escapeHtml_(comeAt) + '.</b></p>' +
+              '<p>You do not need to bring anything downstairs. You can go to ' +
+              'your locker after the tour.</p>' +
               '<p>You will be back in class by ' + escapeHtml_(backBy) + '. ' +
               'Your teachers already know you are out.</p>'
             : '')
