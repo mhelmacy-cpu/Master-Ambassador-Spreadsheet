@@ -809,9 +809,16 @@ morning before they reach the printer.
 
       AURELIA WALKER   (CCM - Marco)
       Wednesday, October 7
-      Tour Guide for Visitor 1 - route 1
+      Tour Guide for Visitor 1, with Charlotte Schwartz
       Cafeteria 8:25 AM. Back in class by 9:05 AM.
       Nothing to bring down. You can go to your locker after the tour.
+
+  **A tour guide is told who they are walking with**, on the slip and in
+  their own email, because finding out in the cafeteria on the morning is
+  half the fun gone. Guides only: a panel and a greeting crew are a group
+  of people standing in one place, and naming the rest of them is a list
+  nobody needs. A guide walking a family alone is told nothing, rather
+  than told about nobody.
 
 ## Is the editor running this script?
 

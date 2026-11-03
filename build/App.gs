@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-03 b';
+var BUILD_ = '2026-11-03 c';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -5160,8 +5160,41 @@ function passOffReceivers_(dateVal) {
   return out;
 }
 
+/**
+ * Who else is walking the same family, so a guide knows their partner
+ * before the morning rather than finding out in the cafeteria.
+ *
+ * Tour guides only. A panel and a greeting crew are a group of people
+ * standing in one place, and naming the rest of them on a slip is a list
+ * nobody needs; a guide spends the whole morning with one other person.
+ */
+function guidePartners_(assignments) {
+  const byVisitor = {};
+  [].concat(assignments || []).forEach(function (a) {
+    if (a.job !== JOBS.GUIDE || !trim_(a.visitor)) return;
+    const k = norm_(a.visitor);
+    (byVisitor[k] = byVisitor[k] || []).push(a.name);
+  });
+  return function (name, visitor) {
+    return (byVisitor[norm_(visitor)] || []).filter(function (n) {
+      return norm_(n) !== norm_(name);
+    });
+  };
+}
+
+/** "Tour Guide for Sam Visitor, with Charlotte Schwartz". */
+function jobLine_(job, partnerOf) {
+  let line = job.job + (job.visitor ? ' for ' + job.visitor : '');
+  if (job.job === JOBS.GUIDE && partnerOf) {
+    const with_ = partnerOf(job.name, job.visitor);
+    if (with_.length) line += ', with ' + with_.join(' and ');
+  }
+  return line;
+}
+
 function lockerSlipData_(dateVal) {
   const assignments = assignmentsOn_(dateVal);
+  const partnerOf = guidePartners_(assignments);
   const amb = {};
   ambassadors_().forEach(function (a) { amb[norm_(a.name)] = a; });
 
@@ -5203,8 +5236,9 @@ function lockerSlipData_(dateVal) {
       // of them gets sorted before it reaches the lockers.
       where: who ? [who.pod, who.advisor].filter(Boolean).join(' - ') : '',
       jobs: grouped[name].map(function (j) {
-        // Same as the email: the route is on the sheet they are handed.
-        return j.job + (j.visitor ? ' for ' + j.visitor : '');
+        // Same as the email: the route is on the sheet they are handed,
+        // and a guide is told who they are walking with.
+        return jobLine_(j, partnerOf);
       }),
       // When this one starts and when they are actually finished, which
       // is their own job's hours and not the tour's. A greeter is at the
@@ -6322,6 +6356,8 @@ function sendStudentEmails(dateStr) {
 
   const assignments = assignmentsOn_(dateVal);
   if (!assignments.length) return { sent: 0, skipped: [], note: 'Nothing staffed for that date yet.' };
+  // Who each guide is walking with, which is half the fun of the job.
+  const partnerOf = guidePartners_(assignments);
 
   const when = whenLabel_(dateVal);
   const byName = {};
@@ -6380,9 +6416,7 @@ function sendStudentEmails(dateStr) {
     // No route number here. They are given their route on paper on the
     // morning, and a number in an email the day before only confuses them.
     const items = jobs.map(function (j) {
-      let line = escapeHtml_(j.job);
-      if (j.visitor) line += ' for ' + escapeHtml_(j.visitor);
-      return '<li>' + line + '</li>';
+      return '<li>' + escapeHtml_(jobLine_(j, partnerOf)) + '</li>';
     }).join('');
 
     const passOff = handed.map(function (r) {
