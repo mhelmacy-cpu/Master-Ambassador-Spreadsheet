@@ -88,7 +88,18 @@ own" or "with Fia Heldebro Leon", and both rows of a pair show it.
 Changing it on either row changes the one pairing, and saving writes Tour
 With, which stays the record. The answer says what it did ("Adam
 Gingerich and Fia Heldebro Leon go round together now, on one pair of
-guides and one route").
+guides and one route"), because a pairing that did not happen has to look
+different from one that did.
+
+The column is **added when she first uses the dropdown** if it is not
+there yet, rather than the pairing being dropped on a sheet that has not
+had setup run since the paste. The answer says that too.
+
+A guide she picked on the row that stops having places of its own, in the
+same save that puts the two children together, lands on the places that
+now exist. She picks a guide on each row and then pairs them: both guides
+walk both children, which is the point, and neither pick is quietly
+lost.
 
 **Both children's guides come onto the tour**, rather than one set being
 dropped: giving Adam one guide and Fia another and then putting the two

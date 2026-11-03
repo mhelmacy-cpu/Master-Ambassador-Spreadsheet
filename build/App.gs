@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-03 d';
+var BUILD_ = '2026-11-03 e';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -3395,9 +3395,15 @@ function applySwaps_(plan, swaps, ignored) {
      * change if anything had already written her pick into the plan, so
      * where the dialog says which place it means, that is read instead. */
     if (x.slot !== undefined && x.slot !== null && trim_(x.visitor)) {
-      const p = plan.pairs.filter(function (q) {
-        return norm_(q.visitor.name) === norm_(x.visitor);
-      })[0];
+      const p = (function () {
+        const own = plan.pairs.filter(function (q) {
+          return norm_(q.visitor.name) === norm_(x.visitor);
+        })[0];
+        if (!own || !own.follows) return own;
+        return plan.pairs.filter(function (q) {
+          return norm_(q.visitor.name) === norm_(own.follows);
+        })[0] || own;
+      })();
       const standing = p ? p.guideNames[Number(x.slot)] : '';
       if (standing) {
         if (norm_(x.to) === norm_(standing)) {
@@ -3498,6 +3504,23 @@ function applySwaps_(plan, swaps, ignored) {
       p.guideNames.join(' and ') + '.';
   };
 
+  /* Where a family's guide places really are.
+   *
+   * Two children going round together share one set, kept on the row
+   * that leads, and the dialog only draws dropdowns there. But she can
+   * put them together in the same save as a guide she picked on the
+   * other row a moment earlier, and that pick has to land on the places
+   * that now exist rather than on a row that no longer has any. */
+  const pairFor = function (visitor) {
+    const p = plan.pairs.filter(function (q) {
+      return norm_(q.visitor.name) === norm_(visitor);
+    })[0];
+    if (!p || !p.follows) return p;
+    return plan.pairs.filter(function (q) {
+      return norm_(q.visitor.name) === norm_(p.follows);
+    })[0] || p;
+  };
+
   const out = [];
   list.forEach(function (x) {
     const who = x.drop ? null : byName[norm_(x.to)];
@@ -3509,9 +3532,7 @@ function applySwaps_(plan, swaps, ignored) {
        * Said and skipped, before anything tries to move them off the
        * place they are already standing in, which is this one. */
       if (x.add && !x.job) {
-        const already = plan.pairs.filter(function (q) {
-          return norm_(q.visitor.name) === norm_(x.visitor);
-        })[0];
+        const already = pairFor(x.visitor);
         if (already && already.guideNames.some(function (g) {
           return norm_(g) === norm_(who.name);
         })) {
@@ -3540,9 +3561,7 @@ function applySwaps_(plan, swaps, ignored) {
      * The other way round from a drop, and the same in reverse: the
      * family has a pair again and nothing else about them changes. */
     if (x.add && !x.job) {
-      const pair = plan.pairs.filter(function (p) {
-        return norm_(p.visitor.name) === norm_(x.visitor);
-      })[0];
+      const pair = pairFor(x.visitor);
       if (!pair) {
         throw new Error('Nobody called ' + trim_(x.visitor) + ' is visiting that day ' +
           'any more. Close this and run Staff This Wednesday Tour again.');
@@ -3622,9 +3641,7 @@ function applySwaps_(plan, swaps, ignored) {
       return;
     }
 
-    const pair = plan.pairs.filter(function (p) {
-      return norm_(p.visitor.name) === norm_(x.visitor);
-    })[0];
+    const pair = pairFor(x.visitor);
     if (!pair) {
       throw new Error('Nobody called ' + trim_(x.visitor) + ' is visiting that day any more. ' +
         'Close this and run Staff This Wednesday Tour again.');
@@ -4190,14 +4207,25 @@ function saveGroups_(dateVal, groups) {
   });
   if (!list.length) return [];
   const P = SHEETS.PROSPECTIVE;
+  const said = [];
+  /* Added here rather than waited for.
+   *
+   * It is a column setup adds, and she should not have to know that:
+   * saying two children go round together and having nothing happen,
+   * because a column she has never heard of is missing, is the worst
+   * kind of silence. */
+  if (optionalCol_(P, 'Tour With') === -1) {
+    ensureColumn_(P, 'Tour With');
+    clearReadCache_();
+    said.push('Tour With was added to Prospective Students, which is where who ' +
+      'goes round with whom is kept.');
+  }
   const col = optionalCol_(P, 'Tour With');
   if (col === -1) {
-    return ['There is no Tour With column on Prospective Students yet, so who ' +
-      'goes round with whom could not be saved. Run First-Time Setup once and it ' +
-      'is added.'];
+    return said.concat(['Tour With could not be added to Prospective Students, ' +
+      'so who goes round with whom was not saved.']);
   }
   const sheet = sheet_(P);
-  const said = [];
   const forget = function (name) {
     prospectiveFor_(dateVal).forEach(function (v) {
       if (norm_(v.name) !== norm_(name) &&
@@ -7773,6 +7801,11 @@ function showStaffDialog() {
     'Prospective Students."+(r.panel?"<br>Panel: "+r.panel.total+" ambassador(s)"+' +
     '(r.panel.added?", "+r.panel.added+" added":"")+(r.panel.removed?", "+r.panel.removed+' +
     '" taken off":"")+".":"")+' +
+    /* What putting two children together did, which is a change to
+     * Prospective Students rather than to the tracker and so is not in
+     * any of the counts above. Silence here is how a pairing that did
+     * not happen looked exactly like one that did. */
+    '((r.grouped&&r.grouped.length)?"<br>"+r.grouped.map(esc).join("<br>"):"")+' +
     '((r.swapped&&r.swapped.length)?"<br>"+r.swapped.map(function(w){' +
     'return (w.added?esc(w.to)+" added":' +
     '(w.to?esc(w.to)+" in place of "+esc(w.from):esc(w.from)+" taken off"+' +
