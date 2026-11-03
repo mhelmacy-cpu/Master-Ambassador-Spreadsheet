@@ -44,12 +44,12 @@ const tableOf=()=>{ global.__doc=[]; buildTourRoster('2026-10-07');
     if(cells.length){ tables.push(cells); cells=[]; } });
   if(cells.length) tables.push(cells);
   const flat=tables[0]||[];
-  const rows=[]; for(let i=0;i<flat.length;i+=5) rows.push(flat.slice(i,i+5));
+  const rows=[]; for(let i=0;i<flat.length;i+=6) rows.push(flat.slice(i,i+6));
   return {head:head,rows:rows,tables:tables}; };
 
 console.log('the roster has a column for them');
 let t=tableOf();
-ok(t.rows[0].join(' | ')==='Student | Name tag | Role | Class teacher | Advisor',
+ok(t.rows[0].join(' | ')==='Student | Name tag | Route | Role | Class teacher | Advisor',
    'the headings read: '+t.rows[0].join(' | '));
 const body=t.rows.slice(1);
 ok(body.length>1,body.length+' ambassadors on it');
@@ -74,16 +74,47 @@ clearReadCache_();
 t=tableOf();
 const theirs=t.rows.filter(r=>r[0]===away)[0];
 ok(!!theirs,away+' is on the roster: '+theirs.join(' | '));
-ok(theirs[2].indexOf(JOBS.PASSOFF)===0,'as a '+JOBS.PASSOFF);
+ok(theirs[3].indexOf(JOBS.PASSOFF)===0,'as a '+JOBS.PASSOFF);
 ok(theirs[1]==='','with no box, because they get their guide\'s tag at the door');
+ok(theirs[2]==='','and none for a route sheet either: they are given no route');
 const rest=t.rows.slice(1).filter(r=>r[0]!==away);
 ok(rest.every(r=>r[1]==='[    ]'),'everybody else still has one');
 ok(t.head.join(' ').indexOf(rest.length+' name tags')!==-1,
    'and the count leaves them out: "'+t.head[1]+'"');
 
+console.log('\nand a box for a route sheet, which is a guide\'s');
+{
+  const guides=t.rows.slice(1).filter(r=>/Tour Guide/.test(r[3]));
+  ok(guides.length>0,guides.length+' guide(s) on the roster');
+  ok(guides.every(r=>r[2]==='[    ]'),'each with a box for their route sheet');
+  const rest2=t.rows.slice(1).filter(r=>!/Tour Guide/.test(r[3]));
+  ok(rest2.every(r=>r[2]===''),'and nobody else has one: '+
+     rest2.map(r=>r[3]).join(', '));
+  ok(/route sheets? to hand out/.test(t.head.join(' ')),
+     'the top says how many: "'+t.head[1]+'"');
+  ok(((global.__docTables[0]||{}).widths||[])[2]>0,'the column is narrow too');
+}
+
 console.log('\nand the data behind it says the same');
 const data=tourRoster_(wed);
 ok(data.filter(r=>r.name===away)[0].needsTag===false,away+' needs no tag');
 ok(data.filter(r=>r.name!==away).every(r=>r.needsTag===true),'everybody else does');
+ok(data.filter(r=>/Tour Guide/.test(r.role)).every(r=>r.needsRoute===true),
+   'and a guide needs a route sheet');
+ok(data.filter(r=>!/Tour Guide/.test(r.role)).every(r=>r.needsRoute===false),
+   'where nobody else does');
+
+console.log('\nand there is a button for it');
+{
+  global.__dialogs.length=0;
+  showRosterDialog();
+  const html=String(global.__dialogs[0].html);
+  ok(/Print the tour roster/.test(html),'the dialog opens');
+  ok(/api_buildTourRoster/.test(html),'and builds the roster');
+  ok(typeof api_buildTourRoster==='function','which the script answers');
+  const src=fs.readFileSync('build/App.gs','utf8');
+  ok(/addItem\('Print the Tour Roster\.\.\.', 'showRosterDialog'\)/.test(src),
+     'and it is on the Wednesday Tours menu');
+}
 
 console.log('\ntick them off as you count them.');

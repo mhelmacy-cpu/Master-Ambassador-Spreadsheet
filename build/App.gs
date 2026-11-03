@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-03 e';
+var BUILD_ = '2026-11-03 f';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -6077,6 +6077,9 @@ function tourRoster_(dateVal) {
      * with the route and the clock. So they get a line on the roster like
      * everybody else, and no box to tick. */
     const needsTag = jobs.some(function (j) { return j.job !== JOBS.PASSOFF; });
+    /* A route sheet is a tour guide's. Nobody else is given one, so
+     * nobody else gets a box for it. */
+    const needsRoute = jobs.some(function (j) { return j.job === JOBS.GUIDE; });
     const role = jobs.map(function (j) {
       return j.job + (j.visitor ? ' for ' + j.visitor : '') +
         (j.route ? ' (route ' + j.route + ')' : '');
@@ -6106,6 +6109,7 @@ function tourRoster_(dateVal) {
       role: role,
       teacher: teacher,
       needsTag: needsTag,
+      needsRoute: needsRoute,
       advisor: who ? who.advisor : ''
     };
   });
@@ -6185,20 +6189,27 @@ function buildTourRoster(dateStr) {
   body.clear();
   body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING1);
   const tags = rows.filter(function (r) { return r.needsTag; }).length;
+  const sheets = rows.filter(function (r) { return r.needsRoute; }).length;
   body.appendParagraph(rows.length + ' ambassadors on duty. ' + tags +
-    ' name tag' + (tags === 1 ? '' : 's') + ' to count out.');
+    ' name tag' + (tags === 1 ? '' : 's') + ' to count out, ' + sheets +
+    ' route sheet' + (sheets === 1 ? '' : 's') + ' to hand out.');
 
-  /* A box against each name for their name tag, because the tags are
-   * counted out by hand the afternoon before and the roster is the one
-   * sheet that already lists everybody on duty, in one line each and in
-   * alphabetical order. It prints empty, to be ticked with a pen. */
-  const table = [['Student', 'Name tag', 'Role', 'Class teacher', 'Advisor']];
+  /* A box against each name for the two things that are handed out by
+   * hand on the morning: their name tag and, for a guide, their route
+   * sheet. Both are counted out the afternoon before, and this is the
+   * one sheet that already lists everybody on duty, in one line each and
+   * in alphabetical order. They print empty, to be ticked with a pen. */
+  const table = [['Student', 'Name tag', 'Route', 'Role', 'Class teacher', 'Advisor']];
   rows.forEach(function (r) {
-    table.push([r.name, r.needsTag ? TICK_BOX_ : '', r.role, r.teacher, r.advisor]);
+    table.push([r.name, r.needsTag ? TICK_BOX_ : '',
+      r.needsRoute ? TICK_BOX_ : '', r.role, r.teacher, r.advisor]);
   });
   const grid = body.appendTable(table);
-  // Narrow, since it holds a tick and nothing else.
-  if (grid.setColumnWidth) grid.setColumnWidth(1, 54);
+  // Narrow, since each holds a tick and nothing else.
+  if (grid.setColumnWidth) {
+    grid.setColumnWidth(1, 54);
+    grid.setColumnWidth(2, 54);
+  }
 
   /* And the same morning the other way round: every visiting family and
    * the class they are walked into at the end. The roster above has it a
@@ -6229,7 +6240,7 @@ function buildTourRoster(dateStr) {
 
   doc.saveAndClose();
   return { url: doc.getUrl(), name: title, rows: rows.length,
-    visits: visits.length };
+    tags: tags, sheets: sheets, visits: visits.length };
 }
 
 /**
@@ -7281,6 +7292,7 @@ function onOpen() {
     .addItem('Staff This Wednesday Tour...', 'showStaffDialog')
     .addItem('Print Tour Routes...', 'showRouteSheetDialog')
     .addItem('Print Locker Slips...', 'showLockerSlipDialog')
+    .addItem('Print the Tour Roster...', 'showRosterDialog')
     .addItem('Change Who Is Working...', 'showSwapDialog')
     .addItem('Confirm a Tour Afterwards...', 'showConfirmDialog')
     .addItem('Make a Check In Sheet...', 'showCheckInDialog')
@@ -8215,6 +8227,45 @@ function showLockerSlipDialog() {
 }
 
 /**
+ * The roster, on demand.
+ *
+ * It goes out with every send already, but that is an email and the
+ * morning wants it on paper: one line per ambassador, with a box for
+ * their name tag and a box for a guide's route sheet, to tick off as she
+ * hands them out, and every family's class visit underneath.
+ */
+function showRosterDialog() {
+  const next = nextTourDate_();
+  const html =
+    '<style>' + DIALOG_CSS_ + '</style>' +
+    '<h2>Print the tour roster</h2>' +
+    '<p class="sub">Everybody on duty, one line each, with a box to tick as you ' +
+    'hand out their name tag and, for a guide, their route sheet. The class ' +
+    'visits are underneath it, one line per visiting family. Opens as a Google ' +
+    'Doc.</p>' +
+    '<label for="d">Tour date</label>' +
+    '<input type="date" id="d" value="' + (next ? dateKey_(next) : nextWednesday()) + '">' +
+    '<div style="margin-top:14px;"><button id="go" onclick="make()">Build the document</button></div>' +
+    '<div id="out"></div>' +
+    '<script>' + DIALOG_JS_ +
+    'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
+    'function make(){document.getElementById("go").disabled=true;' +
+    'document.getElementById("out").innerHTML="<p class=\'muted\'>Building...</p>";' +
+    'google.script.run.withSuccessHandler(function(r){' +
+    'document.getElementById("go").disabled=false;' +
+    'document.getElementById("out").innerHTML="<div class=\'free\'><b>"+r.rows+' +
+    '" ambassador(s) on it.</b> "+r.tags+" name tag(s) and "+r.sheets+' +
+    '" route sheet(s) to hand out"+(r.visits?", and "+r.visits+" class visit(s)":"")+' +
+    '".<br><a href=\'"+r.url+"\' target=\'_blank\'>Open "+esc(r.name)+' +
+    '"</a><br><span class=\'muted\'>It is in your Drive. File &rsaquo; Print.</span></div>";})' +
+    '.withFailureHandler(function(e){document.getElementById("go").disabled=false;' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";})' +
+    '.api_buildTourRoster(document.getElementById("d").value);}' +
+    '<\/script>';
+  dialog_(html, 'Print the Tour Roster', 600, 470);
+}
+
+/**
  * Change who is working a tour that is already staffed.
  *
  * The whole roster for the day, each person shown with everybody who is
@@ -8670,6 +8721,7 @@ function showCheckDialog() {
 }
 
 function api_buildLockerSlips(dateStr) { return buildLockerSlips(dateStr); }
+function api_buildTourRoster(dateStr) { return buildTourRoster(dateStr); }
 function api_buildRouteSheets(dateStr) { return buildRouteSheets(dateStr); }
 /**
  * Who is free for a job on a date, so she can fill it herself before

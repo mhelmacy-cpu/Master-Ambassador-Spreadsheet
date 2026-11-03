@@ -792,7 +792,7 @@ answer into a Google Doc for printing or forwarding.
 
 ## Printouts
 
-Two documents, both built as Google Docs so they can be corrected on the
+Three documents, all built as Google Docs so they can be corrected on the
 morning before they reach the printer.
 
 - **Print Tour Routes** - one page per tour guide, addressed to them by
@@ -825,6 +825,12 @@ morning before they reach the printer.
   The 5th grade class visit buddies are left out, the same as the emails
   - they are told in person, and their instructions print on the
   visitor's route sheet.
+
+- **Print the Tour Roster** - everybody on duty, one line each, with a
+  box to tick as she hands out their name tag and, for a guide, their
+  route sheet. The class visits are underneath it, one line per visiting
+  family. It is the same document that goes out with every send, so the
+  button is only a way of having it without sending anything.
 
       AURELIA WALKER   (CCM - Marco)
       Wednesday, October 7
@@ -1092,12 +1098,12 @@ would do without filling her inbox with the same message thirty times.
 Every send, test or real, and the automatic teacher send on Tuesday and
 Wednesday morning, also builds a Google Doc and mails her the link:
 
-    7 ambassadors on duty. 6 name tags to count out.
+    7 ambassadors on duty. 6 name tags to count out, 3 route sheets to hand out.
 
-    Student                Name tag  Role                        Class teacher   Advisor
-    Afia-Kusiwaa Twumasi   [    ]    Lobby Greeter               Lila, Eliza     Eliza
-    Aurelia Walker         [    ]    Tour Guide for Sam Visitor  Jeremiah        Marco
-    Camille Bedeau                   Pass Off for Sam Visitor    Oliver          Oliver
+    Student                Name tag  Route   Role                        Class teacher  Advisor
+    Afia-Kusiwaa Twumasi   [    ]            Lobby Greeter               Lila, Eliza    Eliza
+    Aurelia Walker         [    ]    [    ]  Tour Guide for Sam Visitor  Jeremiah       Marco
+    Camille Bedeau                           Pass Off for Sam Visitor    Oliver         Oliver
 
 One line per ambassador on duty, so the office has in one place what the
 emails only say one person at a time. The 5th grade buddies are not on
@@ -1118,13 +1124,19 @@ been picked for yet, which is the line she needs to see:
     Kit Visitor       Alexander Rogoff (5th grade)  Spanish in M209     Mary Katherine
     Nia Visitor       nobody yet                    -
 
-**A box for their name tag** against each name, printed empty to be
-ticked with a pen, because the tags are counted out by hand the afternoon
-before and this is the one sheet that already lists everybody on duty, in
-one line each and in alphabetical order. The heading says how many to
-count out. Somebody who is only being handed a family at the end gets a
-line but no box: the guide hands them their own tag at the door, with the
-route and the clock.
+**A box for each of the two things handed out by hand**, printed empty to
+be ticked with a pen: their name tag, and, for a tour guide, their route
+sheet. Both are counted out the afternoon before and this is the one
+sheet that already lists everybody on duty, in one line each and in
+alphabetical order. The heading says how many of each. Somebody who is
+only being handed a family at the end gets a line but no boxes at all:
+the guide hands them their own tag at the door, with the route and the
+clock. Nobody but a guide is given a route sheet, so nobody else has that
+box either.
+
+**Print the Tour Roster** on the menu builds it on demand, for the same
+reason the other two printouts have buttons: it is wanted on paper on the
+morning, not only in an inbox the night before.
 
 The redirect works inside `mailOptions_`, which every message is built
 by, so a send cannot get past it - and it is cleared in a `finally`, so

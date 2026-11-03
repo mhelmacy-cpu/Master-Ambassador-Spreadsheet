@@ -101,8 +101,8 @@ ok(nia[1]==='nobody yet','it says "'+nia[1]+'"');
 ok(nia[2]==='-','with nothing to say about the class');
 
 console.log('\nthe roster above is untouched');
-const roster=rowsOf(page.tables[0],5);
-ok(roster[0].join(' | ')==='Student | Name tag | Role | Class teacher | Advisor',
+const roster=rowsOf(page.tables[0],6);
+ok(roster[0].join(' | ')==='Student | Name tag | Route | Role | Class teacher | Advisor',
    'still: '+roster[0].join(' | '));
 ok(roster.length-1===page.r.rows,page.r.rows+' ambassadors on it');
 
