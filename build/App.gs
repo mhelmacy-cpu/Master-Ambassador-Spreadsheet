@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-03 a';
+var BUILD_ = '2026-11-03 b';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -2419,6 +2419,7 @@ function planTour(dateStr, keepExisting) {
    * route off that row. */
   const groups = visitorGroups_(visitors);
   const leaderOf = groups.leaderOf;
+  const withMe = groups.withMe;
   const groupProblems = groups.problems;
   const byVisitorName = groups.byName;
 
@@ -2441,8 +2442,24 @@ function planTour(dateStr, keepExisting) {
     const wantGrades = usableGrades_(guideGradesFor_(v.grade, perVisitor), pool);
     const needsSoC = needsSoCGuide_(v.race);
 
-    // Already paired on a previous run: left exactly as it is.
-    const had = kept && kept.guides[norm_(v.name)];
+    /* Already paired on a previous run: left exactly as it is.
+     *
+     * Where she has just put two students together, both children's
+     * guides come onto the group rather than one set being dropped. She
+     * gave Adam a guide and Fia a guide and then said the two of them go
+     * round together: what she means is all four walking as one, not one
+     * of the guides quietly going home. */
+    const had = (function () {
+      if (!kept) return null;
+      const own = (kept.guides[norm_(v.name)] || []).slice();
+      const mine = own.slice();
+      (withMe[norm_(v.name)] || []).forEach(function (follow) {
+        (kept.guides[follow] || []).forEach(function (g) {
+          if (!mine.some(function (x) { return norm_(x) === norm_(g); })) mine.push(g);
+        });
+      });
+      return mine;
+    })();
     if (had && had.length) {
       const asAmb = had.map(function (n) {
         return byAmbName[norm_(n)] || { name: n, grade: '', gender: '', presenting: '' };
@@ -3423,8 +3440,11 @@ function applySwaps_(plan, swaps, ignored) {
     p.guideNames.forEach(function (g, k) { if (norm_(g) === norm_(name)) i = k; });
     if (i === -1) return '';
     if (p.guideNames.length < 2) {
-      throw new Error(name + ' is the only guide ' + at.visitor + ' has. Give them ' +
-        'somebody else first, or ' + at.visitor + ' is left with nobody.');
+      throw new Error(name + ' is the only guide ' + at.visitor + ' has, so moving ' +
+        'them would leave ' + at.visitor + ' with nobody. If you want both ' +
+        'children to go round together, on the same guides and the same route, ' +
+        'set "goes round" to "with ' + at.visitor + '" on the other one\'s row ' +
+        'instead. Otherwise give ' + at.visitor + ' somebody else first.');
     }
     p.guideNames.splice(i, 1);
     p.guides.splice(i, 1);
@@ -3729,7 +3749,7 @@ function refreshClassVisits_(dateVal) {
 }
 
 /** Writes a plan to the Tour Tracker and back onto Prospective Students. */
-function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
+function commitTour(dateStr, keepExisting, panelists, swaps, handoffs, groups) {
   /* The panel is written before anything is worked out.
    *
    * The greeting crew downstairs comes off the panel, so the panel has to
@@ -3739,6 +3759,13 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
    */
   const panelFirst = savePanel_(toDate_(dateStr) || nextTourDate_(), panelists, null);
   if (panelFirst) clearReadCache_();
+
+  /* Who goes round with whom, before anything is worked out: the pairing
+   * decides whose row the guide places are on and how many routes are
+   * handed out, so it has to be on the sheet before the planning reads
+   * it. */
+  const grouped = saveGroups_(toDate_(dateStr) || nextTourDate_(), groups);
+  if (grouped.length) clearReadCache_();
 
   const plan = planTour(dateStr, keepExisting);
   /* What the dialog asked for, and anything it asked for that could not
@@ -3873,6 +3900,31 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
     tracker.getRange(tracker.getLastRow() + 1, 1, out.length, out[0].length).setValues(out);
     tracker.getRange(2, col_(N, 'Tour Date') + 1, tracker.getLastRow() - 1, 1)
       .setNumberFormat('yyyy-mm-dd');
+  }
+
+  /* The route on every guide row, kept in step with the plan.
+   *
+   * A row is only written once, so a family whose route has since
+   * changed went on carrying the old number: putting two children
+   * together gave them one route everywhere except on the tracker, which
+   * is what the printouts and the emails read. */
+  {
+    const rcol = optionalCol_(N, 'Route');
+    if (rcol !== -1) {
+      const want = {};
+      plan.pairs.forEach(function (p) { want[norm_(p.visitor.name)] = trim_(p.route); });
+      let moved = 0;
+      clearReadCache_();
+      rows_(N).forEach(function (r, i) {
+        if (!sameDay_(toDate_(r[col_(N, 'Tour Date')]), dateVal)) return;
+        if (trim_(r[col_(N, 'Job')]) !== JOBS.GUIDE) return;
+        const v = norm_(r[col_(N, 'Prospective Student(s)')]);
+        if (want[v] === undefined || trim_(r[rcol]) === want[v]) return;
+        tracker.getRange(i + 2, rcol + 1).setValue(want[v]);
+        moved++;
+      });
+      if (moved) clearReadCache_();
+    }
   }
 
   /* A row for whoever is handed a family at the end. They have a real
@@ -4074,8 +4126,79 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
 
   return {
     written: out.length, panel: panel, plan: plan, swapped: swapped,
-    asked: asked, ignored: ignored
+    asked: asked, ignored: ignored, grouped: grouped
   };
+}
+
+/**
+ * Who goes round with whom, as she set it in the dialog.
+ *
+ * Tour With on Prospective Students is the record, so this writes that
+ * column: the dialog is only a nicer way of filling it in than typing a
+ * name into a cell. It runs before the tour is planned, because the
+ * pairing decides the guide places and the route.
+ *
+ * The pairing is one fact about two children, so it is kept in the plain
+ * shape every time: whatever named either of them before is cleared
+ * first, and then one cell names the other. That is what stops a chain
+ * forming out of two separate changes.
+ */
+function saveGroups_(dateVal, groups) {
+  const list = [].concat(groups || []).filter(function (g) {
+    return g && trim_(g.visitor) && (trim_(g.with) || g.alone);
+  });
+  if (!list.length) return [];
+  const P = SHEETS.PROSPECTIVE;
+  const col = optionalCol_(P, 'Tour With');
+  if (col === -1) {
+    return ['There is no Tour With column on Prospective Students yet, so who ' +
+      'goes round with whom could not be saved. Run First-Time Setup once and it ' +
+      'is added.'];
+  }
+  const sheet = sheet_(P);
+  const said = [];
+  const forget = function (name) {
+    prospectiveFor_(dateVal).forEach(function (v) {
+      if (norm_(v.name) !== norm_(name) &&
+          norm_(v.tourWith) !== norm_(name)) return;
+      if (!trim_(v.tourWith)) return;
+      sheet.getRange(v.row, col + 1).setValue('');
+    });
+    clearReadCache_();
+  };
+  list.forEach(function (g) {
+    const here = prospectiveFor_(dateVal);
+    const byName = {};
+    here.forEach(function (v) { byName[norm_(v.name)] = v; });
+    const mine = byName[norm_(g.visitor)];
+    if (!mine) return;
+    if (g.alone) {
+      const was = trim_(mine.tourWith) ||
+        (here.filter(function (v) {
+          return norm_(v.tourWith) === norm_(mine.name);
+        })[0] || {}).name || '';
+      forget(mine.name);
+      if (was) said.push(mine.name + ' and ' + was + ' go round on their own now.');
+      return;
+    }
+    const other = byName[norm_(g.with)];
+    if (!other) {
+      said.push('Nobody called "' + trim_(g.with) + '" is visiting that day, so ' +
+        mine.name + ' was left as they were.');
+      return;
+    }
+    if (norm_(other.name) === norm_(mine.name)) return;
+    // Already the two of them, whichever row says so.
+    if (norm_(mine.tourWith) === norm_(other.name) ||
+        norm_(other.tourWith) === norm_(mine.name)) return;
+    forget(mine.name);
+    forget(other.name);
+    sheet.getRange(mine.row, col + 1).setValue(other.name);
+    clearReadCache_();
+    said.push(mine.name + ' and ' + other.name +
+      ' go round together now, on one pair of guides and one route.');
+  });
+  return said;
 }
 
 /**
@@ -7218,6 +7341,27 @@ function showStaffDialog() {
      * One dropdown per guide on the pair, and one empty dropdown for
      * every place still to fill. With nothing suggested that is all of
      * them, which is the point: she picks each one. */
+    /* Who this family goes round with, which is hers to set here rather
+     * than by typing a name into Tour With on the sheet. Picking the same
+     * guide on two families is the natural way to ask for it and cannot
+     * work on its own, since one body cannot walk two routes, so the
+     * question is asked plainly instead.
+     *
+     * Both rows of a pair show it, and changing it on either row changes
+     * the one pairing. Saving writes it to Tour With, which stays the
+     * record. */
+    'function groupPicker(x){var pr=window.__pairs||[];' +
+    'if(pr.length<2){return "";}' +
+    'var with_=x.follows||((x.withVisitors||[])[0]||"");' +
+    'var h="<select class=\'tsel\' data-pair=\'"+x.order+"\'>";' +
+    'h+="<option value=\'\'>"+(with_?"with "+esc(with_):"on their own")+"</option>";' +
+    'if(with_){h+="<option value=\'-\'>on their own</option>";}' +
+    'pr.forEach(function(o){' +
+    'if(o.visitor.name===x.visitor.name){return;}' +
+    'if(with_&&o.visitor.name===with_){return;}' +
+    'h+="<option value=\'"+esc(o.visitor.name)+"\'>with "+esc(o.visitor.name)+' +
+    '"</option>";});' +
+    'return "<br><span class=\'muted\'>goes round </span>"+h+"</select>";}' +
     /* The guide places for one family, or, where she has put two
      * students on one pair of guides, a line saying whose row to change
      * them on. The places are on the row that leads, once, because the
@@ -7462,7 +7606,8 @@ function showStaffDialog() {
     '(x.visitor.grade?" <span class=\'muted\'>grade "+esc(x.visitor.grade)+"</span>":"")+' +
     '(x.visitor.race?" <span class=\'muted\'>"+esc(x.visitor.race)+"</span>":"")+' +
     '(x.priority?" <b class=\'yel\'>"+esc(x.priority)+"</b>":"")+' +
-    '(x.visitor.school?" <span class=\'muted\'><br>("+esc(x.visitor.school)+")</span>":"")+"</td><td>"+' +
+    '(x.visitor.school?" <span class=\'muted\'><br>("+esc(x.visitor.school)+")</span>":"")+' +
+    'groupPicker(x)+"</td><td>"+' +
     'guidePicker(x)+' +
     '(x.anyGrade?"<br><span class=\'muted\'>no grade on this visitor, so any grade was ' +
     'used</span>":(x.wantGrades&&x.wantGrades.length?"<br><span class=\'muted\'>looking for ' +
@@ -7560,7 +7705,17 @@ function showStaffDialog() {
     '+"</div>";})' +
     '.withFailureHandler(fail).api_commitTour(document.getElementById("d").value,' +
     'document.getElementById("keep").checked,panelPicked(),swapsPicked(),' +
-    'handoffsPicked());}' +
+    'handoffsPicked(),groupsPicked());}' +
+    /* Who she has said goes round with whom. "on their own" sends the
+     * pairing off rather than nothing, or there would be no way to undo
+     * one. */
+    'function groupsPicked(){var out=[];' +
+    'var sels=document.querySelectorAll("select.tsel");' +
+    'for(var i=0;i<sels.length;i++){var v=sels[i].value;if(!v){continue;}' +
+    'var x=pairOf(Number(sels[i].getAttribute("data-pair")));if(!x){continue;}' +
+    'if(v==="-"){out.push({visitor:x.visitor.name,alone:true});continue;}' +
+    'out.push({visitor:x.visitor.name,with:v});}' +
+    'return out;}' +
     'function panelPicked(){var out=[];var f=window.__free||[];' +
     'var boxes=document.querySelectorAll("input.pan");' +
     'for(var i=0;i<boxes.length;i++){if(boxes[i].checked){' +
@@ -8517,8 +8672,8 @@ function api_classVisitPreview(dateStr, families) {
   });
   return { cap: landed.cap, byVisitor: out, problems: landed.problems || [] };
 }
-function api_commitTour(dateStr, keep, panelists, swaps, handoffs) {
-  return commitTour(dateStr, keep, panelists, swaps, handoffs);
+function api_commitTour(dateStr, keep, panelists, swaps, handoffs, groups) {
+  return commitTour(dateStr, keep, panelists, swaps, handoffs, groups);
 }
 /**
  * One test click gives her every version that will really go out.

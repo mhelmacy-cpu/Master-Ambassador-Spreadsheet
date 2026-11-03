@@ -60,11 +60,10 @@ to hand a family to.
 
 A blank column never means the family gets nobody.
 
-**Tour With: two students on one pair of guides.** Put the other
-student's name in it and the two of them go round together. Either row
-will do; naming each other on both is fine as well, and whoever is higher
-up the sheet leads. What they share is **the guides and the route, and
-nothing else**:
+**Tour With: two students on one tour.** Put the other student's name in
+it and the two of them go round together. Either row will do; naming each
+other on both is fine as well, and whoever is higher up the sheet leads.
+What they share is **the guides and the route, and nothing else**:
 
 - The guide places are on the leading row, once, because the two children
   share them. The other row says "going round with Sam Visitor" and shows
@@ -82,6 +81,25 @@ nothing else**:
 - The **route sheet is one sheet per guide**, not two: both children on
   the header, the walk printed once, the locker line once because it is
   the guide's own, and then each child's 9:06 under their own name.
+
+**She sets it in the staffing dialog**, not by hunting for the column:
+every family's row carries a "goes round" dropdown, reading "on their
+own" or "with Fia Heldebro Leon", and both rows of a pair show it.
+Changing it on either row changes the one pairing, and saving writes Tour
+With, which stays the record. The answer says what it did ("Adam
+Gingerich and Fia Heldebro Leon go round together now, on one pair of
+guides and one route").
+
+**Both children's guides come onto the tour**, rather than one set being
+dropped: giving Adam one guide and Fia another and then putting the two
+of them together means all four walking as one, which is what she meant
+by it. Where that leaves more guides than **Tour Guides Per Visiting
+Student**, they all stay, and "nobody" on a place takes one off.
+
+Picking the same guide on two families is the other way to ask for this,
+and it cannot work on its own, because one body cannot walk two routes.
+It was a dead end that told her to give the other family somebody else
+first, which is not what she wanted. It now names the dropdown instead.
 
 A name in Tour With that matches nobody visiting that day is reported in
 the dialog by name and the student goes round alone, because a pairing
@@ -371,6 +389,12 @@ sees what she has done.
 ### Reference sheets
 Bell Schedule 5, Bell Schedule 6, Bell Schedule 7, Bell Schedule 8,
 Teachers, Tour Routes, Settings.
+
+The **Route** on a guide row is kept in step with the plan on every save.
+A row is written once, so a family whose route has since changed went on
+carrying the old number: putting two children together gave them one
+route everywhere except on the tracker, which is what the printouts and
+the emails read.
 
 **Tour Routes** holds the seven walks, one itinerary per route, and it is
 seeded once and never rewritten, because she edits it. **The Co-Lab is
