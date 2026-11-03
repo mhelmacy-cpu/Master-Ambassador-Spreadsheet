@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-03 c';
+var BUILD_ = '2026-11-03 d';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -197,7 +197,10 @@ var DEFAULT_SETTINGS = [
   ['Guide Grades for Rising 7', '6 and 7'],
   ['Guide Grades for Rising 8', '7 and 8'],
   ['Max Families Per Route', '1'],
-  ['Max Visitors Per Class', '3'],
+  /* Not a limit: nothing is ever refused or moved because of it. It is
+   * the number of visitors in one class above which the dialog says so,
+   * and she decides what to do about it. */
+  ['Warn Above Visitors Per Class', '3'],
   ['Class Visit Handoff Time', '9:06'],
   ['Wait For', 'Maren']
 ];
@@ -1374,6 +1377,44 @@ function setupRoutes_() {
  * setting works off its default and she can never see it, let alone
  * change it.
  */
+/**
+ * The old name for a setting, renamed in place on her own sheet.
+ *
+ * It was called Max Visitors Per Class, which read like a limit and was
+ * never one: nothing was refused or moved because of it. The number is
+ * hers and is kept; only the name changes, so the Settings sheet says
+ * what it really does.
+ */
+var SETTING_RENAMES_ = [
+  { from: 'Max Visitors Per Class', to: 'Warn Above Visitors Per Class' }
+];
+
+function refreshSettingNames_() {
+  const s = sheet_(SHEETS.SETTINGS);
+  if (s.getLastRow() < 2) return [];
+  const said = [];
+  SETTING_RENAMES_.forEach(function (r) {
+    const rows = s.getRange(2, 1, s.getLastRow() - 1, 2).getValues();
+    let at = -1;
+    let already = false;
+    rows.forEach(function (row, i) {
+      if (norm_(row[0]) === norm_(r.from)) at = i + 2;
+      if (norm_(row[0]) === norm_(r.to)) already = true;
+    });
+    if (at === -1) return;
+    if (already) {
+      // Both there: the new one is the one being read, so the old row is
+      // only something to be puzzled by.
+      s.deleteRow(at);
+    } else {
+      s.getRange(at, 1).setValue(r.to);
+    }
+    said.push(r.from + ' is now called ' + r.to);
+  });
+  if (said.length) clearReadCache_();
+  return said;
+}
+
 function ensureSettings_() {
   const s = sheet_(SHEETS.SETTINGS);
   if (s.getLastRow() < 2) return 0;
@@ -1391,7 +1432,7 @@ function ensureSettings_() {
 
 function setupSettings_() {
   const s = sheet_(SHEETS.SETTINGS);
-  if (s.getLastRow() > 1) { ensureSettings_(); return; }
+  if (s.getLastRow() > 1) { refreshSettingNames_(); ensureSettings_(); return; }
   // Plain text, or Sheets reads "6 and 6" style values as dates and the
   // grades come back as a day and a year.
   s.getRange(2, 2, Math.max(DEFAULT_SETTINGS.length, 200), 1).setNumberFormat('@');
@@ -4402,8 +4443,12 @@ function classLabel_(what) {
  * Each pair sends its visitor to one of its two guides' classes. Left to
  * itself that piles them up: four pairs whose guides all sit in the same
  * Humanities section put four visitors in one teacher's room. So the
- * choice is made across the tour, keeping each class under Max Visitors
- * Per Class, and preferring an academic room where both are free.
+ * choice is made across the tour, counting how many land in each room
+ * and preferring an academic one where both guides are free.
+ *
+ * The count is never a limit. Nothing is refused and nothing is moved
+ * because of it: it is said, above the number in Warn Above Visitors Per
+ * Class, and what to do about it is hers.
  *
  * It never changes who is guiding. The only thing it decides is which of
  * the two already on the pair walks the family to class.
@@ -4452,7 +4497,11 @@ function handbackChoices_(dateVal) {
  * or a plan she is still looking at and has not saved.
  */
 function handbackAllocate_(dateVal, entries) {
-  const cap = Number(setting_('Max Visitors Per Class', '3')) || 3;
+  /* The old name for it is read as well, for a sheet setup has not
+   * renamed yet, so the number she set is never quietly replaced by the
+   * default. */
+  const cap = Number(setting_('Warn Above Visitors Per Class',
+    setting_('Max Visitors Per Class', '3'))) || 3;
   const startMin = toMinutes_(setting_('Class Visit Handoff Time', '9:06'));
   const endMin = toMinutes_(setting_('Tour End Time', '9:25'));
   const amb = {};
@@ -4757,6 +4806,8 @@ function handbackAllocate_(dateVal, entries) {
       return {
         name: o.name, where: o.where.label, teacher: o.where.teacher,
         job: o.job, count: load[o.where.key] || 0,
+        // How many are going there already, so she can see it. Nothing
+        // is refused for being over the number she asked to be warned at.
         full: (load[o.where.key] || 0) >= cap,
         same: !guiding[norm_(o.name)] && !!hereKey && o.where.key === hereKey,
         own: !!guiding[norm_(o.name)],
@@ -4798,8 +4849,8 @@ function handbackPlan_(page, dateVal) {
   const where = {};
   names.forEach(function (n) { where[n] = classLabel_(classOf(n)); });
 
-  /* What was decided for this family across the whole tour, so no one
-   * teacher is given more visitors than Max Visitors Per Class allows.
+  /* What was decided for this family across the whole tour, which is
+   * also how the count in one class is known and said.
    *
    * This is read first, before anything is worked out from the guides'
    * own schedules, because a family she has handed to somebody else has
@@ -7454,7 +7505,7 @@ function showStaffDialog() {
     'hb+="<option value=\'\'>"+esc(x.buddy.name)+" hosts them (as it is)</option>";' +
     'o.forEach(function(c,k){hb+="<option value=\'"+k+"\'>"+esc(c.name)+" - "+' +
     'esc(c.where)+(c.teacher?" ("+esc(c.teacher)+")":"")+", "+c.count+" there"+' +
-    '(c.full?" - full":"")+(c.own?" - their own guide":"")+' +
+    '(c.own?" - their own guide":"")+' +
     '(c.fifth?" - 5th grade class visit":' +
     '(c.job||c.own?"":" - not on this tour"))+"</option>";});' +
     'return hb+"</select>";}' +
@@ -7470,9 +7521,9 @@ function showStaffDialog() {
     ':"<br><b>where this family goes at 9:06 cannot be worked out. Their guide ' +
     'needs Homeroom, Split and Grade on the Ambassadors sheet, or send the family ' +
     'to somebody below.</b>");' +
-    'if(v&&v.over){h+="<br><b class=\'yel\'>that class has "+v.count+' +
-    '" visitors, more than the limit of "+window.__cap+". Hand this family to ' +
-    'somebody in another class below.</b>";}' +
+    'if(v&&v.over){h+="<br><b class=\'yel\'>that class is getting "+v.count+' +
+    '" visitors.</b> <span class=\'muted\'>Which is fine if you want it. To ' +
+    'spread them out, hand this family to somebody in another class below.</span>";}' +
     'if(!o.length){return h;}' +
     'h+="<br><select class=\'hsel\' data-pair=\'"+x.order+"\'>";' +
     'h+="<option value=\'\'>"+(v?esc(v.takers.join(" and "))+" takes them (as it is)"' +
@@ -7487,7 +7538,7 @@ function showStaffDialog() {
     'esc((x.guideNames||[]).join(" and "))+" take them together</option>";}' +
     'o.forEach(function(c,k){h+="<option value=\'"+k+"\'>"+esc(c.name)+" - "+' +
     'esc(c.where)+(c.teacher?" ("+esc(c.teacher)+")":"")+", "+c.count+" there"+' +
-    '(c.full?" - full":"")+(c.same?" - same room":"")+' +
+    '(c.same?" - same room":"")+' +
     '(c.own?" - their own guide":"")+' +
     '(c.fifth?" - 5th grade class visit":(c.job||c.own?"":" - not on this tour"))+' +
     '"</option>";});' +
@@ -7690,11 +7741,13 @@ function showStaffDialog() {
     '<div class=\'panel\'>";' +
     'p.classLoad.forEach(function(c){h+="<div>"+(c.over?"<b class=\'yel\'>":"")+' +
     'esc(c.label)+(c.teacher?" ("+esc(c.teacher)+")":"")+": "+c.count+" visitor"+' +
-    '(c.count===1?"":"s")+(c.over?" - more than the limit of "+p.classCap+"</b>":"")+' +
+    '(c.count===1?"":"s")+(c.over?" - more than the "+p.classCap+" you asked to ' +
+    'be told about</b>":"")+' +
     '" <span class=\'muted\'>"+esc(c.visitors.join(", "))+"</span></div>";});' +
-    'h+="</div><span class=\'muted\'>Nothing is moved for you. Where a class has ' +
-    'too many, use the dropdown on that family above to hand them to somebody in ' +
-    'another class. The limit is Max Visitors Per Class on Settings.</span>";}' +
+    'h+="</div><span class=\'muted\'>Nothing here is stopped and nothing is moved ' +
+    'for you: a class can take as many as you send it. To spread them out, use the ' +
+    'dropdown on that family above. The number you are told about is Warn Above ' +
+    'Visitors Per Class on Settings.</span>";}' +
     'if(p.overallMix){h+="<h3>Everyone assigned ("+p.assignedCount+")</h3><div class=\'muted\'>"+' +
     'esc(p.overallMix)+(p.overallRaceMix?"<br>"+esc(p.overallRaceMix):"")+"</div>";}' +
     'h+="</div>";' +

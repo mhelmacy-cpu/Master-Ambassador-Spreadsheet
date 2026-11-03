@@ -464,10 +464,18 @@ their own guides' classes; where she has handed them off it is somebody
 else's.
 
 The script counts how many families land in each teacher's room and
-reports it, and **it never moves anybody to even them out**. A class
-over `Max Visitors Per Class` on Settings (3) is flagged in the
-staffing dialog, on that family's own row and in a summary of every
-class taking visitors. Fixing it is hers.
+reports it, and **it never moves anybody to even them out, and never
+refuses one**. The count is a warning, not a limit: above
+`Warn Above Visitors Per Class` on Settings (3) the staffing dialog says
+so on that family's own row ("that class is getting 4 visitors. Which is
+fine if you want it. To spread them out, hand this family to somebody in
+another class below") and in a summary of every class taking visitors.
+What to do about it is hers, including nothing.
+
+That setting was called `Max Visitors Per Class`, which read like a rule
+and never was one. Setup renames the row on her own sheet, keeping
+whatever number she had set, and the old name is read as well until it
+does.
 
 Every family gets a hand-off dropdown listing everybody else who could
 take them, each with the room they would be in and how many are there
