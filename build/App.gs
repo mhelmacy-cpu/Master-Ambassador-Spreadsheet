@@ -35,7 +35,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-10-27 b';
+var BUILD_ = '2026-11-03 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -49,7 +49,8 @@ var CONTACT_COLUMNS_ = ['Student Email', 'Parent 1 Name', 'Parent 1 Email',
 
 /** Written by the script after a tour is staffed or confirmed. */
 var COUNT_COLUMNS_ = ['Signed Up', 'Confirmed', 'Jobs Done'];
-HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'School', 'Grade', 'Gender', 'Race', 'Borough',
+HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'Tour With', 'School', 'Grade', 'Gender',
+  'Race', 'Borough',
   'Full Pay', 'Well Connected', 'Class Visit', 'Route', 'Tour Guides', 'Class Buddy',
   'Class Visit To', 'Pass Off', 'Notes'];
 HEADERS[SHEETS.APART] = ['Ambassador', 'And', 'Notes'];
@@ -555,6 +556,9 @@ function setupSpreadsheet() {
   if (ensureColumn_(SHEETS.PROSPECTIVE, 'Pass Off', YES_NO)) {
     added.push('Pass Off on Prospective Students');
   }
+  if (ensureColumn_(SHEETS.PROSPECTIVE, 'Tour With')) {
+    added.push('Tour With on Prospective Students');
+  }
   COUNT_COLUMNS_.forEach(function (h) {
     if (ensureColumn_(SHEETS.AMBASSADORS, h)) added.push(h + ' on Ambassadors');
   });
@@ -713,6 +717,14 @@ function setupProspective_() {
     'For a rising 5th grader you can instead pick one of the 5th grade ' +
     'language classes. A 5th grader from that class collects them from the ' +
     'guides and walks them to ' + endPlace_() + ' at the end.');
+  note_(s, SHEETS.PROSPECTIVE, 'Tour With',
+    'To send two visiting students round together, on one pair of guides, ' +
+    'put the other one\'s name here. Either row will do: naming them on one ' +
+    'is enough, and naming each other on both is fine too.\n\n' +
+    'They share the guides and the route. Everything else stays each ' +
+    'student\'s own, the class visit included, so you can still send one of ' +
+    'them to a different class at the end.\n\n' +
+    'Leave it blank and they go round on their own, which is the usual way.');
   note_(s, SHEETS.PROSPECTIVE, 'Full Pay',
     'Yes on either this or Well Connected and their guides are picked from the ' +
     'High Strength ambassadors first. It never overrides the grade, gender or ' +
@@ -2161,6 +2173,9 @@ function prospectiveFor_(dateVal) {
       grade: trim_(r[col_(N, 'Grade')]).replace(/[^0-9]/g, ''),
       gender: trim_(r[col_(N, 'Gender')]),
       race: trim_(cell_(r, N, 'Race')),
+      /* The other visiting student this one goes round with, where she
+       * has put two of them on one pair of guides. */
+      tourWith: trim_(cell_(r, N, 'Tour With')),
       classVisit: trim_(cell_(r, N, 'Class Visit')),
       classVisitTo: trim_(cell_(r, N, 'Class Visit To')),
       passOff: isYes_(cell_(r, N, 'Pass Off')),
@@ -2170,6 +2185,62 @@ function prospectiveFor_(dateVal) {
     });
   });
   return out;
+}
+
+/**
+ * Who goes round with whom, off Tour With on Prospective Students.
+ *
+ * Two visiting students on one pair of guides share the guides and the
+ * route and nothing else. Naming it on one of the two rows is enough,
+ * and naming each other on both is fine: whoever is higher up the sheet
+ * leads, so it reads the same way round either way.
+ *
+ * Returns the leader of each follower, the followers of each leader, and
+ * anything she typed that cannot be acted on, because a group that
+ * silently did not happen is a pair of guides walking one child while
+ * another waits in the lobby.
+ */
+function visitorGroups_(visitors) {
+  const leaderOf = {};
+  const withMe = {};
+  const problems = [];
+  const byName = {};
+  visitors.forEach(function (v) { byName[norm_(v.name)] = v; });
+  visitors.forEach(function (v) {
+    const said = trim_(v.tourWith);
+    if (!said) return;
+    const other = byName[norm_(said)];
+    if (!other) {
+      problems.push('"' + said + '" is in Tour With for ' + v.name +
+        ', but nobody of that name is visiting that day. Check the spelling, or ' +
+        'empty the cell. They are going round on their own.');
+      return;
+    }
+    if (norm_(other.name) === norm_(v.name)) {
+      problems.push(v.name + ' is in their own Tour With, which cannot be. ' +
+        'They are going round on their own.');
+      return;
+    }
+    const mine = norm_(v.name);
+    const theirs = norm_(other.name);
+    const lead = other.row < v.row ? theirs : mine;
+    const follow = lead === mine ? theirs : mine;
+    if (leaderOf[follow] && leaderOf[follow] !== lead) {
+      problems.push(byName[follow].name + ' is named in more than one Tour With. ' +
+        'They are going round with ' + byName[leaderOf[follow]].name + '.');
+      return;
+    }
+    if (leaderOf[lead]) {
+      problems.push(v.name + ' and ' + other.name + ' point at each other through ' +
+        'somebody else, which cannot be worked out. Put the two of them in one ' +
+        'Tour With and leave the rest blank.');
+      return;
+    }
+    if (leaderOf[follow] === lead) return;      // both rows name each other
+    leaderOf[follow] = lead;
+    (withMe[lead] = withMe[lead] || []).push(follow);
+  });
+  return { leaderOf: leaderOf, withMe: withMe, problems: problems, byName: byName };
 }
 
 /** The 5th graders available to host, from the Buddies sheet. */
@@ -2339,10 +2410,25 @@ function planTour(dateStr, keepExisting) {
     return { route: route, shared: shared };
   };
 
+  /* ---- two students on one pair of guides ----
+   *
+   * Tour With on Prospective Students names the other student: they go
+   * round together, on one pair of guides and one route, and everything
+   * else stays each student's own, the class visit included. The one
+   * higher up the sheet leads, and the other reads the guides and the
+   * route off that row. */
+  const groups = visitorGroups_(visitors);
+  const leaderOf = groups.leaderOf;
+  const groupProblems = groups.problems;
+  const byVisitorName = groups.byName;
+
   // A family marked Full Pay or Well Connected is paired before the
   // others, so the High ambassadors are still there to give them. The
-  // list is put back in sheet order afterwards.
-  const order = visitors.map(function (v, i) { return { v: v, i: i }; });
+  // list is put back in sheet order afterwards. A student going round
+  // with somebody else is left out of the pairing altogether: their
+  // guides and their route come off the row that leads.
+  const order = visitors.map(function (v, i) { return { v: v, i: i }; })
+    .filter(function (e) { return !leaderOf[norm_(e.v.name)]; });
   order.sort(function (a, b) {
     const pa = isPriorityVisitor_(a.v) ? 0 : 1;
     const pb = isPriorityVisitor_(b.v) ? 0 : 1;
@@ -2595,6 +2681,39 @@ function planTour(dateStr, keepExisting) {
             chosen.map(function (a) { return a.name; }))
         : ''
     };
+  });
+
+  /* The students going round with somebody else, each reading their
+   * guides and their route off the row that leads.
+   *
+   * They are a family like any other from here on: their own row in the
+   * preview, their own class visit, their own rows on the Tour Tracker.
+   * The only two things they do not have of their own are the two she
+   * asked to share. */
+  const leadPair = {};
+  pairs.forEach(function (p) { leadPair[norm_(p.visitor.name)] = p; });
+  Object.keys(leaderOf).forEach(function (follow) {
+    const lead = leadPair[leaderOf[follow]];
+    const v = byVisitorName[follow];
+    if (!lead || !v) return;
+    lead.withVisitors = (lead.withVisitors || []).concat([v.name]);
+    pairs.push({
+      visitor: v,
+      order: visitors.indexOf(v),
+      follows: lead.visitor.name,
+      guides: lead.guides.slice(),
+      guideNames: lead.guideNames.slice(),
+      guideSolo: (lead.guideSolo || []).slice(),
+      // Theirs is not the row the guides are picked on, so nothing about
+      // the pairing rules is reported against it twice.
+      wantGrades: [], needsSoC: false, anyGrade: false,
+      guideMix: '', guideRead: '', strengths: '', stretched: '',
+      priority: priorityWhy_(v),
+      weakGuide: false,
+      route: lead.route, routeShared: lead.routeShared,
+      socMet: '', genderMet: '', socShortfall: false, genderShortfall: false,
+      short: 0, why: 'going round with ' + lead.visitor.name
+    });
   });
 
   // Back into the order she typed them in, whatever order they were
@@ -2897,7 +3016,12 @@ function planTour(dateStr, keepExisting) {
   });
 
   const everyone = [];
-  pairs.forEach(function (p) { p.guideNames.forEach(function (g) { everyone.push(g); }); });
+  // A student going round with somebody else shares those guides, so
+  // counting them again would say four guides are out when two are.
+  pairs.forEach(function (p) {
+    if (p.follows) return;
+    p.guideNames.forEach(function (g) { everyone.push(g); });
+  });
   greeters.forEach(function (c) { c.chosen.forEach(function (n) { everyone.push(n); }); });
 
   return {
@@ -2916,6 +3040,7 @@ function planTour(dateStr, keepExisting) {
     classLoad: landing.byClass,
     classCap: landing.cap,
     warnings: setupWarnings_(all, visitors).concat(landing.problems || [])
+      .concat(groupProblems)
   };
 }
 
@@ -3238,6 +3363,10 @@ function applySwaps_(plan, swaps, ignored) {
   const taken = {};
   const standing = {};
   plan.pairs.forEach(function (p) {
+    /* A student going round with somebody else has no places of their
+     * own: those guides stand on the row that leads, and that is the
+     * row anything about them has to be done to. */
+    if (p.follows) return;
     (p.guideNames || []).forEach(function (g) {
       taken[norm_(g)] = true;
       standing[norm_(g)] = { kind: 'guide', visitor: p.visitor.name };
@@ -3622,6 +3751,23 @@ function commitTour(dateStr, keepExisting, panelists, swaps, handoffs) {
     });
   const ignored = [];
   const swapped = applySwaps_(plan, swaps, ignored);
+  /* A student going round with somebody else reads their guides off the
+   * row that leads, so whatever she just changed there has to reach them
+   * before any of it is written. The two of them share those guides: a
+   * swap on the one row is a swap for both children. */
+  {
+    const lead = {};
+    plan.pairs.forEach(function (p) { if (!p.follows) lead[norm_(p.visitor.name)] = p; });
+    plan.pairs.forEach(function (p) {
+      const with_ = p.follows && lead[norm_(p.follows)];
+      if (!with_) return;
+      p.guideNames = with_.guideNames.slice();
+      p.guides = with_.guides.slice();
+      p.guideSolo = (with_.guideSolo || []).slice();
+      p.route = with_.route;
+      p.swapped = with_.swapped;
+    });
+  }
   clearReadCache_();               // the tracker is about to change
   const dateVal = toDate_(plan.date);
   const N = SHEETS.TRACKER;
@@ -4025,6 +4171,7 @@ function routeSheetData_(dateVal) {
   buddies_().forEach(function (b) { buddyIndex[norm_(b.name)] = b; });
   const ambIndex = {};
   ambassadors_().forEach(function (a) { ambIndex[norm_(a.name)] = a; });
+  const groups = visitorGroups_(visitors);
 
   return visitors.map(function (v) {
     const mine = assignments.filter(function (a) { return norm_(a.visitor) === norm_(v.name); });
@@ -4038,9 +4185,14 @@ function routeSheetData_(dateVal) {
     const routeNo = trim_(readCell_(P, v.row, 'Route')) ||
       (mine.length ? trim_(mine[0].route) : '');
     const route = routes[routeNo] || { direction: '', itinerary: '' };
+    /* Two students she has put on one pair of guides walk one route
+     * together, so their pages are one page. Both land on the same key,
+     * whichever of the two rows she filled in: the leader's name. */
+    const group = groups.leaderOf[norm_(v.name)] || norm_(v.name);
     return {
       visitor: v, guides: guides, buddy: buddy,
       buddyName: buddyRow ? buddyRow.name : '',
+      group: group,
       routeNo: routeNo, direction: route.direction,
       lines: route.itinerary.split('\n').map(function (x) { return trim_(x); }).filter(Boolean)
     };
@@ -4665,17 +4817,29 @@ function say_(body, text, bold) {
  */
 function routeSheetPages_(dateVal) {
   const out = [];
+  const seen = {};
   routeSheetData_(dateVal).forEach(function (page) {
     const names = page.guides.map(function (g) { return g.replace(/\s*\(.*$/, ''); });
     if (!names.length) {
-      out.push({ page: page, guide: '', others: [] });
+      out.push({ page: page, guide: '', others: [], also: [] });
       return;
     }
     names.forEach(function (n) {
-      out.push({
-        page: page, guide: n,
+      /* Two students going round together are one walk, so the guide
+       * gets one sheet with both of them on it rather than two sheets
+       * with the same route printed twice. Each child keeps their own
+       * 9:06, because the class visit is each child's own. */
+      const key = page.group + '|' + norm_(n);
+      if (seen[key]) {
+        seen[key].also.push(page);
+        return;
+      }
+      const made = {
+        page: page, guide: n, also: [],
         others: names.filter(function (x) { return x !== n; })
-      });
+      };
+      seen[key] = made;
+      out.push(made);
     });
   });
   // Route order, then by visitor, so the two copies of a route sit together.
@@ -4718,21 +4882,31 @@ function buildRouteSheets(dateStr) {
     say_(body, 'Route ' + (page.routeNo || '-') +
       (page.direction ? ' (' + page.direction + ')' : '') + '   -   ' + longDate_(dateVal));
 
-    const about = [];
-    if (page.visitor.school) about.push('from ' + page.visitor.school);
-    if (page.visitor.grade) about.push('applying for grade ' + page.visitor.grade);
-    say_(body, 'You are taking: ' + page.visitor.name +
-      (about.length ? ' (' + about.join(', ') + ')' : ''), true);
+    /* Every student on this walk: one of them usually, two where she has
+     * put them on one pair of guides. */
+    const mineToday = [page].concat(sheet.also || []);
+    say_(body, 'You are taking: ' + mineToday.map(function (pg) {
+      const about = [];
+      if (pg.visitor.school) about.push('from ' + pg.visitor.school);
+      if (pg.visitor.grade) about.push('applying for grade ' + pg.visitor.grade);
+      return pg.visitor.name + (about.length ? ' (' + about.join(', ') + ')' : '');
+    }).join(' and '), true);
+    if (mineToday.length > 1) {
+      say_(body, 'The two of them go round together, on this one route.');
+    }
     if (sheet.others.length) {
       say_(body, 'With you: ' + sheet.others.join(' and '));
     } else if (!sheet.guide) {
       say_(body, 'No tour guide has been assigned yet.', true);
     }
     say_(body, 'Be in ' + reportTo + ' at ' + reportAt + '.');
-    if (page.buddy) {
-      say_(body, 'Class visit at the end: ' + page.buddyName + ' - ' +
-        page.buddy.language + ' with ' + page.buddy.teacher + ' in ' + page.buddy.room + '.');
-    }
+    mineToday.forEach(function (pg) {
+      if (!pg.buddy) return;
+      say_(body, 'Class visit at the end' +
+        (mineToday.length > 1 ? ' for ' + pg.visitor.name : '') + ': ' +
+        pg.buddyName + ' - ' + pg.buddy.language + ' with ' + pg.buddy.teacher +
+        ' in ' + pg.buddy.room + '.');
+    });
 
     say_(body, 'YOUR WALK', true);
 
@@ -4751,6 +4925,18 @@ function buildRouteSheets(dateStr) {
      * guide's own class. The first two end the same way, so they are
      * written the same way: what happens, what to hand over, and then
      * the block for whoever is receiving them. */
+    /* The locker is the guide's own, so it is said once however many
+     * children they are taking in. Each child's own 9:06 follows. */
+    const anyTakes = mineToday.some(function (pg) {
+      return !pg.buddy &&
+        handbackPlan_(pg, dateVal).takers.indexOf(sheet.guide) !== -1;
+    });
+    if (sheet.guide && anyTakes) {
+      shout_(body, handoffAt + '   Stop at your locker with your visitor ' +
+        'if you need anything, then go to class.');
+    }
+    mineToday.forEach(function (page) {
+    if (mineToday.length > 1) say_(body, page.visitor.name.toUpperCase(), true);
     const handoff = handbackPlan_(page, dateVal);
     const takes = handoff.takers.indexOf(sheet.guide) !== -1;
     /* Handed over only where nobody on this pair is taking the family.
@@ -4785,14 +4971,10 @@ function buildRouteSheets(dateStr) {
        * It used to send them to the cafeteria for them, because they
        * brought everything down at 8:25. They do not bring anything down
        * any more, so it is their locker they stop at, with the visitor. */
-      if (takes) {
-        shout_(body, handoffAt + '   Stop at your locker with your visitor ' +
-          'if you need anything, then go to class.');
-        shout_(body, handbackFor_(page, sheet.guide, dateVal));
-      } else {
-        shout_(body, handoffAt + '   ' + handbackFor_(page, sheet.guide, dateVal));
-      }
+      shout_(body, (takes ? '' : handoffAt + '   ') +
+        handbackFor_(page, sheet.guide, dateVal));
     }
+    });
   });
 
   doc.saveAndClose();
@@ -7036,7 +7218,17 @@ function showStaffDialog() {
      * One dropdown per guide on the pair, and one empty dropdown for
      * every place still to fill. With nothing suggested that is all of
      * them, which is the point: she picks each one. */
+    /* The guide places for one family, or, where she has put two
+     * students on one pair of guides, a line saying whose row to change
+     * them on. The places are on the row that leads, once, because the
+     * two children share them: a dropdown on each row would be two ways
+     * of changing one thing. */
     'function guidePicker(x){var sp=window.__spare||[],h="";' +
+    'if(x.follows){' +
+    'return "<span class=\'muted\'>going round with <b>"+esc(x.follows)+"</b>, on the ' +
+    'same guides and the same route</span>"+(x.guideNames.length?"<br>"+' +
+    'esc(x.guideNames.join(" and ")):"<br><span class=\'muted\'>pick their guides on ' +
+    '"+esc(x.follows)+"\'s row above</span>");}' +
     'if(!sp.length){return "<b>nobody on the Ambassadors sheet can guide</b>";}' +
     'x.guideNames.forEach(function(g,j){' +
     'h+="<select class=\'gsel\' data-pair=\'"+x.order+"\' data-slot=\'"+j+"\' ' +
@@ -7176,10 +7368,17 @@ function showStaffDialog() {
     /* Every family's class visit, worked out again from what the
      * dropdowns say now, so the line underneath and the hand-off list
      * follow her as she switches people about. */
+    /* Whose dropdowns say who is walking this family: their own, or,
+     * for a student going round with somebody else, the row that leads.
+     * Without this their class visit went blank the moment she touched a
+     * guide, because their own row has no dropdowns to read. */
+    'function leadOf(x){var pr=window.__pairs||[];if(!x.follows){return x;}' +
+    'for(var i=0;i<pr.length;i++){' +
+    'if(pr[i].visitor.name===x.follows){return pr[i];}}return x;}' +
     'function cvRefresh(){var pr=window.__pairs||[],fams=[];' +
     'pr.forEach(function(x){if(x.buddy){' +
     'fams.push({visitor:x.visitor.name,guides:[]});return;}' +
-    'fams.push({visitor:x.visitor.name,guides:namesNow(x)});});' +
+    'fams.push({visitor:x.visitor.name,guides:namesNow(leadOf(x))});});' +
     'if(!fams.length){return;}' +
     'google.script.run.withSuccessHandler(cvShow).withFailureHandler(function(){})' +
     '.api_classVisitPreview(document.getElementById("d").value,fams);}' +
@@ -7198,7 +7397,7 @@ function showStaffDialog() {
     'x.classBoth=!!one.classBoth;' +
     'var view={};for(var k in x){if(Object.prototype.hasOwnProperty.call(x,k)){' +
     'view[k]=x[k];}}' +
-    'var now=namesNow(x);if(now.length){view.guideNames=now;}' +
+    'var now=namesNow(leadOf(x));if(now.length){view.guideNames=now;}' +
     'box.innerHTML=classVisitLine(view);});}' +
     'function relabel(key){var x=pairOf(key),sp=window.__spare||[];if(!x){return;}' +
     'cvRefresh();' +
@@ -7255,6 +7454,11 @@ function showStaffDialog() {
     'if(p.keptAnything){h+="<p class=\'muted\'>"+(p.newPairs?p.newPairs+" student(s) staffed now; ":' +
     '"nothing new to staff; ")+"everything else is left exactly as it was.</p>";}' +
     'p.pairs.forEach(function(x){h+="<tr><td>"+esc(x.visitor.name)+' +
+    /* Said on both rows, so a pair she put together is plain from either
+     * end of it rather than only from the one she typed. */
+    '((x.withVisitors&&x.withVisitors.length)?" <span class=\'muted\'>+ "+' +
+    'esc(x.withVisitors.join(" and "))+"</span>":"")+' +
+    '(x.follows?" <span class=\'muted\'>with "+esc(x.follows)+"</span>":"")+' +
     '(x.visitor.grade?" <span class=\'muted\'>grade "+esc(x.visitor.grade)+"</span>":"")+' +
     '(x.visitor.race?" <span class=\'muted\'>"+esc(x.visitor.race)+"</span>":"")+' +
     '(x.priority?" <b class=\'yel\'>"+esc(x.priority)+"</b>":"")+' +

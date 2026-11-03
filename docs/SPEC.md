@@ -56,10 +56,41 @@ usually one of them: their class cannot be worked out, so there is nowhere
 to hand a family to.
 - **Full Pay / Well Connected** blank: an ordinary family.
 - **Class Visit** blank: no class visit.
+- **Tour With** blank: they go round on their own, which is the usual way.
 
 A blank column never means the family gets nobody.
 
-    Name | School | Gender | Borough | Grade
+**Tour With: two students on one pair of guides.** Put the other
+student's name in it and the two of them go round together. Either row
+will do; naming each other on both is fine as well, and whoever is higher
+up the sheet leads. What they share is **the guides and the route, and
+nothing else**:
+
+- The guide places are on the leading row, once, because the two children
+  share them. The other row says "going round with Sam Visitor" and shows
+  the guides it is reading off that row, so it is plain from either end.
+- **The class visit stays each child's own.** They start out walking into
+  the same class, which is what two children with the same two guides
+  means, and either one can be sent to a different class from their own
+  row in the dialog. The limit per class counts them as the two visitors
+  they are.
+- Each child keeps their own rows on the Tour Tracker, so each is a full
+  record of who was walking whom, and nothing downstream has to know
+  about the pairing. A guide walking two children has two Tour Guide
+  rows, which is what their slip and their email say ("Tour Guide for Sam
+  Visitor", "Tour Guide for Kit Visitor").
+- The **route sheet is one sheet per guide**, not two: both children on
+  the header, the walk printed once, the locker line once because it is
+  the guide's own, and then each child's 9:06 under their own name.
+
+A name in Tour With that matches nobody visiting that day is reported in
+the dialog by name and the student goes round alone, because a pairing
+that silently did not happen is a pair of guides walking one child while
+another waits in the lobby. So is a chain (A with B, B with C), which
+cannot be worked out: the two of them go in one Tour With and the rest
+stays blank.
+
+    Tour Date | Name | Tour With | School | Grade | Gender | Race | Borough
 
 Grade is the one addition to what was asked for: guide pairing matches on
 borough, grade and gender, so without it the grade rule cannot run.
