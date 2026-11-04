@@ -175,11 +175,10 @@ themselves do not move: the guides leave the cafeteria at 8:30, the
 visitors go to class at 9:06 and the morning ends at 9:25, whatever the
 day, and the panel and the greeting crews keep their hours too.
 
-**What does not follow the day yet:** the two automatic reminder sends
-are still pinned to Tuesday 8:30am and noon, and Wednesday 7:45am. For a
-tour on another day, send by hand from **Send Emails Now** (which always
-sends for the date in the box), or ask for the reminders to follow the
-tour date.
+The automatic sends follow the tour too, at the hours they have always
+gone out: the day before at 8:30am to teachers and noon to students, and
+the morning of at 7:45am to both. See "Following the tour, not the
+weekday".
 
 ### Routes for a day
 The seven routes on her sheet are Wednesday's: they walk past the classes
@@ -998,8 +997,12 @@ Two audiences, on separate schedules.
 
 ### Teachers and advisors - two sends
 
-    Tuesday    8:30 AM
-    Wednesday  7:45 AM
+    the day before     8:30 AM
+    the morning of     7:45 AM
+
+Counted from the tour, not from a Wednesday. A Wednesday tour writes on
+Tuesday at 8:30 and Wednesday at 7:45, as it always did; a Tuesday tour
+writes on Monday and Tuesday, at the same hours.
 
 Every ambassador on the Tour Tracker is treated the same, whatever the
 job - a panelist gets their own email, their advisor hears, and so does
@@ -1017,8 +1020,8 @@ them hears once:
 
 ### Students - two sends
 
-    Tuesday   12:00 PM
-    Wednesday  7:45 AM
+    the day before    12:00 PM
+    the morning of     7:45 AM
 
 One round: the student's own job, and to be in the cafeteria at 8:25,
 or 8:15 where they are on a greeting crew. A greeter reads 8:15 whatever
@@ -1037,7 +1040,32 @@ slips leave it out for the same reason.
 
 The same message goes out on two different days, so it never says a
 flat "today". It reads Today, Tomorrow, or the weekday by name, worked
-out from when it is actually being sent.
+out from when it is actually being sent. Which is also what makes a tour
+on any day of the week read correctly.
+
+### Following the tour, not the weekday
+
+Each of the four sends has a function of its own and **runs every day**,
+and when it runs it looks for the tour it belongs to: the morning-of
+sends want a tour today, the first sends want a tour whose day before is
+today. On a day with no tour to write about, nothing is sent and nothing
+is said. Nothing has to be switched over when the day of a tour changes.
+
+Which day it is reads off the tour's own date, so what it is for never
+depends on the minute Google happens to run it at.
+
+- **A Monday tour's first send goes out on the Friday**, because the day
+  before it is a Sunday and nobody reads a Sunday email. The wording
+  follows the day it is really sent, so it says "Monday, November 9"
+  rather than "tomorrow".
+- **A week with two tours in it gets both.** Every tour date on the
+  tracker is looked at, not only the next one, so a Tuesday tour and a
+  Wednesday tour share the Tuesday morning: 7:45 is the Tuesday tour's
+  and 8:30 is the Wednesday tour's.
+- Turning the reminders on **replaces** whatever was installed before,
+  the old Tuesday and Wednesday triggers included. **Check This Script**
+  says which sends are on and warns if any of the old pair are still
+  there.
 
 ### Timing in practice
 
@@ -1045,13 +1073,13 @@ Apps Script takes whole hours, so the times that are not on the hour use
 `nearMinute`, and Google runs every time-based trigger within about
 fifteen minutes either side of the time asked for. So:
 
-    Tuesday 8:30 AM ->  roughly 8:15 - 8:45 AM
-    Tuesday noon    ->  roughly 11:45 AM - 12:15 PM
-    Wednesday 7:45  ->  roughly 7:30 - 8:00 AM
+    the day before, 8:30 AM  ->  roughly 8:15 - 8:45 AM
+    the day before, noon     ->  roughly 11:45 AM - 12:15 PM
+    the morning of, 7:45     ->  roughly 7:30 - 8:00 AM
 
-Tuesday's two sends are three and a half hours apart, so the teachers
-always hear well before the students. The Wednesday send is the tight
-one: at the late end it arrives 8:00 AM, still twenty-five minutes before
+The first two are three and a half hours apart, so the teachers always
+hear well before the students. The morning-of send is the tight one: at
+the late end it arrives 8:00 AM, still twenty-five minutes before
 ambassadors are due in the cafeteria at 8:25.
 
 ### One email per teacher
@@ -1128,13 +1156,14 @@ teacher. Untick it to send for real.
 A test runs **both sends**, each worded for the day it goes out, so one
 click shows everything that will really arrive:
 
-    [TEST - Students, Tuesday 12:00 PM] Your Tour Job - Tomorrow
-    [TEST - Students, Wednesday 7:45 AM] Your Tour Job - Today
+    [TEST - Students, the day before at 12:00 PM] Your Tour Job - Tomorrow
+    [TEST - Students, the morning of at 7:45 AM] Your Tour Job - Today
 
-**Every Tuesday email** and **Every Wednesday email** are two buttons
-of their own. Each sends the whole postbag for that day to her and
-nowhere else: students and teachers together, one email per person, no
-sampling. It is always a test whatever the tick boxes above it say. The
+**Every email the day before** and **Every email on the morning** are
+two buttons of their own, named for where they sit against the tour
+rather than for a weekday. Each sends the whole postbag for that send to
+her and nowhere else: students and teachers together, one email per
+person, no sampling. It is always a test whatever the tick boxes above it say. The
 result is one summary, broken down by who would have heard:
 
     13 to ambassadors
@@ -1142,8 +1171,8 @@ result is one summary, broken down by who would have heard:
     1 to the teachers whose class they walk out of
     1 to the teachers whose class they walk into
 
-Asked for a weekday nothing goes out on, it says so by name rather than
-sending nothing quietly.
+Asked for a send that has nothing in it, it says so rather than sending
+nothing quietly.
 
 **Every one of them** is a second tick box beside Test. Still a test,
 still only to her, but one email per person rather than one per job, for

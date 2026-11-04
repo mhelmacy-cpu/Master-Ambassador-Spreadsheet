@@ -381,7 +381,7 @@ function makeMock() {
         onWeekDay: function (d) { made.day = d; return api; },
         atHour: function (h) { made.hour = h; return api; },
         nearMinute: function (m) { made.minute = m; return api; },
-        everyDays: function () { return api; },
+        everyDays: function (n) { made.days = n; return api; },
         create: function () { global.__triggers.push(made); return made; }
       };
       return api;

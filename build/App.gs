@@ -17,8 +17,10 @@
  *      pairs each visitor with two guides, gives each pair one of that
  *      day's routes, and picks the greeters. It does NOT pick panelists
  *      - it lists who is still free so you can.
- *   3. Emails go out on their own: teachers Tuesday 8:30am and Wednesday
- *      7:45am, students Tuesday noon and Wednesday 7:45am.
+ *   3. Emails go out on their own, counted from the tour and not from a
+ *      Wednesday: teachers the day before at 8:30am and the morning of
+ *      at 7:45am, students the day before at noon and the morning of at
+ *      7:45am.
  */
 
 /* =========================================================
@@ -42,7 +44,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-04 a';
+var BUILD_ = '2026-11-04 b';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -4628,8 +4630,8 @@ function saveGroups_(dateVal, groups) {
  * The panel she ticked, written to the tracker.
  *
  * She picks the panel herself, so this only records it - but recording
- * it is what puts those ambassadors in the Tuesday and Wednesday
- * emails along with everybody else, which is the whole point.
+ * it is what puts those ambassadors in both sends, the day before and
+ * the morning of, along with everybody else, which is the whole point.
  *
  * Only the names she was offered are hers to take off again. Anyone
  * typed straight onto the tracker who is not on the Ambassadors sheet
@@ -6598,9 +6600,9 @@ function buildTourRoster(dateStr) {
 /**
  * The roster, mailed to whoever is running this.
  *
- * It goes with every send - the manual button, test or real, and the
- * automatic teacher send on Tuesday and Wednesday morning - so there is
- * always a copy of who was doing what that day.
+ * It goes with every send - the manual button, test or real, and both
+ * automatic teacher sends - so there is always a copy of who was doing
+ * what that day.
  */
 function mailTourRoster_(dateVal) {
   let r = null;
@@ -6627,21 +6629,36 @@ function mailTourRoster_(dateVal) {
 /* =========================================================
  * Emails
  *
- * Teachers and advisors hear twice: Tuesday 8:30am and Wednesday 7:45am.
- * Students hear twice: Tuesday noon and Wednesday 7:45am. The same
- * wording serves all of them, so it never says a flat
- * "today" - it works that out from the day it is actually sent.
+ * Teachers and advisors hear twice: the day before the tour at 8:30am
+ * and the morning of it at 7:45am. Students hear twice: the day before
+ * at noon and the morning of at 7:45am. The same wording serves all of
+ * them, so it never says a flat "today" - it works that out from the day
+ * it is actually sent, which is why a tour on any day of the week reads
+ * correctly.
  * ========================================================= */
 
 /**
- * The day a test run is pretending it is, so she can read the Tuesday
- * wording and the Wednesday wording without waiting for either.
+ * The day a test run is pretending it is, so she can read the wording
+ * of both sends, the day before and the morning of, without waiting for
+ * either.
  */
 var PRETEND_TODAY_ = null;
 
+/**
+ * Today, or the day a test run is pretending it is.
+ *
+ * Every piece that decides what a send says, and which tour it is for,
+ * reads the day from here, so a test can stand on the Monday before a
+ * Tuesday tour and see exactly what would go out.
+ */
+function today_() {
+  const d = PRETEND_TODAY_ ? new Date(PRETEND_TODAY_.getTime()) : new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 function whenLabel_(tourDate) {
-  const today = PRETEND_TODAY_ ? new Date(PRETEND_TODAY_.getTime()) : new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = today_();
   const d = new Date(tourDate.getTime()); d.setHours(0, 0, 0, 0);
   const days = Math.round((d - today) / 86400000);
   const label = WEEKDAYS_[d.getDay()] + ', ' + MONTHS_[d.getMonth()] + ' ' + d.getDate();
@@ -6653,7 +6670,7 @@ function whenLabel_(tourDate) {
 /** The soonest tour date on the Tour Tracker from today onwards. */
 function nextTourDate_() {
   const N = SHEETS.TRACKER;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const today = today_();
   let best = null;
   rows_(N).forEach(function (r) {
     const d = toDate_(r[col_(N, 'Tour Date')]);
@@ -7585,14 +7602,108 @@ function showCheckInDialog() {
 
 /* =========================================================
  * Automatic sends
+ *
+ * Four sends, at the hours they have always gone out, but counted from
+ * the tour rather than from a Wednesday: the day before, and the morning
+ * of. A Wednesday tour writes to teachers on Tuesday at 8:30 and to
+ * students at noon, then to both at 7:45 on the Wednesday, exactly as
+ * before. A Tuesday tour does the same thing one day earlier: Monday
+ * 8:30 and noon, Tuesday 7:45.
+ *
+ * Each one runs every day and looks for the tour it belongs to, so there
+ * is nothing to switch over when the day of a tour changes. On a day
+ * with no tour to write about, nothing is sent and nothing is said.
  * ========================================================= */
 
 var REMINDER_SLOTS_ = [
-  { handler: HANDLER_TEACHER_EMAILS, day: 'TUESDAY', hour: 8, minute: 30, label: 'Teachers, Tuesday 8:30 AM' },
-  { handler: HANDLER_TEACHER_EMAILS, day: 'WEDNESDAY', hour: 7, minute: 45, label: 'Teachers, Wednesday 7:45 AM' },
-  { handler: HANDLER_STUDENT_EMAILS, day: 'TUESDAY', hour: 12, minute: 0, label: 'Students, Tuesday 12:00 PM' },
-  { handler: HANDLER_STUDENT_EMAILS, day: 'WEDNESDAY', hour: 7, minute: 45, label: 'Students, Wednesday 7:45 AM' }
+  { who: 'teachers', when: 'before', handler: 'remindTeachersDayBefore',
+    hour: 8, minute: 30, label: 'Teachers, the day before at 8:30 AM' },
+  { who: 'teachers', when: 'of', handler: 'remindTeachersMorningOf',
+    hour: 7, minute: 45, label: 'Teachers, the morning of at 7:45 AM' },
+  { who: 'students', when: 'before', handler: 'remindStudentsDayBefore',
+    hour: 12, minute: 0, label: 'Students, the day before at 12:00 PM' },
+  { who: 'students', when: 'of', handler: 'remindStudentsMorningOf',
+    hour: 7, minute: 45, label: 'Students, the morning of at 7:45 AM' }
 ];
+
+/**
+ * The day the first email goes out for a tour: the school day before it.
+ *
+ * Which is the day before, bar a Monday tour, where the day before is a
+ * Sunday and nobody reads it. That one goes out on the Friday, and the
+ * wording follows the date it is actually sent, so it says "Monday,
+ * November 9" rather than "tomorrow".
+ */
+function sendDayBefore_(tourDate) {
+  const d = new Date(tourDate.getTime());
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - 1);
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+  return d;
+}
+
+/** Every tour date on the tracker from today onwards, soonest first. */
+function tourDatesAhead_() {
+  const N = SHEETS.TRACKER;
+  const today = today_();
+  const seen = {};
+  const out = [];
+  rows_(N).forEach(function (r) {
+    const d = toDate_(r[col_(N, 'Tour Date')]);
+    if (!d) return;
+    const x = new Date(d.getTime()); x.setHours(0, 0, 0, 0);
+    if (x < today || seen[dateKey_(x)]) return;
+    seen[dateKey_(x)] = true;
+    out.push(x);
+  });
+  out.sort(function (a, b) { return a - b; });
+  return out;
+}
+
+/**
+ * The tour a send is for today, or nothing.
+ *
+ * Asked by every run, every day. The morning-of send wants a tour today;
+ * the first send wants one whose day before is today. Every tour on the
+ * tracker is looked at rather than only the next one, so a week with a
+ * Tuesday tour and a Wednesday tour writes about both: Tuesday morning
+ * is the Tuesday tour's 7:45 and the Wednesday tour's 8:30 at once.
+ */
+function tourToRemind_(when) {
+  const today = today_();
+  const hits = tourDatesAhead_().filter(function (d) {
+    return sameDay_(when === 'of' ? d : sendDayBefore_(d), today);
+  });
+  return hits.length ? hits[0] : null;
+}
+
+/**
+ * One automatic send: the teachers or the students, the day before the
+ * tour or the morning of it.
+ *
+ * Nothing is sent on a day with no tour to write about, and nothing is
+ * sent for a tour with nothing staffed yet. Each slot has a function of
+ * its own so that what it is for does not depend on the minute Google
+ * happens to run it at.
+ */
+function reminderRun_(who, when) {
+  clearReadCache_();
+  const on = tourToRemind_(when);
+  if (!on) {
+    return { sent: 0, note: 'No tour to write about today.' };
+  }
+  const key = dateKey_(on);
+  if (who === 'students') return sendStudentEmails(key);
+  const r = sendTeacherEmails(key);
+  // Once a send, with the round that knows about teachers and advisors.
+  r.roster = mailTourRoster_(on);
+  return r;
+}
+
+function remindTeachersDayBefore() { return reminderRun_('teachers', 'before'); }
+function remindTeachersMorningOf() { return reminderRun_('teachers', 'of'); }
+function remindStudentsDayBefore() { return reminderRun_('students', 'before'); }
+function remindStudentsMorningOf() { return reminderRun_('students', 'of'); }
 
 /** The signed-in address, if the script is allowed to see it. */
 function whoAmI_() {
@@ -7609,27 +7720,51 @@ function deleteTriggersFor_(handler) {
   });
 }
 
+/* Every function a reminder has ever been installed against, so that
+ * turning them on or off clears the lot. The first two are the old
+ * Tuesday and Wednesday triggers, which a sheet set up before the sends
+ * followed the tour date still has. */
+function reminderHandlers_() {
+  const out = [HANDLER_TEACHER_EMAILS, HANDLER_STUDENT_EMAILS];
+  REMINDER_SLOTS_.forEach(function (s) {
+    if (out.indexOf(s.handler) === -1) out.push(s.handler);
+  });
+  return out;
+}
+
+function clearReminders_() {
+  reminderHandlers_().forEach(function (h) { deleteTriggersFor_(h); });
+}
+
 function enableReminders() {
-  deleteTriggersFor_(HANDLER_TEACHER_EMAILS);
-  deleteTriggersFor_(HANDLER_STUDENT_EMAILS);
+  clearReminders_();
+  /* Every day, rather than a weekday each: the send works out which tour
+   * it is for when it runs, so a tour on any day of the week is written
+   * about at the right hours without anything being switched over. A day
+   * with no tour to write about sends nothing. */
   REMINDER_SLOTS_.forEach(function (slot) {
     const b = ScriptApp.newTrigger(slot.handler).timeBased()
-      .onWeekDay(ScriptApp.WeekDay[slot.day]).atHour(slot.hour);
+      .everyDays(1).atHour(slot.hour);
     if (slot.minute) b.nearMinute(slot.minute);
     b.create();
   });
   alert_('Reminder emails are on.\n\n' +
     REMINDER_SLOTS_.map(function (s) { return '  ' + s.label; }).join('\n') + '\n\n' +
+    'They follow the tour, whatever day of the week it is on. A Wednesday ' +
+    'tour writes to teachers on Tuesday at 8:30 and to students at noon, then ' +
+    'to both at 7:45 on the Wednesday. A Tuesday tour does the same one day ' +
+    'earlier. A Monday tour has its first send on the Friday, since nobody ' +
+    'reads a Sunday email.\n\n' +
     'Google runs these within about fifteen minutes either side of the time, ' +
     'so treat them as "around" rather than on the dot.\n\n' +
     'They send as ' + whoAmI_() + ', because that is the account that just ' +
     'switched them on.\n\n' +
-    'A tour with nothing staffed is skipped, so staff it before Tuesday morning.');
+    'A tour with nothing staffed is skipped, so staff it the day before at ' +
+    'the latest.');
 }
 
 function disableReminders() {
-  deleteTriggersFor_(HANDLER_TEACHER_EMAILS);
-  deleteTriggersFor_(HANDLER_STUDENT_EMAILS);
+  clearReminders_();
   alert_('Reminder emails are off. Nothing will send on its own.');
 }
 
@@ -8330,8 +8465,10 @@ function showTestEmailDialog() {
     '<b>The whole postbag</b>' +
     '<p class="sub" style="margin:4px 0 8px;">Every email that day would send, ' +
     'students and teachers together, one per person.</p>' +
-    '<button onclick="wholeDay(\'Tuesday\')">Every Tuesday email</button>' +
-    '<button onclick="wholeDay(\'Wednesday\')">Every Wednesday email</button>' +
+    /* The two sends, named for where they sit against the tour rather
+      * than for a weekday: a Tuesday tour's first send is on the Monday. */
+    '<button onclick="wholeDay(\'before\')">Every email the day before</button>' +
+    '<button onclick="wholeDay(\'of\')">Every email on the morning</button>' +
     '</div>' +
     '<div class="panel" style="margin-top:10px;">' +
     '<b>One of each kind</b>' +
@@ -8345,14 +8482,14 @@ function showTestEmailDialog() {
     'function busy(m){document.getElementById("out").innerHTML="<p class=\'muted\'>"+m+"</p>";}' +
     'function fail(e){document.getElementById("out").innerHTML=' +
     '"<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";}' +
-    'function wholeDay(day){busy("Sending every "+esc(day)+" email to you...");' +
+    'function wholeDay(day){busy("Sending them all to you...");' +
     'google.script.run.withSuccessHandler(done).withFailureHandler(fail)' +
     '.api_sendEveryEmail(document.getElementById("d").value,day);}' +
     'function sample(which){busy("Sending you one of each...");' +
     'google.script.run.withSuccessHandler(done).withFailureHandler(fail)' +
     '.api_sendEmails(which,document.getElementById("d").value,true);}' +
     'function done(r){var h="<div class=\'free\'>";' +
-    'if(r.combined){h+="<b>"+(r.day?esc(r.day)+"\'s":"The")+" whole postbag.</b> "+' +
+    'if(r.combined){h+="<b>The whole postbag"+(r.day?" for "+esc(r.day):"")+".</b> "+' +
     'r.total+" email(s) came to you and nowhere else"+' +
     '(r.testDays&&r.testDays.length?", covering "+esc(r.testDays.join(" and ")):"")+".";' +
     'if(r.lines&&r.lines.length){h+="<ul><li>"+r.lines.map(esc).join("</li><li>")+"</li></ul>";}' +
@@ -9009,6 +9146,8 @@ var LIVE_MARKERS_ = [
   { what: 'Tour routes for a day that is not a Wednesday',
     fn: 'generateDayRoutes_', has: 'Bottom-Up' },
   { what: 'A button for each day of the week', fn: 'showStaffDialog', has: 'nextToStaff_' },
+  { what: 'Reminder emails counted from the tour date',
+    fn: 'enableReminders', has: 'everyDays' },
   { what: 'The check in sheet', fn: 'buildCheckInDoc', has: 'setPageWidth' }
 ];
 
@@ -9082,6 +9221,29 @@ function api_checkScript() {
           .filter(function (x) { return trim_(x); }).length : 0;
       return { day: d, count: mine.numbers.length, lines: first };
     }),
+    /* Whether the automatic sends are on, and whether any of the old
+     * Tuesday and Wednesday triggers are still installed. Those still
+     * fire on their weekday whatever this script now says, so they are
+     * worth seeing: turning the reminders on again replaces them. */
+    reminders: (function () {
+      try {
+        const want = {};
+        REMINDER_SLOTS_.forEach(function (s) { want[s.handler] = s.label; });
+        const on = [];
+        let old = 0;
+        ScriptApp.getProjectTriggers().forEach(function (t) {
+          const h = t.getHandlerFunction();
+          if (want[h]) {
+            if (on.indexOf(want[h]) === -1) on.push(want[h]);
+          } else if (h === HANDLER_TEACHER_EMAILS || h === HANDLER_STUDENT_EMAILS) {
+            old++;
+          }
+        });
+        return { on: on, old: old, read: true };
+      } catch (err) {
+        return { on: [], old: 0, read: false };
+      }
+    })(),
     oldBell: rowsIn(SHEETS.BELL),
     reading: sched.expanded ? 'the per-grade sheets' :
       (rowsIn(SHEETS.BELL) > 0 ? 'the old single Bell Schedule sheet' :
@@ -9117,6 +9279,19 @@ function showCheckDialog() {
     'h+="</table><span class=\'muted\'>The Jobs sheet is what the slips and ' +
     'the emails are built from. Where the two differ, the sheet wins, which is ' +
     'what lets you set an hour yourself.</span>";}' +
+    /* The automatic sends, which follow the tour date now rather than
+     * a weekday, and need turning on again once to do so. */
+    'var rm=p.reminders||{};' +
+    'if(rm.read){h+="<h3>Reminder emails</h3>";' +
+    'if(rm.on&&rm.on.length){h+="<div class=\'free\'><b>On</b><ul><li>"+' +
+    'rm.on.map(esc).join("</li><li>")+"</li></ul>These follow the tour, ' +
+    'whatever day of the week it is on.</div>";}' +
+    'else{h+="<div class=\'warn\'><b>Off.</b> Nothing sends on its own. ' +
+    'Turn them on under Automation.</div>";}' +
+    'if(rm.old){h+="<div class=\'warn\'><b>"+rm.old+" old Tuesday or Wednesday ' +
+    'reminder(s) are still installed.</b><br>Those send on their weekday whatever ' +
+    'the tour date is. Run <b>Automation &rsaquo; Turn ON reminder emails</b> once ' +
+    'to replace them.</div>";}}' +
     /* And the routes, per day, because a tour is not always on a
      * Wednesday and each day walks its own. */
     'var rts=p.routes||[];' +
@@ -9291,36 +9466,20 @@ function api_commitTour(dateStr, keep, panelists, swaps, handoffs, groups) {
  * One test click gives her every version that will really go out.
  *
  * The same message is sent on two days and reads differently on each -
- * "tomorrow" on the Tuesday, "today" on the Wednesday - so a test that
+ * "tomorrow" the day before, "today" on the morning - so a test that
  * only showed one of them would not be a test of what happens.
  */
 /**
- * Which day each send goes out, as a date in the tour's own week.
- *
- * The day number comes from here rather than from ScriptApp.WeekDay,
- * whose values are enum objects and never equal to what getDay()
- * returns - comparing the two is always false, and the search for the
- * day walks backwards for ever.
+ * Which day each send goes out, as a date against the tour's own date:
+ * the school day before it, and the day itself.
  */
-var WEEKDAY_NUMBER_ = {
-  SUNDAY: 0, MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3,
-  THURSDAY: 4, FRIDAY: 5, SATURDAY: 6
-};
-
-function sendDaysFor_(handler, dateVal) {
+function sendDaysFor_(who, dateVal) {
   const days = [];
   REMINDER_SLOTS_.forEach(function (slot) {
-    if (slot.handler !== handler) return;
-    const want = WEEKDAY_NUMBER_[slot.day];
-    if (want === undefined) return;
-    // The nearest such weekday on or before the tour.
-    const d = new Date(dateVal.getTime());
+    if (slot.who !== who) return;
+    const d = slot.when === 'of' ? new Date(dateVal.getTime()) : sendDayBefore_(dateVal);
     d.setHours(0, 0, 0, 0);
-    for (let i = 0; i < 7 && d.getDay() !== want; i++) {
-      d.setDate(d.getDate() - 1);
-    }
-    if (d.getDay() !== want) return;
-    days.push({ when: d, label: slot.label });
+    days.push({ when: d, slot: slot.when, label: slot.label });
   });
   days.sort(function (a, b) { return a.when - b.when; });
   return days;
@@ -9342,15 +9501,18 @@ function api_sendEmails(which, dateStr, test, everyone, skipRoster, onlyDay) {
   if (!to) throw new Error('Could not work out your email address to send the test to.');
   const dateVal = dateStr ? toDate_(dateStr) : nextTourDate_();
   const days = dateVal
-    ? sendDaysFor_(students ? HANDLER_STUDENT_EMAILS : HANDLER_TEACHER_EMAILS, dateVal)
+    ? sendDaysFor_(students ? 'students' : 'teachers', dateVal)
     : [];
-  // One weekday's sends only, where that is what was asked for.
+  /* One of the two sends only, where that is what was asked for: either
+   * the day before the tour or the morning of it. Named that way rather
+   * than by a weekday, because the weekday is whatever the tour's is. */
   const wanted = days.filter(function (d) {
-    return !onlyDay || (d.when && WEEKDAYS_[d.when.getDay()] === onlyDay);
+    return !onlyDay || d.slot === onlyDay;
   });
   if (onlyDay && !wanted.length) {
-    throw new Error('Nothing goes out on a ' + onlyDay + ' for ' +
-      (dateVal ? longDate_(dateVal) : 'that date') + '.');
+    throw new Error('Nothing goes out ' +
+      (onlyDay === 'of' ? 'on the morning of the tour' : 'the day before') +
+      ' for ' + (dateVal ? longDate_(dateVal) : 'that date') + '.');
   }
   days.length = 0;
   wanted.forEach(function (d) { days.push(d); });
@@ -9392,7 +9554,7 @@ function api_sendEmails(which, dateStr, test, everyone, skipRoster, onlyDay) {
 /**
  * Every email a tour would send, to her and nowhere else.
  *
- * Students and teachers, Tuesday and Wednesday, one per person rather
+ * Students and teachers, both sends, one per person rather
  * than one per job: the whole postbag for that date in one go, so she
  * can read the lot before a single message reaches a child. Nothing is
  * sampled and nothing is skipped.
@@ -9435,7 +9597,8 @@ function api_sendEveryEmail(dateStr, onlyDay) {
   return {
     combined: true,
     everyone: true,
-    day: onlyDay || '',
+    day: onlyDay === 'of' ? 'the morning of the tour' :
+      (onlyDay === 'before' ? 'the day before' : ''),
     testTo: stu.testTo || tea.testTo,
     testDays: days,
     total: total,
