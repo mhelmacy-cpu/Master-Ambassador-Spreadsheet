@@ -1,5 +1,11 @@
 /**
- * Wednesday tours: everything that decides or does something.
+ * Middle School tours: everything that decides or does something.
+ *
+ * A tour is usually on a Wednesday and can be on any day of the week.
+ * Everything that depends on the day - which classes the routes walk
+ * past, who is out of which lesson, which class a visitor is taken into
+ * at the end - is read from the bell schedule for the day the tour is
+ * on, not from Wednesday's.
  *
  * Pairs with Data.gs, which holds the school data and nothing else.
  * Apps Script puts both files in one shared namespace, so they can call
@@ -7,9 +13,10 @@
  *
  * The workflow this supports, start to finish:
  *   1. Type the visiting students onto Prospective Students.
- *   2. Run "Staff This Wednesday Tour". It pairs each visitor with two
- *      guides, gives each pair a route, and picks the greeters. It does
- *      NOT pick panelists - it lists who is still free so you can.
+ *   2. Run "Staff a Tour", or pick the day from "Staff a Tour On". It
+ *      pairs each visitor with two guides, gives each pair one of that
+ *      day's routes, and picks the greeters. It does NOT pick panelists
+ *      - it lists who is still free so you can.
  *   3. Emails go out on their own: teachers Tuesday 8:30am and Wednesday
  *      7:45am, students Tuesday noon and Wednesday 7:45am.
  */
@@ -35,7 +42,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-03 f';
+var BUILD_ = '2026-11-04 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -72,7 +79,8 @@ BELL_GRADES_.forEach(function (g) {
   HEADERS[bellSheet_(g)] = ['Day', 'Grade', 'Homeroom', 'Split', 'Start', 'End',
     'What / Teacher / Room'];
 });
-HEADERS[SHEETS.ROUTES] = ['Route', 'Direction', 'Humanities Teacher', 'Language', 'Itinerary'];
+HEADERS[SHEETS.ROUTES] = ['Route', 'Direction', 'Humanities Teacher', 'Language', 'Itinerary',
+  'Day'];
 HEADERS[SHEETS.BUDDIES] = ['Student', 'Gender', 'Language', 'Teacher', 'Room', 'Can Host a Visitor'];
 HEADERS[SHEETS.SETTINGS] = ['Setting', 'Value'];
 
@@ -485,7 +493,7 @@ function setting_(key, fallback) {
 }
 
 function toast_(msg) {
-  try { ss_().toast(msg, 'Wednesday Tours', 6); } catch (err) { /* headless */ }
+  try { ss_().toast(msg, 'Middle School Tours', 6); } catch (err) { /* headless */ }
 }
 
 function alert_(msg) { SpreadsheetApp.getUi().alert(msg); }
@@ -541,6 +549,7 @@ function setupSpreadsheet() {
   }
   const stops = refreshRouteStops_();
   if (stops.length) added.push(stops.join(', '));
+  if (ensureRouteDayColumn_()) added.push('Day on ' + SHEETS.ROUTES);
   if (ensureColumn_(SHEETS.AMBASSADORS, 'Strength', STRENGTH_OPTIONS)) {
     added.push('Strength on Ambassadors');
   }
@@ -619,7 +628,7 @@ function setupSpreadsheet() {
     'Nothing emails a teacher without one.\n' +
     '3. Settings - check the sender name and reply-to.\n\n' +
     'Then type your visitors onto Prospective Students and run ' +
-    '"Staff This Wednesday Tour".');
+    '"Staff a Tour".');
 }
 
 function setupAmbassadors_() {
@@ -693,7 +702,7 @@ function setupProspective_() {
   dropdown_(s, last, col_(SHEETS.PROSPECTIVE, 'Well Connected') + 1, YES_NO, true);
   s.getRange(2, col_(SHEETS.PROSPECTIVE, 'Tour Date') + 1, Math.max(last - 1, 200), 1)
     .setNumberFormat('yyyy-mm-dd');
-  note_(s, SHEETS.PROSPECTIVE, 'Tour Date', 'The Wednesday they are visiting.');
+  note_(s, SHEETS.PROSPECTIVE, 'Tour Date', 'The day they are visiting.');
   note_(s, SHEETS.PROSPECTIVE, 'Class Visit To',
     'Filled in by the script: who walks this family into class at the end, ' +
     'the class it is, and the teacher whose room that is.\n\n' +
@@ -737,9 +746,9 @@ function setupProspective_() {
     'A visitor who is a student of color is given one guide who is too, and ' +
     'one who is white presenting. No pair is two students of color unless ' +
     'there is no other way to fill it.');
-  note_(s, SHEETS.PROSPECTIVE, 'Class Buddy', 'Filled in by Staff This Wednesday Tour - do not type here.');
-  note_(s, SHEETS.PROSPECTIVE, 'Route', 'Filled in by Staff This Wednesday Tour - do not type here.');
-  note_(s, SHEETS.PROSPECTIVE, 'Tour Guides', 'Filled in by Staff This Wednesday Tour - do not type here.');
+  note_(s, SHEETS.PROSPECTIVE, 'Class Buddy', 'Filled in by Staff a Tour - do not type here.');
+  note_(s, SHEETS.PROSPECTIVE, 'Route', 'Filled in by Staff a Tour - do not type here.');
+  note_(s, SHEETS.PROSPECTIVE, 'Tour Guides', 'Filled in by Staff a Tour - do not type here.');
   s.autoResizeColumns(1, h.length);
 }
 
@@ -1358,15 +1367,356 @@ function setupRoutes_() {
   const s = sheet_(SHEETS.ROUTES);
   if (s.getLastRow() > 1) return;
   {
+    /* The seven she has always had, which are Wednesday's: they walk
+     * past the classes that are on at a quarter to nine on a Wednesday.
+     * Another day's routes are worked out from the bell schedule when
+     * she first staffs a tour on it. */
     const rows = TOUR_ROUTES_.map(function (r) {
-      return [r.route, r.direction, r.humanities, r.language, r.itinerary];
+      return [r.route, r.direction, r.humanities, r.language, r.itinerary, 'Wednesday'];
     });
-    s.getRange(2, 1, rows.length, 5).setValues(rows);
+    s.getRange(2, 1, rows.length, 6).setValues(rows);
     s.getRange(2, 5, rows.length, 1).setWrap(true).setVerticalAlignment('top');
     s.setRowHeights(2, rows.length, 180);
     s.setColumnWidth(5, 520);
+    dropdown_(s, Math.max(s.getLastRow(), 2), 6, SCHEDULE_DAYS_, true);
   }
   s.autoResizeColumns(1, 4);
+}
+
+/* =========================================================
+ * Tour routes for any day of the week
+ *
+ * The seven routes she has always had are Wednesday's: they walk past
+ * the classes that are on at a quarter to nine on a Wednesday. A tour on
+ * a Tuesday passes different rooms, so that day's routes are worked out
+ * from the bell schedule the same way she builds them by hand.
+ *
+ * The floors, as she describes them: the room number says which one. A
+ * room starting with 3 is the top floor, 2 the second, 1 the first, and
+ * the lobby floor is the places with no room number of their own - the
+ * library, the auditorium, the co-lab and the board by the front desk.
+ * Bottom-Up starts in the lobby and climbs. Top-Down starts at the top
+ * and comes down.
+ *
+ * A day that already has rows on her Tour Routes sheet is left exactly
+ * as it is. The sheet wins, as it does everywhere else, so an itinerary
+ * she has edited is never written over, and Wednesday's seven are hers.
+ * ========================================================= */
+
+/* The stops that are not a class and are on the route whatever the day:
+ * the two downstairs, which fill the walk while the school is still in
+ * homeroom, and the Learning Center, which sits between the science lab
+ * and the maths room upstairs. */
+var ROUTE_FIXED_STOPS_ = [
+  { label: 'Library', floor: 0, order: 10 },
+  { label: 'Sports Bulletin Board (next to front desk, talk about sports)',
+    floor: 0, order: 20 },
+  { label: 'Learning Center', floor: 3, order: 307.5 }
+];
+
+/* Rooms the school calls something other than their number. */
+var ROUTE_ROOM_NAMES_ = { 'M306': 'Art', 'M307': 'Main Science Lab' };
+
+/* What the guides talk about at a stop, beside saying where they are. */
+var ROUTE_ROOM_NOTES_ = { 'M307': ' - talk about robotics' };
+
+/** The floor a room is on, or null for somewhere a tour does not walk. */
+function routeFloorOf_(room) {
+  const m = /^M(\d)\d\d$/.exec(trim_(room));
+  return m ? Number(m[1]) : null;
+}
+
+/** Where a room sorts on its own floor: by its number. */
+function routeOrderOf_(room) {
+  const m = /^M(\d\d\d)$/.exec(trim_(room));
+  return m ? Number(m[1]) : 999;
+}
+
+/** 8:32, written the way the routes on her sheet are written. */
+function routeClock_(mins) {
+  let h = Math.floor(mins / 60) % 24;
+  const m = mins % 60;
+  if (h > 12) h -= 12;
+  if (h === 0) h = 12;
+  return h + ':' + String(m).padStart(2, '0');
+}
+
+/**
+ * A teacher's first name from the initials on the schedule.
+ *
+ * The routes name a teacher where a class is taught in two rooms at
+ * once, because that is the only way to tell the two stops apart:
+ * "7th Grade Humanities - Elizabeth (M107)". First names, as she writes
+ * them, from the script's own list, and from her Teachers sheet for
+ * anybody the script does not know.
+ */
+function routeTeacherFirstName_(initials) {
+  const want = trim_(initials).toUpperCase();
+  if (!want) return '';
+  let out = '';
+  Object.keys(TEACHER_INITIALS_).forEach(function (name) {
+    String(TEACHER_INITIALS_[name]).split(',').forEach(function (part) {
+      if (!out && trim_(part).toUpperCase() === want) out = name;
+    });
+  });
+  if (out) return out;
+  const hit = teachersByInitials_()[want];
+  return hit ? trim_(String(hit.name).split(' ')[0]) : '';
+}
+
+/**
+ * The classes a tour could walk past on a given day, as stops.
+ *
+ * Everything on the bell schedule that is on while the guides are
+ * walking, happens in a room in this building, and is a class somebody
+ * could be shown. Homeroom, lunch, recess and the Monday meeting are
+ * not; neither is PE in the gym, or an elective that scatters a grade
+ * over six rooms at once.
+ *
+ * The sections of one class are one stop, not several: the two 7th grade
+ * Humanities rooms, the three 6th grade ones, the three world language
+ * rooms. A route takes one room from each, which is what gives the seven
+ * routes something different to see. Where there is more than one room
+ * to choose between, the stop names the teacher, because the room on its
+ * own does not say which class it is.
+ */
+function dayRouteStops_(day) {
+  const schedule = bellSchedule_();
+  const byDay = schedule.byDay[day];
+  if (!byDay) return [];
+  const startMin = toMinutes_(setting_('Tour Start Time', '8:30'));
+  const endMin = toMinutes_(setting_('Class Visit Handoff Time', '9:06'));
+  if (startMin == null || endMin == null) return [];
+  const groups = [];
+  const byKey = {};
+  const seenRoom = {};
+  PODS.forEach(function (pod) {
+    (byDay[pod] || []).forEach(function (b) {
+      if (NON_CLASS_RE_.test(b.what)) return;
+      const what = cleanBlock_(b.what);
+      if (!what || isOpenChoice_(what)) return;
+      const s = toMinutes_(b.start);
+      const e = toMinutes_(b.end);
+      if (s == null || e == null || !(s < endMin && startMin < e)) return;
+      const rooms = roomsIn_(what).filter(function (r) {
+        return routeFloorOf_(r) !== null;
+      });
+      if (!rooms.length) return;
+      const grade = POD_GRADE_[pod] || '';
+      const subject = trim_(classLabel_(what).replace(/\s+in\s+\S[\s\S]*$/, '')) || 'Class';
+      const key = (grade || '?') + '|' + norm_(subject);
+      if (!byKey[key]) {
+        byKey[key] = { grade: grade, subject: subject, what: what, rooms: [] };
+        groups.push(byKey[key]);
+      }
+      const initials = initialsIn_(what);
+      rooms.forEach(function (room, i) {
+        if (seenRoom[room]) return;
+        seenRoom[room] = true;
+        byKey[key].rooms.push({ room: room, who: routeTeacherFirstName_(initials[i] || '') });
+      });
+    });
+  });
+
+  groups.forEach(function (g) {
+    /* Humanities always names its teacher: every grade has two or three
+     * sections of it and she says whose room it is. Anything else names
+     * one only where the stop is a choice of rooms. */
+    const named = g.rooms.length > 1 || /^hum/i.test(g.subject);
+    g.stops = g.rooms.map(function (r) {
+      const language = LANGUAGE_ROOMS_[r.room];
+      const isLanguage = !!language && new RegExp('\\b' + language + '\\b').test(g.what);
+      let label;
+      if (isLanguage) {
+        label = language + ' (' + r.room + ') - talk about world languages';
+      } else if (ROUTE_ROOM_NAMES_[r.room]) {
+        label = ROUTE_ROOM_NAMES_[r.room] + ' (' + r.room + ')' +
+          (ROUTE_ROOM_NOTES_[r.room] || '');
+      } else {
+        label = (g.grade ? g.grade + 'th Grade ' : '') + g.subject +
+          (named && r.who ? ' - ' + r.who : '') + ' (' + r.room + ')' +
+          (ROUTE_ROOM_NOTES_[r.room] || '');
+      }
+      return {
+        label: label, room: r.room, floor: routeFloorOf_(r.room),
+        order: routeOrderOf_(r.room),
+        language: isLanguage ? language : '',
+        humanities: /^hum/i.test(g.subject) && g.rooms.length > 1 ?
+          (r.who || r.room) + ' (' + r.room + ')' : ''
+      };
+    });
+  });
+  return groups.filter(function (g) { return g.stops.length; });
+}
+
+/**
+ * The seven routes for a day, worked out from that day's classes.
+ *
+ * Odd numbers go Bottom-Up and even numbers Top-Down, as hers do, and
+ * each one takes a different room where a class is taught in two. The
+ * times are spread evenly between when they leave the cafeteria and when
+ * the visitors go to class, which is what the last two lines are about.
+ */
+function generateDayRoutes_(day) {
+  const groups = dayRouteStops_(day);
+  const startMin = toMinutes_(setting_('Tour Start Time', '8:30'));
+  const handMin = toMinutes_(setting_('Class Visit Handoff Time', '9:06'));
+  const endMin = toMinutes_(setting_('Tour End Time', '9:25'));
+  if (startMin == null || handMin == null) return [];
+  const waitFor = setting_('Wait For', 'Maren');
+  const ends = endPlace_();
+  const howMany = TOUR_ROUTES_.length;
+  const out = [];
+  for (let i = 0; i < howMany; i++) {
+    const up = i % 2 === 0;
+    const picked = groups.map(function (g) { return g.stops[i % g.stops.length]; });
+    const stops = picked.concat(ROUTE_FIXED_STOPS_);
+    stops.sort(function (a, b) {
+      if (a.floor !== b.floor) return up ? a.floor - b.floor : b.floor - a.floor;
+      if (a.order !== b.order) return up ? a.order - b.order : b.order - a.order;
+      return a.label < b.label ? -1 : 1;
+    });
+    const first = startMin + 2;
+    const last = handMin - 3;
+    const gap = stops.length > 1 ?
+      Math.max(2, Math.floor((last - first) / (stops.length - 1))) : 0;
+    const lines = [routeClock_(startMin) + ' Leave cafeteria to start tour'];
+    stops.forEach(function (stop, k) {
+      lines.push(routeClock_(Math.min(first + k * gap, handMin - 1)) + ' ' + stop.label);
+    });
+    lines.push(routeClock_(handMin) + ' Bring visitors to class - Bring the clock ' +
+      'and tour route with you to class.');
+    if (endMin != null) {
+      lines.push(routeClock_(endMin) + ' Bring visitor down to ' + ends +
+        ' (wait with them for ' + waitFor + ' and parents to get back downstairs)');
+    }
+    /* The two columns beside the route: whose Humanities room this one
+     * goes into, and which language room. Empty where the day has
+     * neither on while the tour walks, which is most days. */
+    const humanities = picked.filter(function (s) { return s.humanities; })
+      .map(function (s) { return s.humanities; });
+    const language = picked.filter(function (s) { return s.language; })
+      .map(function (s) { return s.language; });
+    out.push({
+      day: day, route: String(i + 1), direction: up ? 'Bottom-Up' : 'Top-Down',
+      humanities: humanities.join(', '), language: language.join(', '),
+      itinerary: lines.join('\n')
+    });
+  }
+  return out;
+}
+
+/**
+ * The Day column on her Tour Routes sheet, and what it says about the
+ * routes that were already there.
+ *
+ * Everything on that sheet before today is a Wednesday route, so that is
+ * what the column is filled in with. A blank is read as Wednesday too,
+ * so a row she adds without picking a day still works.
+ */
+function ensureRouteDayColumn_() {
+  const N = SHEETS.ROUTES;
+  const made = ensureColumn_(N, 'Day', SCHEDULE_DAYS_);
+  const at = optionalCol_(N, 'Day');
+  if (at === -1) return made;
+  const s = sheet_(N);
+  let filled = 0;
+  rows_(N).forEach(function (r, i) {
+    if (!trim_(r[col_(N, 'Route')])) return;
+    if (trim_(r[at])) return;
+    s.getRange(i + 2, at + 1).setValue('Wednesday');
+    filled++;
+  });
+  if (made || filled) clearReadCache_();
+  return made;
+}
+
+/**
+ * Routes for a day that has none, written onto her sheet.
+ *
+ * Called by everything that needs a route rather than by setup alone,
+ * so a tour on a Tuesday has its routes the moment she staffs it and
+ * nothing has to be run first. It only ever adds: a day with rows is
+ * left alone, and Wednesday's seven are hers for good.
+ */
+function ensureDayRoutes_(day) {
+  if (SCHEDULE_DAYS_.indexOf(day) === -1) return [];
+  ensureRouteDayColumn_();
+  const N = SHEETS.ROUTES;
+  const at = optionalCol_(N, 'Day');
+  if (at === -1) return [];
+  const already = rows_(N).some(function (r) {
+    return trim_(r[col_(N, 'Route')]) &&
+      norm_(trim_(r[at]) || 'Wednesday') === norm_(day);
+  });
+  if (already) return [];
+  const made = generateDayRoutes_(day);
+  if (!made.length) return [];
+  const s = sheet_(N);
+  const width = Math.max(s.getLastColumn(), HEADERS[N].length);
+  const rows = made.map(function (r) {
+    const row = blankRow_(N);
+    row[col_(N, 'Route')] = r.route;
+    row[col_(N, 'Direction')] = r.direction;
+    row[col_(N, 'Humanities Teacher')] = r.humanities;
+    row[col_(N, 'Language')] = r.language;
+    row[col_(N, 'Itinerary')] = r.itinerary;
+    row[at] = r.day;
+    return row;
+  });
+  const start = Math.max(s.getLastRow(), 1) + 1;
+  s.getRange(start, 1, rows.length, width).setValues(rows);
+  s.getRange(start, col_(N, 'Itinerary') + 1, rows.length, 1)
+    .setWrap(true).setVerticalAlignment('top');
+  s.setRowHeights(start, rows.length, 180);
+  clearReadCache_();
+  const said = rows.length + ' tour routes worked out for ' + day +
+    ' and added to ' + SHEETS.ROUTES;
+  /* Monday morning is the whole middle school in its meeting, so there
+   * is no class to walk past at tour time. The routes are still made,
+   * and still walk the building, but she should know why they are short
+   * rather than wonder what went wrong. */
+  if (!dayRouteStops_(day).length) {
+    return [said + ' - the schedule has no classes on while the tour walks that ' +
+      'day, so they are the library, the board and the Learning Center only'];
+  }
+  return [said];
+}
+
+/** The routes on her sheet for one day: the numbers, and each itinerary. */
+function routesForDay_(day) {
+  const N = SHEETS.ROUTES;
+  const at = optionalCol_(N, 'Day');
+  const numbers = [];
+  const byNumber = {};
+  rows_(N).forEach(function (r) {
+    const no = trim_(r[col_(N, 'Route')]);
+    if (!no) return;
+    // A row with no day on it is one of Wednesday's, which is all the
+    // sheet held before there were other days on it.
+    const mine = at === -1 ? 'Wednesday' : (trim_(r[at]) || 'Wednesday');
+    if (norm_(mine) !== norm_(day)) return;
+    if (byNumber[no]) return;
+    byNumber[no] = { direction: trim_(r[col_(N, 'Direction')]),
+      itinerary: String(r[col_(N, 'Itinerary')] || '') };
+    numbers.push(no);
+  });
+  return { numbers: numbers, byNumber: byNumber };
+}
+
+/**
+ * The routes for a tour date, worked out first if that day has none.
+ *
+ * A date that is not a school day - she has run a tour on one - has no
+ * schedule to build from, so Wednesday's routes stand in rather than
+ * leaving every guide without one.
+ */
+function routesForDate_(dateVal) {
+  const day = WEEKDAYS_[dateVal.getDay()];
+  ensureDayRoutes_(day);
+  const mine = routesForDay_(day);
+  if (mine.numbers.length) return mine;
+  return norm_(day) === norm_('Wednesday') ? mine : routesForDay_('Wednesday');
 }
 
 /**
@@ -2309,7 +2659,7 @@ function classVisitLanguage_(choice) {
 }
 
 /* =========================================================
- * Staffing a Wednesday tour
+ * Staffing a tour
  *
  * Guides are matched on grade and gender, which are requirements, and on
  * borough, which is a preference. Greeters are picked purely on who has
@@ -2410,7 +2760,11 @@ function planTour(dateStr, keepExisting) {
   /* ---- guides, two per visitor ---- */
   const perVisitor = Number(setting_('Tour Guides Per Visiting Student', '2')) || 2;
   const maxPerRoute = Number(setting_('Max Families Per Route', '1')) || 1;
-  const routes = rows_(SHEETS.ROUTES).map(function (r) { return trim_(r[0]); }).filter(Boolean);
+  /* The routes for this day of the week. A Tuesday tour walks past
+   * Tuesday's classes, so a day with no routes on her sheet yet has its
+   * seven worked out from the bell schedule here, and they are hers to
+   * edit from then on. */
+  const routes = routesForDate_(dateVal).numbers;
   const routeUse = {};
   if (kept) {
     Object.keys(kept.route).forEach(function (k) {
@@ -3564,11 +3918,11 @@ function applySwaps_(plan, swaps, ignored) {
       const pair = pairFor(x.visitor);
       if (!pair) {
         throw new Error('Nobody called ' + trim_(x.visitor) + ' is visiting that day ' +
-          'any more. Close this and run Staff This Wednesday Tour again.');
+          'any more. Close this and run Staff a Tour again.');
       }
       if (pair.guideNames.length >= (plan.guidesPer || 2)) {
         throw new Error(pair.visitor.name + ' already has ' + pair.guideNames.length +
-          ' guides. Close this and run Staff This Wednesday Tour again.');
+          ' guides. Close this and run Staff a Tour again.');
       }
       if (pair.guideNames.some(function (g) { return norm_(g) === norm_(who.name); })) {
         return note(x, 'they are already walking that family');
@@ -3604,7 +3958,7 @@ function applySwaps_(plan, swaps, ignored) {
       if (x.add) {
         if (cr.chosen.length >= cr.needed) {
           throw new Error('The ' + cr.job + ' crew already has ' + cr.chosen.length +
-            ' on it. Close this and run Staff This Wednesday Tour again.');
+            ' on it. Close this and run Staff a Tour again.');
         }
         const clash = cr.chosen.filter(function (n) { return keptApart_(who.name, n); });
         if (clash.length) {
@@ -3624,7 +3978,7 @@ function applySwaps_(plan, swaps, ignored) {
       cr.chosen.forEach(function (n, i) { if (norm_(n) === norm_(x.from)) where = i; });
       if (where === -1) {
         throw new Error(trim_(x.from) + ' is not on the ' + x.job +
-          ' crew any more. Close this and run Staff This Wednesday Tour again.');
+          ' crew any more. Close this and run Staff a Tour again.');
       }
       delete taken[norm_(cr.chosen[where])];
       if (x.drop) {
@@ -3644,7 +3998,7 @@ function applySwaps_(plan, swaps, ignored) {
     const pair = pairFor(x.visitor);
     if (!pair) {
       throw new Error('Nobody called ' + trim_(x.visitor) + ' is visiting that day any more. ' +
-        'Close this and run Staff This Wednesday Tour again.');
+        'Close this and run Staff a Tour again.');
     }
     /* Which of the family's places this is about.
      *
@@ -3660,7 +4014,7 @@ function applySwaps_(plan, swaps, ignored) {
     }
     if (at === -1) {
       throw new Error(trim_(x.from) + ' is not guiding ' + pair.visitor.name +
-        ' any more. Close this and run Staff This Wednesday Tour again.');
+        ' any more. Close this and run Staff a Tour again.');
     }
     const beside = pair.guideNames.filter(function (g, i) { return i !== at; });
 
@@ -4355,10 +4709,8 @@ function routeSheetData_(dateVal) {
   const P = SHEETS.PROSPECTIVE;
   const visitors = prospectiveFor_(dateVal);
   const assignments = assignmentsOn_(dateVal);
-  const routes = {};
-  rows_(SHEETS.ROUTES).forEach(function (r) {
-    routes[trim_(r[0])] = { direction: trim_(r[1]), itinerary: String(r[4] || '') };
-  });
+  // This day of the week's routes, worked out first if it has none.
+  const routes = routesForDate_(dateVal).byNumber;
   const buddyIndex = {};
   buddies_().forEach(function (b) { buddyIndex[norm_(b.name)] = b; });
   const ambIndex = {};
@@ -5344,7 +5696,7 @@ function buildLockerSlips(dateStr) {
   const slips = lockerSlipData_(dateVal);
   if (!slips.length) {
     throw new Error('Nothing is staffed for ' + longDate_(dateVal) +
-      ' yet. Run "Staff This Wednesday Tour..." first.');
+      ' yet. Run "Staff a Tour..." first.');
   }
 
   // Five lines, because it is read in a corridor on the way past.
@@ -7183,7 +7535,7 @@ function showCheckInDialog() {
     'parents, in large type, with everything else taken out. Paste as many rows ' +
     'as you like.</p>' +
     '<label for="d">Tour date</label>' +
-    '<input type="date" id="d" value="' + nextWednesday() + '">' +
+    '<input type="date" id="d" value="' + nextToStaff_() + '">' +
     '<label for="paste" style="margin-top:10px;display:block;">What you copied</label>' +
     '<textarea id="paste" rows="8" style="width:100%;font:inherit;padding:6px;' +
     'border:1px solid #bbb;border-radius:4px;" oninput="look()"></textarea>' +
@@ -7286,10 +7638,19 @@ function disableReminders() {
  * ========================================================= */
 
 function onOpen() {
-  SpreadsheetApp.getUi().createMenu('Wednesday Tours')
+  SpreadsheetApp.getUi().createMenu('Middle School Tours')
     .addItem('First-Time Setup', 'setupSpreadsheet')
     .addSeparator()
-    .addItem('Staff This Wednesday Tour...', 'showStaffDialog')
+    .addItem('Staff a Tour...', 'showStaffDialog')
+    /* A button each for the five days. The item above opens on the next
+     * tour she has students listed for, whatever day that is; these are
+     * for staffing a day before anybody is on the sheet for it. */
+    .addSubMenu(SpreadsheetApp.getUi().createMenu('Staff a Tour On')
+      .addItem('Monday', 'staffMonday')
+      .addItem('Tuesday', 'staffTuesday')
+      .addItem('Wednesday', 'staffWednesday')
+      .addItem('Thursday', 'staffThursday')
+      .addItem('Friday', 'staffFriday'))
     .addItem('Print Tour Routes...', 'showRouteSheetDialog')
     .addItem('Print Locker Slips...', 'showLockerSlipDialog')
     .addItem('Print the Tour Roster...', 'showRosterDialog')
@@ -7318,10 +7679,52 @@ function dialog_(html, title, width, height) {
 
 /** The Wednesday coming up, as yyyy-mm-dd, for pre-filling a date box. */
 function nextWednesday() {
+  return nextWeekday_('Wednesday');
+}
+
+/**
+ * The next day of the week with that name, as yyyy-mm-dd.
+ *
+ * Today counts: asked for a Tuesday on a Tuesday morning it says today,
+ * which is the tour she would be staffing.
+ */
+function nextWeekday_(day) {
+  const want = WEEKDAYS_.indexOf(trim_(day));
   const d = new Date(); d.setHours(0, 0, 0, 0);
-  while (d.getDay() !== 3) d.setDate(d.getDate() + 1);
+  if (want === -1) return dateKey_(d);
+  for (let i = 0; i < 7 && d.getDay() !== want; i++) d.setDate(d.getDate() + 1);
   return dateKey_(d);
 }
+
+/**
+ * The date a staffing dialog opens on.
+ *
+ * The soonest tour she has visiting students listed for, whatever day of
+ * the week it falls on, so a Tuesday tour comes up on its own. Nothing
+ * listed and nothing on the tracker: the Wednesday coming up, as before.
+ */
+function nextToStaff_() {
+  const P = SHEETS.PROSPECTIVE;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let best = null;
+  rows_(P).forEach(function (r) {
+    const d = toDate_(r[col_(P, 'Tour Date')]);
+    if (!d) return;
+    const x = new Date(d.getTime()); x.setHours(0, 0, 0, 0);
+    if (x >= today && (!best || x < best)) best = x;
+  });
+  if (!best) best = nextTourDate_();
+  return best ? dateKey_(best) : nextWednesday();
+}
+
+/* A button each for the five days, because a tour is not always on a
+ * Wednesday any more. Each one opens the staffing dialog on that day
+ * coming up; everything inside it is the same whatever the day. */
+function staffMonday() { showStaffDialog(nextWeekday_('Monday')); }
+function staffTuesday() { showStaffDialog(nextWeekday_('Tuesday')); }
+function staffWednesday() { showStaffDialog(nextWeekday_('Wednesday')); }
+function staffThursday() { showStaffDialog(nextWeekday_('Thursday')); }
+function staffFriday() { showStaffDialog(nextWeekday_('Friday')); }
 
 /**
  * The one piece of script every dialog gets, beside the styles.
@@ -7388,15 +7791,27 @@ var DIALOG_CSS_ =
   'textarea{font-family:inherit;}' +
   '.muted{color:#777;}';
 
-function showStaffDialog() {
+/**
+ * The staffing dialog, on a date or on the next tour she has listed.
+ *
+ * The menu item passes no date at all, and each day button passes that
+ * day coming up. Anything that is not a date is ignored rather than
+ * trusted, because Apps Script hands a menu item's function an event
+ * object of its own.
+ */
+function showStaffDialog(dateKey) {
+  const want = /^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || '')) ?
+    String(dateKey) : nextToStaff_();
+  const on = toDate_(want);
   const html =
     '<style>' + DIALOG_CSS_ + '</style>' +
-    '<h2>Staff this Wednesday tour</h2>' +
+    '<h2>Staff a tour</h2>' +
     '<p class="sub">Your panel first. Two of them greet downstairs, and the rest ' +
     'is worked out around them. The tour guides are yours: every place comes up ' +
-    'empty for you to choose from the list.</p>' +
-    '<label for="d">Tour date</label>' +
-    '<input type="date" id="d" value="' + nextWednesday() + '" onchange="restart()">' +
+    'empty for you to choose from the list. The routes are the ones for that day ' +
+    'of the week.</p>' +
+    '<label for="d">Tour date' + (on ? ' - ' + escapeHtml_(longDate_(on)) : '') + '</label>' +
+    '<input type="date" id="d" value="' + want + '" onchange="restart()">' +
     '<div class="byhand">' +
     '<label><span class="step">1</span> Your panel</label>' +
     '<div id="hand"><button id="startpanel" onclick="handLoad()">Show the ambassadors</button>' +
@@ -7854,7 +8269,7 @@ function showStaffDialog() {
     'var k=Number(boxes[i].value);if(f[k]){out.push(f[k].name);}}}' +
     'return out;}' +
     '<\/script>';
-  dialog_(html, 'Staff This Wednesday Tour', 640, 620);
+  dialog_(html, 'Staff a Tour', 640, 620);
 }
 
 /**
@@ -8490,7 +8905,7 @@ function showMeetingDialog() {
     'written anywhere and no email goes out: this only reads the schedule and tells you ' +
     'what each of them would be walking out of, and who teaches it.</p>' +
     '<label for="d">Day</label>' +
-    '<input type="date" id="d" value="' + nextWednesday() + '">' +
+    '<input type="date" id="d" value="' + nextToStaff_() + '">' +
     '<div style="display:flex;gap:12px;">' +
     '<div style="flex:1;"><label for="t1">From</label>' +
     '<input type="time" id="t1" value="08:30"></div>' +
@@ -8591,6 +9006,9 @@ var LIVE_MARKERS_ = [
   { what: 'The 5th graders on the class visit list',
     fn: 'handbackAllocate_', has: 'canHost' },
   { what: 'Where visitors finish', fn: 'endPlace_', has: 'Visitors End In' },
+  { what: 'Tour routes for a day that is not a Wednesday',
+    fn: 'generateDayRoutes_', has: 'Bottom-Up' },
+  { what: 'A button for each day of the week', fn: 'showStaffDialog', has: 'nextToStaff_' },
   { what: 'The check in sheet', fn: 'buildCheckInDoc', has: 'setPageWidth' }
 ];
 
@@ -8654,6 +9072,16 @@ function api_checkScript() {
         };
       });
     })(),
+    /* The routes she has for each day of the week. A Tuesday tour walks
+     * Tuesday's routes, so when a day comes up with no route on a sheet,
+     * or with the wrong day's, this is where it shows. */
+    routes: SCHEDULE_DAYS_.map(function (d) {
+      const mine = routesForDay_(d);
+      const first = mine.numbers.length ?
+        String(mine.byNumber[mine.numbers[0]].itinerary).split('\n')
+          .filter(function (x) { return trim_(x); }).length : 0;
+      return { day: d, count: mine.numbers.length, lines: first };
+    }),
     oldBell: rowsIn(SHEETS.BELL),
     reading: sched.expanded ? 'the per-grade sheets' :
       (rowsIn(SHEETS.BELL) > 0 ? 'the old single Bell Schedule sheet' :
@@ -8689,6 +9117,18 @@ function showCheckDialog() {
     'h+="</table><span class=\'muted\'>The Jobs sheet is what the slips and ' +
     'the emails are built from. Where the two differ, the sheet wins, which is ' +
     'what lets you set an hour yourself.</span>";}' +
+    /* And the routes, per day, because a tour is not always on a
+     * Wednesday and each day walks its own. */
+    'var rts=p.routes||[];' +
+    'if(rts.length){h+="<h3>Tour routes</h3><table><tr><th>Day</th>' +
+    '<th>Routes</th><th>Lines on the first one</th></tr>";' +
+    'rts.forEach(function(x){h+="<tr><td>"+esc(x.day)+"</td><td>"+' +
+    '(x.count?x.count:"<b>none yet</b>")+"</td><td>"+(x.lines||"-")+' +
+    '"</td></tr>";});' +
+    'h+="</table><span class=\'muted\'>A day with none gets its seven worked ' +
+    'out from the bell schedule the first time you staff a tour on it. After ' +
+    'that they are yours: edit them on the Tour Routes sheet and nothing ' +
+    'writes over them.</span>";}' +
     'var live=p.live||[];var old=live.filter(function(x){return !x.current;});' +
     'if(old.length){h+="<div class=\'warn\'><b>The editor is running an older copy ' +
     'of this script.</b><br>These parts are not the ones in the build above:<ul>"+' +

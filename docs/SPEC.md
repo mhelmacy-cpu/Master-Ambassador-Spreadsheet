@@ -159,6 +159,69 @@ set by hand is never overwritten.
 Unchanged: Panelist, Lobby Greeter, Table Greeter, Tour Guide, and the
 matrix of who can do which.
 
+## A tour on any day of the week
+
+A tour is usually on a Wednesday and can be on any day. **Staff a Tour**
+opens on the next tour she has students listed for, whatever day that
+falls on, and **Staff a Tour On** has a button for each of Monday to
+Friday, which opens on that day coming up (today counts). Everything
+inside the dialog is the same whatever the day.
+
+Everything that depends on the day is read from the bell schedule for the
+day the tour is on, not from Wednesday's: which classes the routes walk
+past, which lesson each ambassador is out of, which class a visitor is
+taken into at the end, and which teachers hear about it. The tour times
+themselves do not move: the guides leave the cafeteria at 8:30, the
+visitors go to class at 9:06 and the morning ends at 9:25, whatever the
+day, and the panel and the greeting crews keep their hours too.
+
+**What does not follow the day yet:** the two automatic reminder sends
+are still pinned to Tuesday 8:30am and noon, and Wednesday 7:45am. For a
+tour on another day, send by hand from **Send Emails Now** (which always
+sends for the date in the box), or ask for the reminders to follow the
+tour date.
+
+### Routes for a day
+The seven routes on her sheet are Wednesday's: they walk past the classes
+that are on at a quarter to nine on a Wednesday. The first time a tour is
+staffed on another day, that day's seven are worked out from the bell
+schedule and added to the Tour Routes sheet, under that day's name.
+
+How a day's route is built, which is how she builds one by hand:
+
+- **The stops are the classes that are on while the guides are walking**
+  (8:30 to 9:06), in a room in this building. Homeroom, lunch, recess and
+  the Monday meeting are not stops; neither is PE in the gym, nor an
+  elective that scatters a grade over six rooms.
+- **The sections of one class are one stop, not several.** The two 7th
+  grade Humanities rooms, the three 6th grade ones, the three world
+  language rooms: each route takes one of them, which is what gives the
+  seven routes something different to see. Where there is a choice of
+  rooms the stop names the teacher, because the room alone does not say
+  which class it is.
+- **The floors come off the room number.** A room starting with 3 is the
+  top floor, 2 the second, 1 the first, and the lobby floor is the places
+  with no room number of their own: the library, the board by the front
+  desk, the auditorium, the co-lab. **Bottom-Up** starts in the lobby and
+  climbs; **Top-Down** starts at the top and comes down. Odd-numbered
+  routes go up and even-numbered ones come down, as hers do.
+- **The library, the board by the front desk and the Learning Center are
+  on every route**, whatever the day: they are not classes, so they are
+  always there to be shown. The two downstairs fill the walk while the
+  school is still in homeroom.
+- The times are spread evenly between leaving the cafeteria and the class
+  visit, and the last two lines are the ones every route ends with: the
+  hand-over at 9:06 and the co-lab at 9:25.
+
+A day whose schedule has no class on at all while the tour walks - Monday,
+which is the whole middle school in its meeting - still gets its seven
+routes, walking the library, the board and the Learning Center, and the
+run says so rather than leaving her to wonder.
+
+Once a day has routes they are hers: **nothing is ever written over
+them.** Wednesday's seven stay exactly as she has them, and an itinerary
+she edits on any other day survives every run after it.
+
 ## What the staffing command does
 
 One command, run once the prospective students are entered. It assigns:
@@ -205,7 +268,8 @@ One command, run once the prospective students are entered. It assigns:
   reach outside the rules for a second body, the family goes out with
   the one guide, and the dialog says who is on their own. Blank or No
   and they are never sent out alone. Each guide pair is assigned a **tour route** (one family
-  per route, seven routes available), for the Wednesday morning slot.
+  per route, seven routes available) from the routes for that day of the
+  week.
   With more families than routes, the list starts again at route 1 and
   the sharing is flagged in the dialog.
 - **Lobby Greeters** - three, and **Table Greeters** - two, both **hers
@@ -407,8 +471,13 @@ carrying the old number: putting two children together gave them one
 route everywhere except on the tracker, which is what the printouts and
 the emails read.
 
-**Tour Routes** holds the seven walks, one itinerary per route, and it is
-seeded once and never rewritten, because she edits it. **The Co-Lab is
+**Tour Routes** holds the walks, one itinerary per route, with a **Day**
+column saying which day of the week each belongs to. Everything on that
+sheet before the column existed is a Wednesday route, so that is what it
+is filled in with, and a blank is read as Wednesday. Each day's seven are
+seeded once and never rewritten, because she edits them: Wednesday's at
+setup, and another day's the first time a tour is staffed on it (see
+"Routes for a day"). **The Co-Lab is
 not a stop on any of them.** Changing that in the script alone would do
 nothing to a sheet that already has rows, so setup takes the line off her
 own sheet and says so ("the Co-Lab stop came off route 1"). Only that one
