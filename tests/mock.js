@@ -22,6 +22,7 @@ function makeMock() {
   global.__page = {};
   global.__docName = '';
   global.__triggers = [];
+  global.__menus = [];
   global.__alerts = [];
 
   /* ---------- a sheet ---------- */
@@ -202,14 +203,24 @@ function makeMock() {
       return api;
     },
     getUi: function () {
-      const menu = {
-        addItem: function () { return menu; },
-        addSeparator: function () { return menu; },
-        addSubMenu: function () { return menu; },
-        addToUi: function () { return menu; }
+      /* Every menu the script builds, in the order it builds them, with
+       * each item's label and the function it runs. A menu that does not
+       * appear, or an item wired to a function that is not there, is
+       * invisible from the outside, so it is recorded here. */
+      const makeMenu = function (title) {
+        const me = { title: title, items: [], subs: [], added: false };
+        global.__menus.push(me);
+        me.addItem = function (label, fn) {
+          me.items.push({ label: label, fn: fn });
+          return me;
+        };
+        me.addSeparator = function () { return me; };
+        me.addSubMenu = function (sub) { me.subs.push(sub); return me; };
+        me.addToUi = function () { me.added = true; return me; };
+        return me;
       };
       return {
-        createMenu: function () { return menu; },
+        createMenu: function (title) { return makeMenu(title); },
         alert: function (msg) { global.__alerts.push(String(msg)); },
         showModalDialog: function (out, title) {
           global.__dialogs.push({ html: out && out.__html, title: title });

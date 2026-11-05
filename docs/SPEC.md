@@ -159,6 +159,18 @@ set by hand is never overwritten.
 Unchanged: Panelist, Lobby Greeter, Table Greeter, Tour Guide, and the
 matrix of who can do which.
 
+## The menu
+
+Everything is reached from one menu at the top of the spreadsheet,
+**Middle School Tours** (it was called "Wednesday Tours" until tours
+stopped being only on Wednesdays). It is drawn by `onOpen`, which Apps
+Script runs when the spreadsheet is opened, so after a fresh paste the
+tab has to be reloaded before the new menu appears. A menu that does not
+appear leaves nothing to click and shows no error, and an item wired to a
+function that is not there does nothing when clicked, so `t99` runs
+`onOpen` and checks the menu, its two submenus, and every item against
+the function it says it runs.
+
 ## A tour on any day of the week
 
 A tour is usually on a Wednesday and can be on any day. **Staff a Tour**
