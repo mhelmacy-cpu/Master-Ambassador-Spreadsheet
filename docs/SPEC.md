@@ -1243,19 +1243,44 @@ would do without filling her inbox with the same message thirty times.
 
 ### The roster
 
-Every send, test or real, and the automatic teacher send on Tuesday and
-Wednesday morning, also builds a Google Doc and mails her the link:
+Every send, test or real, and both automatic teacher sends, also build a
+Google Doc and mail her the link:
 
-    7 ambassadors on duty. 6 name tags to count out, 3 route sheets to hand out.
+    7 ambassadors on duty. 6 name tags to count out, 4 route sheets to hand out.
 
-    Student                Name tag  Route   Role                        Class teacher  Advisor
-    Afia-Kusiwaa Twumasi   [    ]            Lobby Greeter               Lila, Eliza    Eliza
-    Aurelia Walker         [    ]    [    ]  Tour Guide for Sam Visitor  Jeremiah       Marco
-    Camille Bedeau                           Pass Off for Sam Visitor    Oliver         Oliver
+    Touring
+    Student            Name tag  Route   Role                                   Class teacher  Advisor
+    Route 1 - Sam Visitor
+    Aurelia Walker     [    ]    [    ]  Tour Guide for Sam Visitor (route 1)    Jeremiah      Marco
+    Avery Griffiths    [    ]    [    ]  Tour Guide for Sam Visitor (route 1);   Chantilly     Dan
+                                         Table Greeter
+    Route 2 - Robin Visitor
+    Blake Glenn        [    ]    [    ]  Tour Guide for Robin Visitor (route 2)  Elizabeth     Luis
+    Camille Bedeau     [    ]    [    ]  Tour Guide for Robin Visitor (route 2)  Oliver        Oliver
+
+    Panel and greeters
+    Student            Name tag  Route   Role                      Class teacher  Advisor
+    Afia-Kusiwaa Twum. [    ]            Panelist; Lobby Greeter   Lila, Eliza    Eliza
+    Aksel Ozturk       [    ]            Lobby Greeter             Brian          Rohan
+    Ama Bediako Whyte                    Pass Off for Sam Visitor  Elizabeth      Brendan
 
 One line per ambassador on duty, so the office has in one place what the
 emails only say one person at a time. The 5th grade buddies are not on
 it, the same as the emails.
+
+**It is read in the order the morning happens in, not down the
+alphabet.** The tours come first, each pair of guides under the family
+they are walking and in route order, with the family on a shaded line of
+its own, because that is how she ticks it off and how she sees who is
+touring whom. Two children she has put on one pair of guides are one
+family here, both names on the one heading. Then the panel and the crews,
+in that order: panel, door, table, and anybody who is only being handed a
+family at the end.
+
+**Somebody who is guiding and greeting is in the tours**, once, with both
+jobs beside their name. One student can hold several jobs now, and the
+roster never lists anybody twice: it puts them where she will look for
+them.
 
 **The class visits are at the bottom of it**, the same morning the other
 way round: by family rather than by ambassador, because that is how the
@@ -1275,8 +1300,8 @@ been picked for yet, which is the line she needs to see:
 **A box for each of the two things handed out by hand**, printed empty to
 be ticked with a pen: their name tag, and, for a tour guide, their route
 sheet. Both are counted out the afternoon before and this is the one
-sheet that already lists everybody on duty, in one line each and in
-alphabetical order. The heading says how many of each. Somebody who is
+sheet that already lists everybody on duty, in one line each. The heading
+says how many of each. Somebody who is
 only being handed a family at the end gets a line but no boxes at all:
 the guide hands them their own tag at the door, with the route and the
 clock. Nobody but a guide is given a route sheet, so nobody else has that

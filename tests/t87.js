@@ -53,13 +53,20 @@ const printed=()=>{ global.__doc=[]; const r=buildTourRoster('2026-10-07');
   if(cells.length) out.tables.push(cells);
   return out; };
 const page=printed();
-const wide=page.tables[1];
 const rowsOf=(flat,n)=>{ const out=[];
   for(let i=0;i<flat.length;i+=n) out.push(flat.slice(i,i+n)); return out; };
-const visits=rowsOf(wide,4);
+/* The page holds the roster, in one table per section, and this one. Each
+ * is found by its own first heading rather than by where it sits, since
+ * the roster is read in tour order now and a tour with nobody on the
+ * panel has no second table. */
+const tableWith=(first,n)=>rowsOf(page.tables
+  .filter(t=>String(t[0])===first)[0]||[],n);
+const visits=tableWith('Visiting student',4);
 
 console.log('a section of its own, under the roster');
-ok(page.tables.length===2,'two tables on the page: the roster and this one');
+ok(page.tables.length>=2,page.tables.length+
+   ' tables on the page: the roster, in sections, and this one');
+ok(visits.length>1,'and this one is found by its own heading, not its place');
 ok(page.head.some(x=>x.h==='H3'&&/^Class visits at /.test(x.t)),
    'with its own heading: "'+page.head.filter(x=>x.h==='H3')[0].t+'"');
 ok(page.head.some(x=>/visiting families are settled/.test(x.t)),
@@ -101,9 +108,14 @@ ok(nia[1]==='nobody yet','it says "'+nia[1]+'"');
 ok(nia[2]==='-','with nothing to say about the class');
 
 console.log('\nthe roster above is untouched');
-const roster=rowsOf(page.tables[0],6);
+const roster=tableWith('Student',6);
 ok(roster[0].join(' | ')==='Student | Name tag | Route | Role | Class teacher | Advisor',
    'still: '+roster[0].join(' | '));
-ok(roster.length-1===page.r.rows,page.r.rows+' ambassadors on it');
+/* A line with nothing in the Role column is one of the family headings
+ * the roster is read by now, not a person. */
+const people=roster.slice(1).filter(r=>!!r[3]);
+ok(people.length===page.r.rows,page.r.rows+' ambassadors on it');
+ok(roster.slice(1).some(r=>!r[3]),'under a heading each: "'+
+   roster.slice(1).filter(r=>!r[3])[0][0]+'"');
 
 console.log('\nevery family, the right way up.');

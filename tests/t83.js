@@ -34,18 +34,29 @@ commitTour('2026-10-07',true,[],
    {job:JOBS.TABLE,to:'Avery Griffiths',add:true}],[]);
 clearReadCache_();
 
-// The roster, read the way the page is laid out: a row of cells each.
-/* The page has two tables: the roster, then the class visits under it.
- * Only the first is this test's business. */
+/* The roster, read the way the page is laid out: a row of cells each.
+ *
+ * The page holds the roster in sections - the tours, each pair under the
+ * family they walk, then the panel and the crews - and the class visits
+ * under all of it. Every roster section has the same six headings, so
+ * they are picked out by that and put back together into the one list of
+ * people this test is about. A line with no Role on it is one of the
+ * family headings rather than somebody on duty. */
 const tableOf=()=>{ global.__doc=[]; buildTourRoster('2026-10-07');
   const head=global.__doc.filter(o=>!o.cell).map(o=>String(o.t||''));
   const tables=[]; let cells=[];
   global.__doc.forEach(o=>{ if(o.cell){ cells.push(String(o.t||'')); return; }
     if(cells.length){ tables.push(cells); cells=[]; } });
   if(cells.length) tables.push(cells);
-  const flat=tables[0]||[];
-  const rows=[]; for(let i=0;i<flat.length;i+=6) rows.push(flat.slice(i,i+6));
-  return {head:head,rows:rows,tables:tables}; };
+  const rowsOf=(flat,n)=>{ const out=[];
+    for(let i=0;i<flat.length;i+=n) out.push(flat.slice(i,i+n)); return out; };
+  const mine=tables.filter(t=>String(t[0])==='Student').map(t=>rowsOf(t,6));
+  const rows=[(mine[0]||[[]])[0]];
+  const groups=[];
+  mine.forEach(t=>t.slice(1).forEach(r=>{
+    if(!r[3]){ groups.push(r[0]); return; }
+    rows.push(r); }));
+  return {head:head,rows:rows,groups:groups,tables:tables}; };
 
 console.log('the roster has a column for them');
 let t=tableOf();
@@ -61,7 +72,7 @@ ok(t.head.join(' ').indexOf(body.length+' name tags')!==-1,
    'which is the number of boxes, '+body.length);
 
 console.log('\nthe column is narrow, since it holds a tick and nothing else');
-// The roster is the first table on the page; the class visits under it
+// The tours are the first table on the page; the class visits under it
 // set no widths of their own.
 ok(((global.__docTables[0]||{}).widths||[])[1]>0,
    'its width is set: '+((global.__docTables[0]||{}).widths||[])[1]);
@@ -114,7 +125,7 @@ console.log('\nand there is a button for it');
   ok(typeof api_buildTourRoster==='function','which the script answers');
   const src=fs.readFileSync('build/App.gs','utf8');
   ok(/addItem\('Print the Tour Roster\.\.\.', 'showRosterDialog'\)/.test(src),
-     'and it is on the Wednesday Tours menu');
+     'and it is on the menu');
 }
 
 console.log('\ntick them off as you count them.');

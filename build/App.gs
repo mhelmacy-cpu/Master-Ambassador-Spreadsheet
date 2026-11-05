@@ -44,7 +44,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-05 b';
+var BUILD_ = '2026-11-05 c';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -6535,6 +6535,10 @@ function api_composeEmail(kind, ids, subject, body, useBcc) {
  * one person at a time.
  * ========================================================= */
 
+/* Where somebody who is not guiding sits on the roster. The panel and
+ * the crews go under the tours, in the order she reads them out. */
+var ROSTER_JOB_ORDER_ = [JOBS.PANELIST, JOBS.LOBBY, JOBS.TABLE, JOBS.PASSOFF];
+
 function tourRoster_(dateVal) {
   const amb = {};
   ambassadors_().forEach(function (a) { amb[norm_(a.name)] = a; });
@@ -6548,7 +6552,81 @@ function tourRoster_(dateVal) {
     (grouped[a.name] = grouped[a.name] || []).push(a);
   });
 
-  return Object.keys(grouped).sort().map(function (name) {
+  /* The tours, a family at a time.
+   *
+   * The roster is what she ticks off on the morning, so it is read in
+   * the order the morning happens in rather than alphabetically: each
+   * pair of guides together under the family they are walking, then the
+   * panel and the crews. Somebody who is guiding and greeting is in the
+   * tours, once, with both jobs beside their name, because that is where
+   * she looks for them.
+   *
+   * Two children she has put on one pair of guides are one family here:
+   * one route, one pair, both names on the heading. */
+  const family = {};                      // key -> {label, route, names, at}
+  const mine = {};                        // guide -> the key they are under
+  let seen = 0;
+  assignmentsOn_(dateVal).forEach(function (a) {
+    if (a.job !== JOBS.GUIDE || !trim_(a.name)) return;
+    const route = trim_(a.route);
+    const key = route ? 'r' + norm_(route) : 'v' + norm_(a.visitor);
+    if (!family[key]) {
+      family[key] = { route: route, visitors: [], names: [], at: seen++ };
+    }
+    const f = family[key];
+    if (trim_(a.visitor) && f.visitors.indexOf(trim_(a.visitor)) === -1) {
+      f.visitors.push(trim_(a.visitor));
+    }
+    if (f.names.indexOf(a.name) === -1) f.names.push(a.name);
+    // A name is read under the first family it appears on, and only once.
+    if (mine[a.name] === undefined) mine[a.name] = key;
+  });
+  const order = Object.keys(family).sort(function (x, y) {
+    const rx = Number(family[x].route) || 0;
+    const ry = Number(family[y].route) || 0;
+    if (rx !== ry) return (rx || 999) - (ry || 999);
+    return family[x].at - family[y].at;
+  });
+  const label = function (f) {
+    const who = f.visitors.length ? f.visitors.join(' and ') : 'nobody yet';
+    return (f.route ? 'Route ' + f.route + ' - ' : '') + who;
+  };
+
+  /* The order every name comes out in: the guides, family by family and
+   * alphabetically inside each one, then everybody else by what they are
+   * doing and then by name. */
+  const place = {};
+  const heading = {};
+  let at = 0;
+  order.forEach(function (key) {
+    const f = family[key];
+    f.names.slice().sort().forEach(function (name) {
+      if (mine[name] !== key || place[name] !== undefined) return;
+      place[name] = at++;
+      heading[name] = label(f);
+    });
+  });
+  const rank = function (name) {
+    const jobs = (grouped[name] || []).map(function (j) { return j.job; });
+    let best = ROSTER_JOB_ORDER_.length;
+    jobs.forEach(function (j) {
+      const i = ROSTER_JOB_ORDER_.indexOf(j);
+      if (i !== -1 && i < best) best = i;
+    });
+    return best;
+  };
+  const names = Object.keys(grouped).sort(function (x, y) {
+    const px = place[x] === undefined ? null : place[x];
+    const py = place[y] === undefined ? null : place[y];
+    if (px !== null && py !== null) return px - py;
+    if (px !== null) return -1;           // the tours come first
+    if (py !== null) return 1;
+    const rx = rank(x), ry = rank(y);
+    if (rx !== ry) return rx - ry;
+    return x < y ? -1 : 1;
+  });
+
+  return names.map(function (name) {
     const jobs = grouped[name];
     const who = amb[norm_(name)];
     /* Somebody who is only being handed a family at the end needs no name
@@ -6589,7 +6667,11 @@ function tourRoster_(dateVal) {
       teacher: teacher,
       needsTag: needsTag,
       needsRoute: needsRoute,
-      advisor: who ? who.advisor : ''
+      advisor: who ? who.advisor : '',
+      // Which family they are walking, for the heading above their line,
+      // and blank for everybody who is not guiding.
+      touring: place[name] !== undefined,
+      group: heading[name] || ''
     };
   });
 }
@@ -6676,18 +6758,73 @@ function buildTourRoster(dateStr) {
   /* A box against each name for the two things that are handed out by
    * hand on the morning: their name tag and, for a guide, their route
    * sheet. Both are counted out the afternoon before, and this is the
-   * one sheet that already lists everybody on duty, in one line each and
-   * in alphabetical order. They print empty, to be ticked with a pen. */
-  const table = [['Student', 'Name tag', 'Route', 'Role', 'Class teacher', 'Advisor']];
-  rows.forEach(function (r) {
-    table.push([r.name, r.needsTag ? TICK_BOX_ : '',
-      r.needsRoute ? TICK_BOX_ : '', r.role, r.teacher, r.advisor]);
-  });
-  const grid = body.appendTable(table);
-  // Narrow, since each holds a tick and nothing else.
-  if (grid.setColumnWidth) {
+   * one sheet that already lists everybody on duty, in one line each.
+   * They print empty, to be ticked with a pen.
+   *
+   * Two tables, in the order the morning happens in rather than
+   * alphabetically: the tours first, each pair of guides under the
+   * family they are walking, then the panel and the crews. Somebody who
+   * is guiding and greeting is in the tours, once, with both jobs beside
+   * their name, because that is where she looks for them while she is
+   * counting tags out. */
+  const HEAD_ = ['Student', 'Name tag', 'Route', 'Role', 'Class teacher', 'Advisor'];
+  const lineFor = function (r) {
+    return [r.name, r.needsTag ? TICK_BOX_ : '',
+      r.needsRoute ? TICK_BOX_ : '', r.role, r.teacher, r.advisor];
+  };
+  const narrow = function (grid) {
+    // Narrow, since each holds a tick and nothing else.
+    if (!grid || !grid.setColumnWidth) return;
     grid.setColumnWidth(1, 54);
     grid.setColumnWidth(2, 54);
+  };
+  const touring = rows.filter(function (r) { return r.touring; });
+  const rest = rows.filter(function (r) { return !r.touring; });
+
+  if (touring.length) {
+    body.appendParagraph('');
+    body.appendParagraph('Touring').setHeading(DocumentApp.ParagraphHeading.HEADING3);
+    const table = [HEAD_];
+    const marks = [];
+    let group = null;
+    touring.forEach(function (r) {
+      if (r.group && r.group !== group) {
+        group = r.group;
+        // The family's own line across the table, so a pair is read as a
+        // pair rather than as two names that happen to be next to
+        // each other.
+        marks.push(table.length);
+        table.push([r.group, '', '', '', '', '']);
+      }
+      table.push(lineFor(r));
+    });
+    const grid = body.appendTable(table);
+    narrow(grid);
+    /* Each of those family lines made to look like one: shaded, and the
+     * name in bold, so the eye goes down the page a tour at a time. */
+    marks.forEach(function (at) {
+      if (!grid.getCell) return;
+      const cell = grid.getCell(at, 0);
+      if (!cell) return;
+      if (cell.setBackgroundColor) cell.setBackgroundColor('#eeeeee');
+      if (cell.getChild && cell.getNumChildren && cell.getNumChildren() > 0) {
+        const first = cell.getChild(0);
+        if (first && first.asParagraph) first.asParagraph().editAsText().setBold(true);
+      }
+      for (let c = 1; c < HEAD_.length; c++) {
+        const other = grid.getCell(at, c);
+        if (other && other.setBackgroundColor) other.setBackgroundColor('#eeeeee');
+      }
+    });
+  }
+
+  if (rest.length) {
+    body.appendParagraph('');
+    body.appendParagraph('Panel and greeters')
+      .setHeading(DocumentApp.ParagraphHeading.HEADING3);
+    const table = [HEAD_];
+    rest.forEach(function (r) { table.push(lineFor(r)); });
+    narrow(body.appendTable(table));
   }
 
   /* And the same morning the other way round: every visiting family and
