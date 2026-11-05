@@ -173,4 +173,39 @@ ok(new RegExp('value="'+nextWeekday_('Tuesday')+'"')
 ok(/Staff a Tour/.test(String(global.__dialogs[0].title||'')),
    'titled "'+global.__dialogs[0].title+'", not Wednesday\'s');
 
+console.log('\nChoices is not a stop, and comes off a route that has one');
+{
+  /* Choices is the students' own project period: nothing for a family to
+   * watch, and she does not take them in. Tuesday has one at that hour,
+   * in M211, and no route goes to it. */
+  const tuesNow=routesForDay_('Tuesday');
+  ok(tuesNow.numbers.every(n=>!/Choices/i.test(tuesNow.byNumber[n].itinerary)),
+     'no Tuesday route names Choices');
+  ok(tuesNow.numbers.every(n=>!/M211/.test(tuesNow.byNumber[n].itinerary)),
+     'and none of them goes to M211, which is where it is');
+  ok(SCHEDULE_DAYS_.every(d=>{const r=routesForDay_(d);
+     return r.numbers.every(n=>!/Choices/i.test(r.byNumber[n].itinerary));}),
+     'nor does any route on any other day');
+
+  // And a route that already has the stop on it loses it, because her
+  // sheet is never regenerated: the line itself is taken out.
+  const at=rows_(R).findIndex(r=>trim_(r[col_(R,'Route')])==='3'&&
+    trim_(r[col_(R,'Day')])==='Tuesday')+2;
+  const was=String(m.sheets[R].getRange(at,col_(R,'Itinerary')+1).getValue());
+  m.sheets[R].getRange(at,col_(R,'Itinerary')+1).setValue(
+    was.split('\n').slice(0,3).concat(
+      ['8:44 6th Grade Choices (M211)','8:47 My own stop'],
+      was.split('\n').slice(3)).join('\n'));
+  clearReadCache_();
+  ok(/Choices/.test(routesForDay_('Tuesday').byNumber['3'].itinerary),
+     'route 3 has a Choices stop on it for a moment');
+  routesForDate_(tue);
+  clearReadCache_();
+  const after=routesForDay_('Tuesday').byNumber['3'].itinerary;
+  ok(!/Choices/.test(after),'and printing anything takes it off again');
+  ok(/My own stop/.test(after),'while the stop she typed herself stays');
+  ok(/Leave cafeteria/.test(after)&&/Bring visitors to class/.test(after),
+     'and so does the rest of the route');
+}
+
 console.log('\na tour on a Tuesday walks Tuesday.');

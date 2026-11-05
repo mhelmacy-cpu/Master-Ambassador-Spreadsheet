@@ -44,7 +44,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-05 a';
+var BUILD_ = '2026-11-05 b';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -1315,9 +1315,14 @@ function setupBellSchedules_() {
  *
  * The itinerary is seeded once and never written again, because she
  * edits it: changing it in the script does nothing to a sheet that
- * already has rows. So the one line is taken out, and only that line.
- * Everything else in the cell is left exactly as she has it, and the
- * stop cannot come back, because setup looks every time.
+ * already has rows. So those lines are taken out, and only those lines.
+ * Everything else in the cell is left exactly as she has it, and a stop
+ * cannot come back, because this is looked at every time.
+ *
+ * Two stops go. The Co-Lab, which is where the morning ends rather than
+ * somewhere they walk through. And Choices, which a worked-out route for
+ * a day put on: it is the students' own project period, there is nothing
+ * for a family to watch, and she does not take them in.
  *
  * The last line of every route is the end of the morning, and that is
  * still the co-lab: a line that names the old place is brought up to
@@ -1335,10 +1340,17 @@ function refreshRouteStops_() {
     if (!was) return;
     const kept = [];
     let dropped = 0;
+    let choices = 0;
     was.split('\n').forEach(function (line) {
       // A stop is a time and a place. Only the Co-Lab's own line goes.
       if (/^\s*\d{1,2}:\d{2}\s*-?\s*co-?\s?lab\b\s*$/i.test(line)) {
         dropped++;
+        return;
+      }
+      /* A Choices stop, in the shape a worked-out route writes it: the
+       * time, the grade, the word, and the room. */
+      if (/^\s*\d{1,2}:\d{2}\s+(?:\d+(?:st|nd|rd|th)\s+Grade\s+)?Choices\b/i.test(line)) {
+        choices++;
         return;
       }
       kept.push(line);
@@ -1352,16 +1364,23 @@ function refreshRouteStops_() {
       '$1' + ends);
     const endMoved = moved !== text;
     if (endMoved) text = moved;
-    if (!dropped && !endMoved) return;
+    if (!dropped && !choices && !endMoved) return;
     s.getRange(i + 2, col + 1).setValue(text);
-    const route = trim_(r[col_(N, 'Route')]) || String(i + 1);
+    const dcol = optionalCol_(N, 'Day');
+    const route = (trim_(r[col_(N, 'Route')]) || String(i + 1)) +
+      (dcol === -1 ? '' : ' (' + (trim_(r[dcol]) || 'Wednesday') + ')');
     if (dropped) {
       said.push('the Co-Lab stop came off route ' + route);
+    }
+    if (choices) {
+      said.push('Choices came off route ' + route);
     }
     if (endMoved) {
       said.push('route ' + route + ' now ends in ' + ends);
     }
   });
+  // What was read a moment ago is now a run behind the sheet itself.
+  if (said.length) clearReadCache_();
   return said;
 }
 
@@ -1415,6 +1434,11 @@ var ROUTE_FIXED_STOPS_ = [
     floor: 0, order: 20 },
   { label: 'Learning Center', floor: 3, order: 307.5 }
 ];
+
+/* Blocks that are not a stop whatever room they are in. Choices is the
+ * students' own project period: there is nothing for a visiting family
+ * to watch, and she does not take them in. */
+var ROUTE_SKIP_SUBJECTS_ = ['choices'];
 
 /* Rooms the school calls something other than their number. */
 var ROUTE_ROOM_NAMES_ = { 'M306': 'Art', 'M307': 'Main Science Lab' };
@@ -1506,6 +1530,7 @@ function dayRouteStops_(day) {
       if (!rooms.length) return;
       const grade = POD_GRADE_[pod] || '';
       const subject = trim_(classLabel_(what).replace(/\s+in\s+\S[\s\S]*$/, '')) || 'Class';
+      if (ROUTE_SKIP_SUBJECTS_.indexOf(norm_(subject)) !== -1) return;
       const key = (grade || '?') + '|' + norm_(subject);
       if (!byKey[key]) {
         byKey[key] = { grade: grade, subject: subject, what: what, rooms: [] };
@@ -1716,6 +1741,11 @@ function routesForDay_(day) {
 function routesForDate_(dateVal) {
   const day = WEEKDAYS_[dateVal.getDay()];
   ensureDayRoutes_(day);
+  /* And a stop that should not be on a route comes off it here too, not
+   * only in setup: she should not have to run anything for a route sheet
+   * to stop sending them to Choices. Only a line this script wrote is
+   * touched, so an itinerary of her own is left exactly as it is. */
+  refreshRouteStops_();
   const mine = routesForDay_(day);
   if (mine.numbers.length) return mine;
   return norm_(day) === norm_('Wednesday') ? mine : routesForDay_('Wednesday');
@@ -5311,11 +5341,11 @@ function handbackFor_(page, name, dateVal) {
     const mine = where[name];
     return (withWhom.length ? 'You and ' + withWhom.join(' and ') + ' take ' : 'Take ') +
       page.visitor.name + ' to ' + (mine || 'your class') + ' with you. At ' + endsAt +
-      ' take them to ' + endPlace_() + ' and wait there with them until ' + wait + ' comes.';
+      ' take them to ' + endPlace_() + ' and wait with them for ' + wait + '.';
   }
   const theirs = where[plan.takers[0]];
   return plan.takers.join(' and ') + ' takes ' + page.visitor.name +
-    ' to ' + (theirs ? theirs : 'class') + '. Go back to your own class. You are finished.';
+    ' to ' + (theirs ? theirs : 'class') + '. Go back to your own class, you are finished.';
 }
 
 /** The guides' line on a sheet that ends in a 5th grade class visit. */
@@ -5326,26 +5356,33 @@ function handoffForGuides_(page) {
   return 'Take ' + page.visitor.name + ' to ' + lang + ' with ' + who + '.';
 }
 
+/* The hand-off, in as few words as it can be said in.
+ *
+ * These are the last lines on a guide's sheet and they are set large, so
+ * every extra clause is two or three printed lines. The whole sheet has
+ * to be one page: a second page is one a guide walks off without. */
+
 /** The same two lines where the family is handed to another ambassador. */
 function handoffToAmbassador_(page, to, where) {
-  return page.visitor.name + ' is going to ' + (where || 'class') + ' with ' + to + '.';
+  return 'Hand ' + page.visitor.name + ' to ' + to +
+    (where ? ' (' + where + ')' : '') + '.';
 }
 
 /** What the guide does once they have handed the family over. */
-var HANDOFF_ACTION_ = 'Give them the tour route, the clock and YOUR NAME TAG. ' +
-  'Go back to your own class. You are finished.';
+var HANDOFF_ACTION_ = 'Give them the route, the clock and YOUR NAME TAG. ' +
+  'Back to class, you are finished.';
 
 /** What the student receiving them does, whoever they are. */
 function handoffReceive_(page, visitorName) {
   const wait = setting_('Wait For', 'Maren');
   const endsAt = timeLabelOrRaw_(setting_('Tour End Time', '9:25'));
   return 'At ' + endsAt + ' take ' + (visitorName || 'them') +
-    ' to ' + endPlace_() + ' and wait there with them until ' + wait + ' comes.';
+    ' to ' + endPlace_() + ' and wait with them for ' + wait + '.';
 }
 
 /** What the 5th grader does once the sheet reaches them. */
 function handoffForBuddy_(page) {
-  return 'Say hello, and tell ' + page.visitor.name + ' what you are working on. ' +
+  return 'Say hello and tell ' + page.visitor.name + ' what you are doing. ' +
     handoffReceive_(page);
 }
 
@@ -5363,18 +5400,86 @@ function appendBold_(body, text) {
 
 /** One line on a route sheet, double spaced so it can be read while walking. */
 /** The same, but set large: the lines a guide must not misread. */
-function shout_(body, text) {
-  const p = body.appendParagraph(text);
-  p.setLineSpacing(2);
-  p.editAsText().setBold(true).setFontSize(14);
-  return p;
+/* =========================================================
+ * One page per guide
+ *
+ * A guide reads their sheet walking, holding a visiting family, so it is
+ * large and airy. It also has to be ONE page: a second sheet is the one
+ * they leave on the printer, and the end of the morning is on it.
+ *
+ * Google does not tell a script how a Doc will break, so the only way to
+ * promise one page is to work it out here. The sheet is collected as
+ * lines first, its height is worked out at the width it will have, and
+ * the airiest look it fits in is the one used. A sheet with nothing much
+ * on it stays double spaced; the heavy one, two children going round
+ * together with a class visit each, closes up until it fits instead of
+ * running onto a second page.
+ * ========================================================= */
+
+var SHEET_PAPER_ = { height: 792, width: 612 };     // Letter, in points
+
+/* How much of the page a sheet may fill and still count as fitting.
+ * The height here is worked out, not measured: Google lays the Doc out
+ * its own way, and a sheet that only just fits on paper is one a long
+ * name spills. So a line or two of the page is kept back. */
+var SHEET_FIT_ = 0.94;
+
+/* Tried in this order, airiest first. Only the last one is cramped, and
+ * only a sheet that cannot fit any other way ever uses it. */
+var SHEET_LOOKS_ = [
+  { spacing: 2, body: 11, big: 14, margin: 54 },
+  { spacing: 1.5, body: 11, big: 14, margin: 54 },
+  { spacing: 1.3, body: 11, big: 14, margin: 54 },
+  { spacing: 1.15, body: 11, big: 13, margin: 54 },
+  { spacing: 1.15, body: 10, big: 12, margin: 36 },
+  { spacing: 1, body: 10, big: 11, margin: 36 }
+];
+
+/**
+ * How tall a sheet comes out, near enough to choose by.
+ *
+ * Each line is as many printed lines as its characters need at the width
+ * it has, and each printed line is its own height. Deliberately a little
+ * pessimistic: a sheet that only just fits is one a long name would push
+ * over, so the estimate rounds against itself.
+ */
+function sheetHeight_(lines, look) {
+  const usable = SHEET_PAPER_.width - look.margin * 2;
+  let h = 0;
+  (lines || []).forEach(function (l) {
+    const size = l.head ? 20 : (l.big ? look.big : look.body);
+    const wide = !!(l.head || l.big || l.bold);
+    const perChar = size * (wide ? 0.58 : 0.54);
+    const perLine = Math.max(10, Math.floor(usable / perChar));
+    const rows = Math.max(1, Math.ceil(String(l.t || '').length / perLine));
+    h += rows * size * 1.2 * (l.head ? 1.15 : look.spacing);
+  });
+  return h;
 }
 
-function say_(body, text, bold) {
-  const p = body.appendParagraph(text);
-  p.setLineSpacing(2);
-  if (bold) p.editAsText().setBold(true);
-  return p;
+/** The airiest look this sheet fits on one page in. */
+function sheetLook_(lines) {
+  for (let i = 0; i < SHEET_LOOKS_.length; i++) {
+    const look = SHEET_LOOKS_[i];
+    const room = (SHEET_PAPER_.height - look.margin * 2) * SHEET_FIT_;
+    if (sheetHeight_(lines, look) <= room) return look;
+  }
+  return SHEET_LOOKS_[SHEET_LOOKS_.length - 1];
+}
+
+/** One sheet's lines onto the page, in the look that was chosen. */
+function sheetRender_(body, lines, look) {
+  (lines || []).forEach(function (l) {
+    const p = body.appendParagraph(String(l.t == null ? '' : l.t));
+    if (l.head) {
+      p.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+      return;
+    }
+    p.setLineSpacing(look.spacing);
+    const text = p.editAsText();
+    text.setFontSize(l.big ? look.big : look.body);
+    if (l.big || l.bold) text.setBold(true);
+  });
 }
 
 /**
@@ -5442,12 +5547,20 @@ function buildRouteSheets(dateStr) {
   const body = doc.getBody();
   body.clear();
 
-  sheets.forEach(function (sheet, i) {
+  /* Every sheet is collected as lines first and put on the page after,
+   * because how airy it can be depends on how much of it there is. */
+  const built = [];
+  sheets.forEach(function (sheet) {
     const page = sheet.page;
-    if (i > 0) body.appendPageBreak();
+    const lines = [];
+    const say_ = function (unused, text, bold) { lines.push({ t: text, bold: !!bold }); };
+    const shout_ = function (unused, text) { lines.push({ t: text, big: true }); };
+    const body = null;
 
-    body.appendParagraph(sheet.guide ? sheet.guide.toUpperCase() : page.visitor.name.toUpperCase())
-      .setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    lines.push({
+      t: sheet.guide ? sheet.guide.toUpperCase() : page.visitor.name.toUpperCase(),
+      head: true
+    });
 
     say_(body, 'Route ' + (page.routeNo || '-') +
       (page.direction ? ' (' + page.direction + ')' : '') + '   -   ' + longDate_(dateVal));
@@ -5531,7 +5644,7 @@ function buildRouteSheets(dateStr) {
       shout_(body, HANDOFF_ACTION_);
       say_(body, 'FOR ' + to.toUpperCase(), true);
       shout_(body, 'Take ' + page.visitor.name + ' to ' +
-        (handoff.landing || 'class') + ' with you. ' + handoffReceive_(page));
+        (handoff.landing || 'class') + '. ' + handoffReceive_(page));
     } else if (sheet.guide) {
       /* The guide who takes the family into their own class walks out of
        * the tour and straight into a period, so their books come first,
@@ -5545,6 +5658,23 @@ function buildRouteSheets(dateStr) {
         handbackFor_(page, sheet.guide, dateVal));
     }
     });
+    built.push(lines);
+  });
+
+  /* The page itself. Each sheet takes the airiest look it fits on one
+   * page in, and the document's margin is the smallest any of them
+   * needs, since a margin belongs to the whole document rather than to
+   * one page. A sheet printed with more room than it was measured for
+   * only fits better. */
+  const looks = built.map(function (lines) { return sheetLook_(lines); });
+  const margin = looks.reduce(function (least, look) {
+    return Math.min(least, look.margin);
+  }, 54);
+  body.setMarginTop(margin).setMarginBottom(margin)
+    .setMarginLeft(margin).setMarginRight(margin);
+  built.forEach(function (lines, i) {
+    if (i > 0) body.appendPageBreak();
+    sheetRender_(body, lines, looks[i]);
   });
 
   doc.saveAndClose();

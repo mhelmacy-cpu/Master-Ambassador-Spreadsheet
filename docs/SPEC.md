@@ -203,7 +203,11 @@ How a day's route is built, which is how she builds one by hand:
 - **The stops are the classes that are on while the guides are walking**
   (8:30 to 9:06), in a room in this building. Homeroom, lunch, recess and
   the Monday meeting are not stops; neither is PE in the gym, nor an
-  elective that scatters a grade over six rooms.
+  elective that scatters a grade over six rooms. **Choices is not a stop
+  either**: it is the students' own project period, there is nothing for a
+  family to watch, and she does not take them in. A route that already
+  has a Choices stop on it loses that line the next time anything prints,
+  the same way the Co-Lab stop came off.
 - **The sections of one class are one stop, not several.** The two 7th
   grade Humanities rooms, the three 6th grade ones, the three world
   language rooms: each route takes one of them, which is what gives the
@@ -740,11 +744,13 @@ what she decided rather than working it out again from the guide's own
 schedule.
 
 - **The route sheet.** The guide's page ends, in large type, with
-  "Robin Visitor is going to Science in M307 with Jane Moss." and "Give
-  them the tour route, the clock, and YOUR NAME TAG. Then go back to
-  your own class. You are finished." Underneath, a block headed FOR
-  JANE MOSS tells the receiving student to take them to class and bring
-  them to the co-lab at 9:25.
+  "Hand Robin Visitor to Jane Moss (Science in M307)." and "Give them the
+  route, the clock and YOUR NAME TAG. Back to class, you are finished."
+  Underneath, a block headed FOR JANE MOSS: "Take Robin Visitor to
+  Science in M307. At 9:25 AM take them to the co-lab and wait with them
+  for Maren." Said in as few words as it can be: these are the last lines
+  on the sheet and they are set large, so every extra clause is two or
+  three printed lines of a page that has to hold everything.
 - **The teacher whose room it is** gets their own email, naming the
   visiting student, who is bringing them up and who they will be
   sitting with.
@@ -901,6 +907,19 @@ morning before they reach the printer.
   they are taking, who is with them, the walk itself, and what to do at
   9:06 - which differs between the two guides, so each is told only
   their own part.
+
+  **It is one page, always.** A second sheet is the one a guide leaves on
+  the printer, and the end of the morning is on it. Google does not tell
+  a script where a Doc will break, so each sheet is collected as lines
+  first, its height worked out at the width it will have, and the airiest
+  look it fits in is the one used: double spaced at 11 point for an
+  ordinary sheet, closing up through 1.5 and 1.15 and, only if it has to,
+  to 10 point with half-inch margins. Nothing goes below 10 point. The
+  heaviest sheet there is - two children going round together with a
+  class visit each - fits at 1.15. A sheet may only fill 94% of the page,
+  because the height is worked out rather than measured and a sheet that
+  only just fits is one a long name spills. `t100` measures every sheet
+  for every day of the week and holds this down.
 
   A guide who takes their visitor into their own class is told first, in
   the same large type, to **"Stop at your locker with your visitor if you
