@@ -101,8 +101,22 @@ ok(dup.ignored.some(x=>/already on that crew/.test(x)),
 const onTable=rows_(T).filter(r=>trim_(r[col_(T,'Job')])===JOBS.TABLE)
   .map(r=>trim_(r[col_(T,'Ambassador')]));
 ok(onTable.length===1,'and they are on it once: '+onTable.join(', '));
-ok(rows_(T).filter(r=>trim_(r[col_(T,'Job')])===JOBS.LOBBY).length===2,
-   'the move took them off the door, which is two short now');
+
+/* But the two crews are two jobs, and one student can hold both: she
+ * has just put a door greeter on the table crew as well, and the door
+ * keeps its three. Nobody is taken off a job for another one. */
+ok(rows_(T).filter(r=>trim_(r[col_(T,'Job')])===JOBS.LOBBY).length===3,
+   'the door still has its three: they were not taken off it');
+ok(rows_(T).filter(r=>trim_(r[col_(T,'Ambassador')])===can[0].name)
+   .map(r=>trim_(r[col_(T,'Job')])).sort().join(' and ')===
+   [JOBS.LOBBY,JOBS.TABLE].sort().join(' and '),
+   can[0].name+' is down for both: '+rows_(T)
+   .filter(r=>trim_(r[col_(T,'Ambassador')])===can[0].name)
+   .map(r=>trim_(r[col_(T,'Job')])).join(' and '));
+ok((dup.swapped||[]).some(w=>(w.problems||[])
+   .some(t=>new RegExp('also on the '+JOBS.LOBBY+' crew').test(t))),
+   'and the answer says so: "'+(dup.swapped||[])
+   .map(w=>(w.problems||[]).join(' ')).filter(Boolean)[0]+'"');
 
 console.log('\nher panel still covers two of the places downstairs');
 {
@@ -110,14 +124,12 @@ console.log('\nher panel still covers two of the places downstairs');
   const panel=api_handChoices('2026-10-07',JOBS.PANELIST).rows.slice(0,4).map(r=>r.name);
   api_saveByHand('2026-10-07',JOBS.PANELIST,panel);
   clearReadCache_();
-  /* She has two of her own on the door by now, and the crew is three, so
-   * the panel covers the one place left and no more: her picks keep
-   * their places and the crew never grows past its size. */
+  /* She has all three of her own on the door by now, so the panel covers
+   * nothing: her picks keep their places and the crew never grows past
+   * its size. */
   const c=crewOf(planTour('2026-10-07',true),JOBS.LOBBY);
   ok(c.chosen.length===c.needed,'the door is full: '+c.chosen.join(', '));
-  ok(c.fromPanel===1,'one place covered off the panel, which is all that was open');
-  ok(panel.slice(0,2).some(n=>c.chosen.indexOf(n)!==-1),
-     'by somebody she put on the panel');
+  ok(c.fromPanel===0,'and none of it off the panel: there was no place open');
   // And with the door empty, the panel covers both of its places.
   const mine=c.chosen.filter(n=>panel.indexOf(n)===-1);
   commitTour('2026-10-07',true,panel,

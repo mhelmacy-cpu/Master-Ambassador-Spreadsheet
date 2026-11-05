@@ -358,13 +358,25 @@ used to disappear and leave her nothing to click:
   named, so nothing is counted against their guides' rooms, which they are
   not going to.
 
-Picking one of them **moves** them. They come off the place they were on,
-and the answer says so ("Mika Rivers comes off the Lobby Greeter crew,
-which is one short now"), so the gap is hers to fill rather than a
-surprise on the tracker. Two things are refused instead of done quietly:
-taking the only guide off a family, and moving somebody onto the other
-place on the family they are already guiding, which is a roundabout way
-of asking for one guide when choosing "nobody" says it plainly.
+Picking one of them **adds that place to what they already have.**
+Nobody is taken off a job to be given another: one student can be a
+greeter, guide a family and be handed a family at the end of it, which is
+three jobs, three rows on the Tour Tracker, and all three on their locker
+slip and in their email. The answer says what else they are down for
+("Blake Glenn is also guiding Sam Visitor, and stays on it"), so a clash
+she did not mean is on the screen rather than a surprise on the tracker.
+
+**One thing cannot stack, and it is the same job twice rather than two
+jobs: a guide cannot walk two families at the same time.** Picking a
+guide onto another family still moves them, which is what the dropdowns
+are for, and the answer says what it left ("Blake Glenn comes off Sam
+Visitor, who is down to Camille Bedeau. A guide cannot walk two families
+at once"). Everything else about them stays. Two things are refused
+instead of done quietly: taking the **only** guide off a family, which
+says to use "goes round" if the two children are to tour together, and
+putting somebody on the other place of the family they are already
+guiding, which is a roundabout way of asking for one guide when choosing
+"nobody" says it plainly.
 
 **A pair goes down to one and back up to two.** Choosing "nobody" on a
 guide place leaves the other one walking the family alone, as before. A
@@ -396,22 +408,27 @@ Greeting** to 0 hands the crew back to the roster and **Lobby Greeters
 Needed**; naming the other crew in **Greeting Done By Panelists** swaps
 which one they cover.
 
-Nobody else is given two jobs in the same slot. Whoever has done fewest jobs
-so far is offered first, so the work spreads evenly across the year.
+The command's own suggestions give nobody a second job: whoever has done
+fewest jobs so far is offered first, so the work spreads evenly across
+the year. **Her own picks are another matter.** Every list offers
+everybody, with what they already have beside the name and the free ones
+first, and picking somebody who is already down for something gives them
+both.
 
 ### Changing a guide before it is saved
 
 Every guide in the preview is a dropdown holding that person plus
-everybody still free to guide (active, allowed the job, not already
-working that tour), each shown with grade, gender, race, strength and
-how many jobs they have done, least busy first. Change as many as she
+everybody who could guide (active, allowed the job), each shown with
+grade, gender, race, strength and how many jobs they have done, least
+busy first. Anybody already working that tour is in the list too, with
+that job written beside their name. Change as many as she
 likes and press Save: what she picked is what reaches the Tour Tracker
 and Prospective Students.
 
 The swap is refused only where it would break the sheet rather than a
-matching rule: a name not on the Ambassadors sheet, somebody not
-Active, somebody already working that tour, or two people the Keep
-Apart list says cannot walk the same family. Anything else goes
+matching rule: a name not on the Ambassadors sheet, somebody not Active,
+a guide who would end up walking two families at once, or two people the
+Keep Apart list says cannot walk the same family. Anything else goes
 through, and the Saved message says what each swap did to the pair.
 
 Each dropdown also offers **nobody**, which takes that place off and
@@ -444,11 +461,13 @@ Anything else, blank included, is a no.
 ## Changing who is working
 
 "Change Who Is Working..." opens the whole roster for a date: every job,
-who has it, who they are working with, and a list of everybody free to
-take it over. Free means active, allowed that job on Eligibility, not
-already working that tour, and not kept apart from anyone on the same
-pair. Each name is shown with grade, gender, race, strength and how many
-jobs they have done, least busy first.
+who has it, who they are working with, and a list of everybody who could
+take it over: active, allowed that job on Eligibility, and not kept apart
+from anyone on the same pair. Each name is shown with grade, gender,
+race, strength and how many jobs they have done, least busy first, and
+anyone already working that tour has that job beside their name. Picking
+one of them keeps what they have and adds this, and the answer says so;
+the exception is the guide walking two families, as above.
 
 Pick a name, press Swap, and it is written to the Tour Tracker there and
 then. Every email, route sheet and locker slip is built from the tracker

@@ -44,7 +44,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-04 b';
+var BUILD_ = '2026-11-05 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -3323,15 +3323,15 @@ function planTour(dateStr, keepExisting) {
    * below them, marked with what that job is. Offering only the ones
    * left over made the list a record of what the command had done, and
    * the panel is where she changes her mind: somebody down as a guide is
-   * exactly who she may want to move onto it. Anyone already saved as a
-   * panelist is in it too, ticked.
+   * exactly who she may want on it as well, and they keep the guiding.
+   * Anyone already saved as a panelist is in it too, ticked.
    */
   const onPanel = {};
   assignmentsOn_(dateVal).forEach(function (a) {
     if (a.job === JOBS.PANELIST) onPanel[norm_(a.name)] = true;
   });
-  // Which family each guide has, so the list can say what ticking them
-  // would take them off.
+  // Which family each guide has, so the list can say what else ticking
+  // them would have them doing.
   const guidingFor = {};
   pairs.forEach(function (p) {
     (p.guideNames || []).forEach(function (n) {
@@ -3367,7 +3367,10 @@ function planTour(dateStr, keepExisting) {
    * mind as she goes, and the person she wants is often somebody this
    * run has already put somewhere else. They are offered with the job
    * they already have written beside them, and sorted below everybody
-   * who is free; picking one moves them, and says what it left. */
+   * who is free. Picking one adds this place to what they have, since
+   * one student can do more than one job; the one exception is a guide
+   * on another family, who is moved, because nobody can walk two
+   * families at the same time. Either way it says what it did. */
   const spare = pool.slice().sort(function (a, b) {
     const ba = used[a.name] ? 1 : 0;
     const bb = used[b.name] ? 1 : 0;
@@ -3381,8 +3384,8 @@ function planTour(dateStr, keepExisting) {
     [JOBS.GUIDE, JOBS.LOBBY, JOBS.TABLE].forEach(function (j) {
       jobs[j] = canDo(a, j);
     });
-    // What this run has already given them, so she can see what picking
-    // them would move them off.
+    // What this run has already given them, so she can see what else
+    // they would be doing.
     const busyWith = used[a.name]
       ? used[a.name] + (guidingFor[norm_(a.name)] ? ' for ' + guidingFor[norm_(a.name)] : '')
       : '';
@@ -3778,86 +3781,98 @@ function applySwaps_(plan, swaps, ignored) {
   const byName = {};
   ambassadors_().forEach(function (a) { byName[norm_(a.name)] = a; });
 
-  // Everybody the plan already has a job for, and where, so picking one
-  // of them moves them rather than putting them on twice.
+  /* Everybody the plan already has a job for. Picking one of them puts
+   * them on the new place as well: nobody is taken off anything, because
+   * one student can do more than one job on a tour. A greeter can guide,
+   * and can be handed a family at the end of it.
+   *
+   * What else they are down for is said out loud instead, so a clash she
+   * did not mean is on the screen in front of her rather than only on
+   * the tracker. */
   const taken = {};
-  const standing = {};
+  const panel = {};
+  (plan.free || []).forEach(function (f) { if (f.onPanel) panel[norm_(f.name)] = true; });
   plan.pairs.forEach(function (p) {
     /* A student going round with somebody else has no places of their
      * own: those guides stand on the row that leads, and that is the
      * row anything about them has to be done to. */
     if (p.follows) return;
-    (p.guideNames || []).forEach(function (g) {
-      taken[norm_(g)] = true;
-      standing[norm_(g)] = { kind: 'guide', visitor: p.visitor.name };
-    });
-    if (p.buddy) {
-      taken[norm_(p.buddy.name)] = true;
-      standing[norm_(p.buddy.name)] = { kind: 'buddy', visitor: p.visitor.name };
-    }
+    (p.guideNames || []).forEach(function (g) { taken[norm_(g)] = true; });
+    if (p.buddy) taken[norm_(p.buddy.name)] = true;
   });
   plan.greeters.forEach(function (c) {
-    c.chosen.forEach(function (n) {
-      taken[norm_(n)] = true;
-      standing[norm_(n)] = { kind: 'crew', job: c.job };
-    });
+    c.chosen.forEach(function (n) { taken[norm_(n)] = true; });
   });
 
-  /* Somebody she has picked who is already somewhere else in this plan.
-   * They come off that place first, because nobody works two jobs at
-   * once, and what it left is said out loud rather than discovered on
-   * the tracker afterwards. The one thing refused is emptying a family,
-   * since then nobody is walking them at all. */
-  const freeUp = function (name, forVisitor) {
-    const at = standing[norm_(name)];
-    if (!at) return '';
-    /* Already on this very family. Moving them here would leave the
-     * family with one guide by a side door, and there is a plain way to
-     * ask for that, so it says so instead of quietly doing it. */
-    if (at.kind === 'guide' && forVisitor && norm_(at.visitor) === norm_(forVisitor)) {
-      throw new Error(name + ' is already guiding ' + at.visitor +
-        '. To make it one guide, pick "nobody" on the other place instead.');
-    }
-    if (at.kind === 'buddy') {
-      throw new Error(name + ' is hosting ' + at.visitor + ' for their class visit. ' +
-        'Change that on the Prospective Students sheet first.');
-    }
-    if (at.kind === 'crew') {
-      const cr = plan.greeters.filter(function (c) { return c.job === at.job; })[0];
-      if (!cr) return '';
-      let i = -1;
-      cr.chosen.forEach(function (n, k) { if (norm_(n) === norm_(name)) i = k; });
-      if (i === -1) return '';
-      cr.chosen.splice(i, 1);
-      cr.short = Math.max(0, cr.needed - cr.chosen.length);
-      cr.swapped = true;
+  /**
+   * What else she has this one down for, said rather than undone.
+   *
+   * One student can hold more than one job on a tour: a greeter can
+   * guide, and can be handed a family at the end of it. So a name picked
+   * for a place keeps everything else it already has, and what that is
+   * gets said out loud, so a clash she did not mean is on the screen in
+   * front of her rather than only on the tracker afterwards.
+   *
+   * One thing cannot stack, and it is the same job twice rather than two
+   * jobs: a guide cannot walk two families at the same time. Picking a
+   * guide onto another family still moves them, which is what the
+   * dropdowns are for, and still says what it left behind. Two children
+   * who are to go round together on one pair of guides are asked for
+   * with "goes round" instead, and that is what the refusal says.
+   */
+  const alsoDoing = function (name, forVisitor, forJob) {
+    const said = [];
+    let moved = '';
+    plan.pairs.forEach(function (p) {
+      if (p.follows) return;
+      if (p.buddy && norm_(p.buddy.name) === norm_(name)) {
+        said.push('hosting ' + p.visitor.name + ' for their class visit');
+      }
+      let at = -1;
+      (p.guideNames || []).forEach(function (g, i) { if (norm_(g) === norm_(name)) at = i; });
+      if (at === -1) return;
+      if (!forVisitor) {
+        // A crew place, or the panel: guiding is another job, so it stays.
+        said.push('guiding ' + p.visitor.name);
+        return;
+      }
+      /* Already on this very family. Moving them here would leave the
+       * family with one guide by a side door, and there is a plain way
+       * to ask for that, so it says so instead of quietly doing it. */
+      if (norm_(p.visitor.name) === norm_(forVisitor)) {
+        throw new Error(name + ' is already guiding ' + p.visitor.name +
+          '. To make it one guide, pick "nobody" on the other place instead.');
+      }
+      if (p.guideNames.length < 2) {
+        throw new Error(name + ' is the only guide ' + p.visitor.name + ' has, so ' +
+          'moving them would leave ' + p.visitor.name + ' with nobody, and one guide ' +
+          'cannot walk two families at the same time. If you want both children to go ' +
+          'round together, on the same guides and the same route, set "goes round" to ' +
+          '"with ' + p.visitor.name + '" on the other one\'s row instead. Otherwise ' +
+          'give ' + p.visitor.name + ' somebody else first.');
+      }
+      p.guideNames.splice(at, 1);
+      p.guides.splice(at, 1);
+      if (p.guideSolo) p.guideSolo.splice(at, 1);
+      p.solo = p.guideNames.join(', ');
+      p.swapped = true;
       delete taken[norm_(name)];
-      delete standing[norm_(name)];
-      return name + ' comes off the ' + at.job + ' crew, which is one short now.';
-    }
-    const p = plan.pairs.filter(function (x) {
-      return norm_(x.visitor.name) === norm_(at.visitor);
-    })[0];
-    if (!p) return '';
-    let i = -1;
-    p.guideNames.forEach(function (g, k) { if (norm_(g) === norm_(name)) i = k; });
-    if (i === -1) return '';
-    if (p.guideNames.length < 2) {
-      throw new Error(name + ' is the only guide ' + at.visitor + ' has, so moving ' +
-        'them would leave ' + at.visitor + ' with nobody. If you want both ' +
-        'children to go round together, on the same guides and the same route, ' +
-        'set "goes round" to "with ' + at.visitor + '" on the other one\'s row ' +
-        'instead. Otherwise give ' + at.visitor + ' somebody else first.');
-    }
-    p.guideNames.splice(i, 1);
-    p.guides.splice(i, 1);
-    if (p.guideSolo) p.guideSolo.splice(i, 1);
-    p.solo = p.guideNames.join(', ');
-    p.swapped = true;
-    delete taken[norm_(name)];
-    delete standing[norm_(name)];
-    return name + ' comes off ' + at.visitor + ', who is down to ' +
-      p.guideNames.join(' and ') + '.';
+      moved = name + ' comes off ' + p.visitor.name + ', who is down to ' +
+        p.guideNames.join(' and ') + '. A guide cannot walk two families at once.';
+    });
+    plan.greeters.forEach(function (c) {
+      // The crew she is picking on says it where it is picked.
+      if (forJob && c.job === forJob) return;
+      if (c.chosen.some(function (n) { return norm_(n) === norm_(name); })) {
+        said.push('on the ' + c.job + ' crew');
+      }
+    });
+    if (panel[norm_(name)]) said.push('on the panel');
+    const note = said.length
+      ? name + ' is also ' + said.join(' and ') +
+        ', and stays on it: nobody is taken off a job for another one.'
+      : '';
+    return [moved, note].filter(Boolean).join(' ');
   };
 
   /* Where a family's guide places really are.
@@ -3910,8 +3925,9 @@ function applySwaps_(plan, swaps, ignored) {
           return;
         }
       }
-      // Already working this tour: they are moved, not refused.
-      if (taken[norm_(who.name)]) moved = freeUp(who.name, x.visitor);
+      /* Already working this tour: they take this place as well, and
+       * what else they are down for is said. */
+      if (taken[norm_(who.name)]) moved = alsoDoing(who.name, x.visitor, x.job);
     }
     /* A second guide put back on a family that is walking with one.
      * The other way round from a drop, and the same in reverse: the
@@ -3935,7 +3951,6 @@ function applySwaps_(plan, swaps, ignored) {
           ' are on the Keep Apart list, so they cannot walk the same family.');
       }
       taken[norm_(who.name)] = true;
-      standing[norm_(who.name)] = { kind: 'guide', visitor: pair.visitor.name };
       pair.guideNames.push(who.name);
       pair.guides.push(who.name + ' (grade ' + (who.grade || '?') + ')');
       if (pair.guideSolo) pair.guideSolo.push(!!who.canSolo);
@@ -3968,7 +3983,6 @@ function applySwaps_(plan, swaps, ignored) {
             ' are on the Keep Apart list, so they cannot work the same crew.');
         }
         taken[norm_(who.name)] = true;
-        standing[norm_(who.name)] = { kind: 'crew', job: cr.job };
         cr.chosen.push(who.name);
         cr.short = Math.max(0, cr.needed - cr.chosen.length);
         cr.swapped = true;
@@ -5954,8 +5968,9 @@ function api_swapList(dateStr) {
  *
  * The row goes straight on the Tour Tracker, which every email, route
  * sheet and locker slip is built from, so they all follow. Somebody
- * already working that morning is moved rather than refused, the same as
- * a swap, and what it left empty is said in the answer.
+ * already working that morning keeps what they have and takes this
+ * place as well, the same as a swap, and what else they are down for is
+ * said in the answer.
  */
 function api_addGuide(dateStr, visitor, newName) {
   clearReadCache_();
@@ -5989,23 +6004,16 @@ function api_addGuide(dateStr, visitor, newName) {
       ' are on the Keep Apart list, so they cannot walk the same family.');
   }
 
-  // Already working that morning: moved, not refused.
+  /* Already working that morning: they take this place as well and keep
+   * what they have, because one student can do more than one job. What
+   * else they are down for is said rather than undone. */
+  if (have.some(function (r) { return norm_(r.name) === norm_(who.name); })) {
+    throw new Error(who.name + ' is already guiding ' + have[0].visitor + '.');
+  }
   const elsewhere = roster.filter(function (r) { return norm_(r.name) === norm_(who.name); });
-  elsewhere.forEach(function (r) {
-    if (r.job !== JOBS.GUIDE) return;
-    const rest = roster.filter(function (o) {
-      return o.row !== r.row && o.job === JOBS.GUIDE && norm_(o.visitor) === norm_(r.visitor);
-    });
-    if (!rest.length) {
-      throw new Error(who.name + ' is the only guide ' + r.visitor + ' has. Give ' +
-        r.visitor + ' somebody else first.');
-    }
-  });
-  elsewhere.slice().sort(function (a, b) { return b.row - a.row; }).forEach(function (r) {
-    sheet_(N).deleteRow(r.row);
-  });
   const moved = elsewhere.map(function (r) {
-    return who.name + ' comes off ' + r.job + (r.visitor ? ' for ' + r.visitor : '') + '.';
+    return who.name + ' is also down as ' + r.job +
+      (r.visitor ? ' for ' + r.visitor : '') + ', and stays on it.';
   });
 
   const tracker = sheet_(N);
@@ -6048,47 +6056,34 @@ function api_swapAmbassador(dateStr, row, newName) {
     return norm_(a.name) === norm_(newName);
   })[0];
   if (!who) throw new Error(trim_(newName) + ' is not on the Ambassadors sheet.');
-  /* Already working that morning: they are moved rather than refused,
-   * because this is where she changes her mind. What it leaves empty is
-   * said in the answer, and the list underneath refreshes to show it.
-   * The one thing refused is taking the only guide off a family. */
+  /* Already working that morning: they keep what they have and take
+   * this place as well, because one student can do more than one job.
+   * What else they are down for is said in the answer rather than
+   * quietly undone. The one thing refused is the same person in both of
+   * one family's guide places. */
   const elsewhere = roster.filter(function (r) {
     return r.row !== at && norm_(r.name) === norm_(who.name);
   });
   elsewhere.forEach(function (r) {
     if (r.job !== JOBS.GUIDE) return;
-    /* Already guiding this very family. Moving them across would take the
-     * family down to one guide by a side door, and there is a plain way
-     * to ask for that, so it says so instead. */
     if (entry.job === JOBS.GUIDE && norm_(r.visitor) === norm_(entry.visitor)) {
       throw new Error(who.name + ' is already guiding ' + r.visitor +
         '. To make it one guide, choose "nobody" on this place instead.');
     }
-    const rest = roster.filter(function (o) {
-      return o.row !== r.row && o.job === JOBS.GUIDE && norm_(o.visitor) === norm_(r.visitor);
-    });
-    if (!rest.length) {
-      throw new Error(who.name + ' is the only guide ' + r.visitor + ' has. Give ' +
-        r.visitor + ' somebody else first.');
-    }
-  });
-  let target = at;
-  elsewhere.slice().sort(function (a, b) { return b.row - a.row; }).forEach(function (r) {
-    sheet_(N).deleteRow(r.row);
-    if (r.row < target) target--;          // the rows above it have shifted up
   });
   const moved = elsewhere.map(function (r) {
-    return who.name + ' comes off ' + r.job + (r.visitor ? ' for ' + r.visitor : '') + '.';
+    return who.name + ' is also down as ' + r.job +
+      (r.visitor ? ' for ' + r.visitor : '') + ', and stays on it.';
   });
 
-  sheet_(N).getRange(target, col_(N, 'Ambassador') + 1).setValue(who.name);
+  sheet_(N).getRange(at, col_(N, 'Ambassador') + 1).setValue(who.name);
   clearReadCache_();
   refreshCounts_();
   refreshClassVisits_(dateVal);
 
   // What the swap did to the pair, said plainly rather than left to be found.
   const after = rosterRows_(dateVal);
-  const now = after.filter(function (r) { return r.row === target; })[0];
+  const now = after.filter(function (r) { return r.row === at; })[0];
   const names = [who.name].concat(alongside_(after, now).map(function (r) { return r.name; }));
   let visitor = null;
   prospectiveFor_(dateVal).forEach(function (v) {
@@ -7957,6 +7952,8 @@ function showStaffDialog(dateKey) {
     '<p class="sub" style="margin:0 0 8px;">The routes are worked out for you. ' +
     'The guide places and the greeting crews are empty: pick each one from its ' +
     'dropdown. Your panel covers two of the places downstairs already. ' +
+    'Somebody already down for a job can take another one, and keeps both: ' +
+    'a greeter can guide, and can be handed a family at the end. ' +
     'Nothing is written until you save.</p>' +
     '<label class="opt"><input type="checkbox" id="keep" checked>' +
     '<span><b>Keep what is already assigned.</b> Only students with no guides yet are ' +
@@ -9136,8 +9133,8 @@ var LIVE_MARKERS_ = [
     fn: 'showStaffDialog', has: 'view[k]=x[k]' },
   { what: 'The class visit list, when the class cannot be worked out',
     fn: 'showStaffDialog', has: 'cannot be worked out' },
-  { what: 'Moving somebody who is already working the tour',
-    fn: 'applySwaps_', has: 'freeUp' },
+  { what: 'A second job for somebody already working the tour',
+    fn: 'applySwaps_', has: 'alsoDoing' },
   { what: 'Adding a second guide back to a family',
     fn: 'applySwaps_', has: 'x.add' },
   { what: 'The 5th graders on the class visit list',
@@ -9343,8 +9340,8 @@ function api_buildRouteSheets(dateStr) { return buildRouteSheets(dateStr); }
  * the command fills anything else.
  *
  * Anyone already on that job comes back ticked. Anyone already doing
- * something else that day is not offered, because nobody works two
- * jobs on one tour.
+ * something else that day is offered too, with what they have beside
+ * their name: one student can hold more than one job.
  */
 function api_handChoices(dateStr, job) {
   clearReadCache_();
@@ -9352,18 +9349,16 @@ function api_handChoices(dateStr, job) {
   if (!dateVal) throw new Error('Pick a tour date first.');
   if (!job) throw new Error('Pick a job first.');
 
-  /* For the panel, everybody active and allowed it, whether or not they
-   * already have another job on this tour.
+  /* Everybody active and allowed the job, whether or not they already
+   * have another one on this tour.
    *
-   * Leaving the busy ones off made the list a record of what was left
-   * rather than a list of the people, and picking the panel is where she
-   * changes her mind: somebody down as a guide is exactly who she may
-   * want to move onto it. They are shown with the job they already have,
-   * and sorted below everybody who is free.
-   *
-   * Every other job keeps the old list of who is free, because those are
-   * assigned around the panel rather than instead of it. */
-  const showBusy = job === JOBS.PANELIST;
+   * One student can do more than one job: a greeter can guide, and can
+   * be handed a family at the end of it. Leaving the busy ones off made
+   * the list a record of what was left rather than a list of the people,
+   * and it is exactly where she wants somebody who is already down for
+   * something. They are shown with what they have already, and sorted
+   * below everybody who is free, and picking one adds this job rather
+   * than taking the other away. */
   const busy = {};
   const onThis = {};
   assignmentsOn_(dateVal).forEach(function (a) {
@@ -9378,7 +9373,6 @@ function api_handChoices(dateStr, job) {
   const hist = jobHistory_();
   const rows = ambassadors_().filter(function (a) {
     if (!a.active) return false;
-    if (!showBusy && busy[norm_(a.name)]) return false;
     const e = elig[norm_(a.name)];
     return !e || e[job] !== false;
   }).map(function (a) {
@@ -9414,14 +9408,16 @@ function api_saveByHand(dateStr, job, names) {
   refreshClassVisits_(dateVal);
   out.job = job;
   /* Anybody she has just picked who is already down for something else
-   * that morning. Nothing is taken off the tracker for her: doing that
-   * would quietly leave a family a guide short. She is told by name
-   * instead, and changes it in the next step. */
+   * that morning. They keep both: nothing is taken off the tracker for
+   * her, which would quietly leave a family a guide short. She is told
+   * by name, so a clash she did not mean is in front of her. */
   const want = {};
   (names || []).forEach(function (n) { if (trim_(n)) want[norm_(n)] = true; });
   out.clashes = rows.filter(function (r) {
     return r.busy && want[norm_(r.name)];
-  }).map(function (r) { return r.name + ' is also down as ' + r.busy + '.'; });
+  }).map(function (r) {
+    return r.name + ' is also down as ' + r.busy + ', and stays on it.';
+  });
   return out;
 }
 
