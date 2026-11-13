@@ -44,7 +44,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-05 c';
+var BUILD_ = '2026-11-13 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -183,6 +183,9 @@ var DEFAULT_SETTINGS = [
    * in the emails, on the slips and on the route sheets, reads it from
    * here, so moving it moves all of them at once. */
   ['Visitors End In', 'the co-lab'],
+  /* What a parent's tag says where she ticks "current LREI parent". Her
+   * own sheet says "Current LREI Family"; either is a cell away. */
+  ['Current Parent Line', 'Current LREI Parent'],
   ['Lobby Greeters Needed', '3'],
   ['Table Greeters Needed', '2'],
   /* The greeting job downstairs is not staffed from the roster any more:
@@ -6527,6 +6530,204 @@ function api_composeEmail(kind, ids, subject, body, useBcc) {
 }
 
 /* =========================================================
+ * Name tags
+ *
+ * The sheet she has always made by hand in Pages: eight tags to a page,
+ * two across and four down, the name large and what they are underneath
+ * it, centred, in Times. The measurements and the two sizes are taken
+ * off that document, so a page out of this prints over the same label
+ * stock as the ones already in the drawer.
+ *
+ * An ambassador's tag is their first name and their grade, as hers are.
+ * A visiting parent's is their name, then their child and the grade the
+ * child is applying for, and, where she ticks it, that they are already
+ * an LREI parent.
+ * ========================================================= */
+
+var NAME_TAG_ = {
+  font: 'Times New Roman',
+  big: 28,                  // the name
+  small: 20,                // the line or two under it
+  across: 2,
+  down: 4,
+  width: 270,               // 3.75 inches, in points
+  height: 180,              // 2.5 inches
+  margin: 36                // half an inch all round
+};
+
+/**
+ * "6" or "6th" written the way the tags write it.
+ *
+ * Anything that is not a number is left exactly as she typed it, since
+ * that is her saying something the script has no name for.
+ */
+function gradeLabel_(grade) {
+  const g = trim_(grade);
+  if (!g) return '';
+  if (/grade/i.test(g)) return g;
+  const n = g.replace(/[^0-9]/g, '');
+  if (!n) return g;
+  const last = n.charAt(n.length - 1);
+  const suffix = n.length === 2 && n.charAt(0) === '1' ? 'th'
+    : (last === '1' ? 'st' : last === '2' ? 'nd' : last === '3' ? 'rd' : 'th');
+  return n + suffix + ' Grade';
+}
+
+/**
+ * One tag: the big line, and the small lines under it.
+ *
+ * Three kinds, and the only one with any rules is a parent's. Her words:
+ * the name on top, the child and their grade under it, and "Current LREI
+ * Parent" as well where she has ticked it. Untick it and that line is
+ * simply not there.
+ */
+function nameTagLines_(p) {
+  const kind = norm_(p && p.kind) || 'person';
+  if (kind === 'parent') {
+    const name = [trim_(p.first), trim_(p.last)].filter(Boolean).join(' ');
+    const child = [trim_(p.child), gradeLabel_(p.grade)].filter(Boolean).join(', ');
+    const lines = [];
+    if (child) lines.push(child);
+    if (isYes_(p.current) || p.current === true) {
+      lines.push(setting_('Current Parent Line', 'Current LREI Parent'));
+    }
+    return { top: name, lines: lines };
+  }
+  if (kind === 'ambassador') {
+    // First names only, the way her own sheet reads.
+    const first = trim_(String(p.name || '').split(/\s+/)[0]);
+    return { top: first, lines: [gradeLabel_(p.grade)].filter(Boolean) };
+  }
+  return {
+    top: trim_(p.name),
+    lines: [trim_(p.note)].filter(Boolean)
+  };
+}
+
+/** Everybody on duty that day, as tags: first name, their grade. */
+function nameTagsOnDuty_(dateVal) {
+  const amb = {};
+  ambassadors_().forEach(function (a) { amb[norm_(a.name)] = a; });
+  const seen = {};
+  const out = [];
+  assignmentsOn_(dateVal).forEach(function (a) {
+    if (a.job === JOBS.BUDDY) return;          // told in person, as everywhere
+    if (seen[norm_(a.name)]) return;
+    seen[norm_(a.name)] = true;
+    const who = amb[norm_(a.name)];
+    out.push({ kind: 'ambassador', name: a.name, grade: who ? who.grade : '' });
+  });
+  out.sort(function (x, y) { return x.name < y.name ? -1 : 1; });
+  return out;
+}
+
+/**
+ * The tags, eight to a page, in a Google Doc to print.
+ *
+ * The grid is a table with no border: two columns of 3.75 inches and
+ * rows of 2.5, which is 7.5 by 10 inches inside half-inch margins, and
+ * that is the sheet she has been printing all along. Every tag is
+ * centred in its own box, so a short name and a long one sit on the
+ * same line as each other.
+ */
+function buildNameTags(dateStr, people) {
+  clearReadCache_();
+  const list = [].concat(people || []).map(nameTagLines_)
+    .filter(function (t) { return trim_(t.top) || (t.lines || []).length; });
+  if (!list.length) throw new Error('Nobody to make a tag for yet.');
+
+  const dateVal = dateStr ? toDate_(dateStr) : null;
+  const title = 'Name Tags' + (dateVal ? ' - ' + longDate_(dateVal) : '');
+  const doc = DocumentApp.create(title);
+  const body = doc.getBody();
+  body.clear();
+  body.setMarginTop(NAME_TAG_.margin).setMarginBottom(NAME_TAG_.margin)
+    .setMarginLeft(NAME_TAG_.margin).setMarginRight(NAME_TAG_.margin);
+
+  const perPage = NAME_TAG_.across * NAME_TAG_.down;
+  const pages = [];
+  list.forEach(function (tag, i) {
+    if (i % perPage === 0) pages.push([]);
+    pages[pages.length - 1].push(tag);
+  });
+
+  pages.forEach(function (page, at) {
+    if (at > 0) body.appendPageBreak();
+    const rows = [];
+    for (let r = 0; r < NAME_TAG_.down; r++) {
+      const row = [];
+      for (let c = 0; c < NAME_TAG_.across; c++) row.push('');
+      rows.push(row);
+    }
+    const grid = body.appendTable(rows);
+    if (grid.setBorderWidth) grid.setBorderWidth(0);
+    for (let c = 0; c < NAME_TAG_.across; c++) {
+      if (grid.setColumnWidth) grid.setColumnWidth(c, NAME_TAG_.width);
+    }
+    for (let r = 0; r < NAME_TAG_.down; r++) {
+      if (grid.getRow) grid.getRow(r).setMinimumHeight(NAME_TAG_.height);
+      for (let c = 0; c < NAME_TAG_.across; c++) {
+        const tag = page[r * NAME_TAG_.across + c];
+        const cell = grid.getCell(r, c);
+        if (cell.setPaddingTop) {
+          cell.setPaddingTop(0).setPaddingBottom(0).setPaddingLeft(6).setPaddingRight(6);
+        }
+        if (cell.setVerticalAlignment) {
+          cell.setVerticalAlignment(DocumentApp.VerticalAlignment.CENTER);
+        }
+        // An empty box at the end of the last page: the sheet still has
+        // its eight places, so what prints lines up with the labels.
+        if (!tag) continue;
+        const head = cell.getChild(0).asParagraph();
+        head.setText(tag.top);
+        nameTagLook_(head, NAME_TAG_.big);
+        (tag.lines || []).forEach(function (line) {
+          nameTagLook_(cell.appendParagraph(line), NAME_TAG_.small);
+        });
+      }
+    }
+  });
+
+  doc.saveAndClose();
+  return { url: doc.getUrl(), name: title, tags: list.length, pages: pages.length };
+}
+
+/* Times, centred, and plain: not bold and not italic, whatever the
+ * document a tag was copied out of happens to have on it. */
+function nameTagLook_(paragraph, size) {
+  if (paragraph.setAlignment) {
+    paragraph.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+  }
+  const text = paragraph.editAsText();
+  if (text.setFontFamily) text.setFontFamily(NAME_TAG_.font);
+  text.setFontSize(size);
+  text.setBold(false);
+  if (text.setItalic) text.setItalic(false);
+  return paragraph;
+}
+
+/** The tags the dialog is about to make, as it would print them. */
+function api_nameTagPreview(dateStr, people, onDuty) {
+  clearReadCache_();
+  const dateVal = dateStr ? toDate_(dateStr) : null;
+  const all = (onDuty && dateVal ? nameTagsOnDuty_(dateVal) : [])
+    .concat([].concat(people || []));
+  return {
+    tags: all.map(nameTagLines_),
+    onDuty: dateVal ? nameTagsOnDuty_(dateVal).length : 0,
+    perPage: NAME_TAG_.across * NAME_TAG_.down
+  };
+}
+
+function api_buildNameTags(dateStr, people, onDuty) {
+  clearReadCache_();
+  const dateVal = dateStr ? toDate_(dateStr) : null;
+  const all = (onDuty && dateVal ? nameTagsOnDuty_(dateVal) : [])
+    .concat([].concat(people || []));
+  return buildNameTags(dateStr, all);
+}
+
+/* =========================================================
  * The roster
  *
  * One line per ambassador on duty: their name, what they are doing,
@@ -8051,6 +8252,7 @@ function onOpen() {
     .addItem('Print Tour Routes...', 'showRouteSheetDialog')
     .addItem('Print Locker Slips...', 'showLockerSlipDialog')
     .addItem('Print the Tour Roster...', 'showRosterDialog')
+    .addItem('Print Name Tags...', 'showNameTagDialog')
     .addItem('Change Who Is Working...', 'showSwapDialog')
     .addItem('Confirm a Tour Afterwards...', 'showConfirmDialog')
     .addItem('Make a Check In Sheet...', 'showCheckInDialog')
@@ -8709,6 +8911,116 @@ function api_whoWouldGet(dateStr) {
     students: tidy(students),
     teachers: tidy(teachers)
   };
+}
+
+/**
+ * The name tag dialog.
+ *
+ * Everybody on duty is in it already, because the script knows who they
+ * are; the typing is for the people it does not know, which is the
+ * parents coming round and anybody else she wants a tag for.
+ */
+function showNameTagDialog() {
+  const next = nextTourDate_();
+  const html =
+    '<style>' + DIALOG_CSS_ +
+    '.tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}' +
+    '.tag{border:1px solid #ccc;border-radius:4px;padding:8px 10px;text-align:center;' +
+    'min-width:150px;font-family:"Times New Roman",Times,serif;}' +
+    '.tag b{display:block;font-size:17px;font-weight:normal;}' +
+    '.tag span{display:block;font-size:12px;color:#444;}' +
+    '.tag a{font-family:inherit;font-size:11px;color:#a8322a;cursor:pointer;' +
+    'text-decoration:underline;}' +
+    '.two{display:flex;gap:8px;}.two>div{flex:1;}' +
+    'input[type=text]{width:100%;box-sizing:border-box;}' +
+    '</style>' +
+    '<h2>Print name tags</h2>' +
+    '<p class="sub">Eight to a page, two across and four down, centred, in Times, ' +
+    'the same size as the sheet you make by hand. Everybody on duty is on it ' +
+    'already: first name and grade. Add the parents coming round underneath.</p>' +
+    '<label for="d">Tour date</label>' +
+    '<input type="date" id="d" value="' +
+    (next ? dateKey_(next) : nextToStaff_()) + '" onchange="look()">' +
+    '<label class="opt"><input type="checkbox" id="duty" checked onchange="look()">' +
+    '<span><b>A tag for everybody on duty that day.</b> Their first name and ' +
+    'their grade, the way yours read.</span></label>' +
+
+    '<div class="byhand">' +
+    '<label><span class="step">1</span> Add a parent</label>' +
+    '<div class="two"><div><label for="pf">First name</label>' +
+    '<input type="text" id="pf"></div>' +
+    '<div><label for="pl">Last name</label><input type="text" id="pl"></div></div>' +
+    '<div class="two" style="margin-top:8px;"><div><label for="pc">Child\'s name</label>' +
+    '<input type="text" id="pc"></div>' +
+    '<div><label for="pg">Grade</label><input type="text" id="pg" placeholder="6"></div>' +
+    '</div>' +
+    '<label class="opt"><input type="checkbox" id="pcur">' +
+    '<span><b>Current LREI parent.</b> Ticked, the tag says so under their ' +
+    'child\'s name. Unticked, it is just their name and their child.</span></label>' +
+    '<div style="margin-top:10px;"><button onclick="addParent()">Add this parent</button>' +
+    '</div></div>' +
+
+    '<div class="byhand">' +
+    '<label><span class="step">2</span> Anybody else</label>' +
+    '<div class="two"><div><label for="xn">Name</label><input type="text" id="xn"></div>' +
+    '<div><label for="xs">Underneath</label>' +
+    '<input type="text" id="xs" placeholder="6th Grade"></div></div>' +
+    '<div style="margin-top:10px;"><button class="ghost" onclick="addOther()">Add</button>' +
+    '</div></div>' +
+
+    '<div id="out"></div>' +
+    '<div style="margin-top:12px;"><button id="go" onclick="make()">Make the tags</button>' +
+    '</div><div id="done"></div>' +
+    '<script>' + DIALOG_JS_ +
+    'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}' +
+    'function val(id){var e=document.getElementById(id);return e?e.value:"";}' +
+    'function fail(e){document.getElementById("done").innerHTML=' +
+    '"<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";}' +
+    'window.__people=[];' +
+    'function addParent(){var f=val("pf"),l=val("pl");' +
+    'if(!f&&!l){alert("Type the parent\'s name first.");return;}' +
+    'window.__people.push({kind:"parent",first:f,last:l,child:val("pc"),' +
+    'grade:val("pg"),current:document.getElementById("pcur").checked});' +
+    'document.getElementById("pf").value="";document.getElementById("pl").value="";' +
+    'document.getElementById("pc").value="";document.getElementById("pg").value="";' +
+    'document.getElementById("pcur").checked=false;look();}' +
+    'function addOther(){var n=val("xn");' +
+    'if(!n){alert("Type a name first.");return;}' +
+    'window.__people.push({kind:"person",name:n,note:val("xs")});' +
+    'document.getElementById("xn").value="";document.getElementById("xs").value="";' +
+    'look();}' +
+    'function drop(i){window.__people.splice(i,1);look();}' +
+    'function look(){' +
+    'google.script.run.withSuccessHandler(show).withFailureHandler(fail)' +
+    '.api_nameTagPreview(val("d"),window.__people,' +
+    'document.getElementById("duty").checked);}' +
+    'function show(p){var t=p.tags||[];var h="";' +
+    'if(!t.length){h="<p class=\'muted\'>Nobody yet. Tick the people on duty, or ' +
+    'add a parent above.</p>";}else{' +
+    'h="<div class=\'free\'><b>"+t.length+" tag"+(t.length===1?"":"s")+"</b>, "+' +
+    'Math.ceil(t.length/p.perPage)+" page(s) of "+p.perPage+".' +
+    ' The ones on duty come first.</div><div class=\'tags\'>";' +
+    'var mine=t.length-(window.__people||[]).length;' +
+    't.forEach(function(x,i){h+="<div class=\'tag\'><b>"+esc(x.top)+"</b>"+' +
+    '(x.lines||[]).map(function(l){return "<span>"+esc(l)+"</span>";}).join("")+' +
+    '(i>=mine?"<a onclick=\'drop("+(i-mine)+")\'>take off</a>":"")+"</div>";});' +
+    'h+="</div>";}' +
+    'document.getElementById("out").innerHTML=h;}' +
+    'function make(){document.getElementById("go").disabled=true;' +
+    'document.getElementById("done").innerHTML="<p class=\'muted\'>Making them...</p>";' +
+    'google.script.run.withSuccessHandler(function(r){' +
+    'document.getElementById("go").disabled=false;' +
+    'document.getElementById("done").innerHTML="<div class=\'free\'><b>"+r.tags+' +
+    '" tag(s) on "+r.pages+" page(s).</b><br><a href=\'"+r.url+"\' target=\'_blank\'>' +
+    'Open "+esc(r.name)+"</a><br><span class=\'muted\'>Print it at 100%, no scaling, ' +
+    'so the boxes land on the labels.</span></div>";})' +
+    '.withFailureHandler(function(e){document.getElementById("go").disabled=false;' +
+    'fail(e);})' +
+    '.api_buildNameTags(val("d"),window.__people,' +
+    'document.getElementById("duty").checked);}' +
+    'look();' +
+    '<\/script>';
+  dialog_(html, 'Name Tags', 640, 640);
 }
 
 /**

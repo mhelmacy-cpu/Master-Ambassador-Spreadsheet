@@ -1311,6 +1311,33 @@ box either.
 reason the other two printouts have buttons: it is wanted on paper on the
 morning, not only in an inbox the night before.
 
+### Name tags
+
+**Print Name Tags** builds the sheet she used to make by hand in Pages,
+to the same measurements taken off that document: eight tags to a page,
+two across and four down, half-inch margins, boxes of 3.75 by 2.5 inches,
+every tag centred in its own box, in **Times New Roman, 28 point for the
+name and 20 point for the line or two under it**, never bold and never
+italic. The grid is a borderless table, so a page out of this prints over
+the same label stock as the ones already in the drawer, and a part-full
+last page still has its eight places so the boxes land on the labels.
+
+Three kinds of tag:
+
+- **An ambassador on duty**, which the script fills in itself from the
+  tour date: their **first name**, the way her own sheet reads, and their
+  grade under it.
+- **A parent**, typed in: first name and last name on top, then their
+  child and the grade the child is applying for ("Theo Denson, 6th
+  Grade"). A tick for **current LREI parent** adds a line saying so
+  underneath; untick it and the line is simply not there. The wording of
+  that line is **Current Parent Line** on Settings, so "Current LREI
+  Parent" or "Current LREI Family" is one cell.
+- **Anybody else**, typed in: a name and whatever goes under it.
+
+A grade typed as "6" prints as "6th Grade"; one she writes out herself is
+left exactly as she wrote it, and so is anything that is not a number.
+
 The redirect works inside `mailOptions_`, which every message is built
 by, so a send cannot get past it - and it is cleared in a `finally`, so
 a test run that fails part way cannot leave the next real send pointing

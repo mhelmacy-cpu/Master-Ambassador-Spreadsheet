@@ -241,6 +241,7 @@ function makeMock() {
       t: t, h: '', b: false, cell: !!inCell,
       setHeading: function (x) { this.h = x; return this; },
       setLineSpacing: function (x) { this.ls = x; return this; },
+      setAlignment: function (x) { this.align = x; return this; },
       setSpacingBefore: function () { return this; },
       setSpacingAfter: function () { return this; },
       setText: function (x) { this.t = x; return this; },
@@ -250,6 +251,7 @@ function makeMock() {
         const text = {
           setBold: function (v) { self.b = (v !== false); return text; },
           setFontSize: function (n) { self.size = n; return text; },
+          setFontFamily: function (f) { self.font = f; return text; },
           setForegroundColor: function (c) { self.color = c; return text; },
           setItalic: function (v) { self.i = (v !== false); return text; }
         };
@@ -281,6 +283,7 @@ function makeMock() {
   global.DocumentApp = {
     ParagraphHeading: { HEADING1: 'H1', HEADING2: 'H2', HEADING3: 'H3', NORMAL: 'N' },
     VerticalAlignment: { TOP: 'top', CENTER: 'center' },
+    HorizontalAlignment: { LEFT: 'left', CENTER: 'center', RIGHT: 'right' },
     create: function (name) {
       global.__doc = [];
       global.__page = {};
@@ -322,7 +325,8 @@ function makeMock() {
             setColumnWidth: function (i, w) {
               widths[i] = w; global.__docTable = slot; return t;
             },
-            setBorderWidth: function () { return t; }
+            setBorderWidth: function (w) { slot.border = w; return t; },
+            setRows: function () { return t; }
           };
           return t;
         },
