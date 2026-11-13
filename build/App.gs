@@ -44,7 +44,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-13 e';
+var BUILD_ = '2026-11-13 f';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -6659,13 +6659,24 @@ function nameTagLines_(p) {
   const kind = norm_(p && p.kind) || 'person';
   if (kind === 'parent') {
     const name = [trim_(p.first), trim_(p.last)].filter(Boolean).join(' ');
-    /* The child by their first name and the grade short: "Theo, 6th".
-     * Their last name is the parent's own, two lines above it, and the
-     * whole of a badge has to be read across a lobby. */
-    const first = trim_(String(p.child || '').split(/\s+/)[0]);
-    const child = [first, gradeShort_(p.grade)].filter(Boolean).join(', ');
+    /* Their children, one to a line: "Theo, 6th". By first name, because
+     * the last name is the parent's own two lines above it, and the
+     * grade short, because the whole of a badge has to be read across a
+     * lobby. A line each rather than one long line, so a parent with
+     * three of them still reads at arm's length.
+     *
+     * One child typed into the old single pair of boxes still works, so
+     * a tag saved before there was a list of them is unchanged. */
+    const kids = [].concat(p.children || []);
+    if (!kids.length && (trim_(p.child) || trim_(p.grade))) {
+      kids.push({ name: p.child, grade: p.grade });
+    }
     const lines = [];
-    if (child) lines.push(child);
+    kids.forEach(function (k) {
+      const first = trim_(String((k && k.name) || '').split(/\s+/)[0]);
+      const said = [first, gradeShort_(k && k.grade)].filter(Boolean).join(', ');
+      if (said) lines.push(said);
+    });
     if (isYes_(p.current) || p.current === true) {
       lines.push(setting_('Current Parent Line', 'Current LREI Parent'));
     }
@@ -9059,6 +9070,9 @@ function showNameTagDialog() {
     'and the grade short, as "Theo, 6th": their last name is the parent\'s own, ' +
     'two lines above it. A year that is not a number, the 4s or K, prints just ' +
     'as you type it.</p>' +
+    '<div style="margin-top:8px;">' +
+    '<button class="ghost" onclick="addKid()">Another child for this parent</button>' +
+    '<span class="muted" id="kids"></span></div>' +
     '<label class="opt"><input type="checkbox" id="pcur">' +
     '<span><b>Current LREI parent.</b> Ticked, the tag says so under their ' +
     'child\'s name. Unticked, it is just their name and their child.</span></label>' +
@@ -9094,11 +9108,27 @@ function showNameTagDialog() {
     'function val(id){var e=document.getElementById(id);return e?e.value:"";}' +
     'function fail(e){document.getElementById("done").innerHTML=' +
     '"<div class=\'warn\'><b>"+failText(e.message)+"</b></div>";}' +
-    'window.__people=[];' +
+    'window.__people=[];window.__kids=[];' +
+    /* The children of the parent being typed, each put by before the
+     * boxes are cleared for the next one. */
+    'function kidsNow(){var out=[];' +
+    'for(var i=0;i<window.__kids.length;i++){out.push(window.__kids[i]);}' +
+    'if(val("pc")||val("pg")){out.push({name:val("pc"),grade:val("pg")});}' +
+    'return out;}' +
+    'function sayKids(){var k=window.__kids;' +
+    'document.getElementById("kids").innerHTML=k.length?" so far: "+' +
+    'k.map(function(x){return esc(x.name)+(x.grade?", "+esc(x.grade):"");})' +
+    '.join("; "):"";}' +
+    'function addKid(){var n=val("pc");' +
+    'if(!n){alert("Type the child\'s name first, then add another.");return;}' +
+    'window.__kids.push({name:n,grade:val("pg")});' +
+    'document.getElementById("pc").value="";document.getElementById("pg").value="";' +
+    'document.getElementById("pc").focus();sayKids();}' +
     'function addParent(){var f=val("pf"),l=val("pl");' +
     'if(!f&&!l){alert("Type the parent\'s name first.");return;}' +
-    'window.__people.push({kind:"parent",first:f,last:l,child:val("pc"),' +
-    'grade:val("pg"),current:document.getElementById("pcur").checked});' +
+    'window.__people.push({kind:"parent",first:f,last:l,children:kidsNow(),' +
+    'current:document.getElementById("pcur").checked});' +
+    'window.__kids=[];sayKids();' +
     'document.getElementById("pf").value="";document.getElementById("pl").value="";' +
     'document.getElementById("pc").value="";document.getElementById("pg").value="";' +
     'document.getElementById("pcur").checked=false;look();}' +

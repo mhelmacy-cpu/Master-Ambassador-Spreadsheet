@@ -116,6 +116,36 @@ console.log('\na student she types in is a first name too');
   ok(any.lines.join('')==='Spanish','and whatever she puts under it');
 }
 
+console.log('\na parent with more than one child, a line each');
+{
+  const t=nameTagLines_({kind:'parent',first:'Annie',last:'Denson',
+    children:[{name:'Theo Denson',grade:'6'},{name:'Ada Denson',grade:'4s'}],
+    current:true});
+  ok(t.top==='Annie Denson','their name on top: "'+t.top+'"');
+  ok(t.lines[0]==='Theo, 6th'&&t.lines[1]==='Ada, 4s',
+     'a line for each child: "'+t.lines[0]+'" then "'+t.lines[1]+'"');
+  ok(t.lines[2]==='Current LREI Parent','and the LREI line under them both');
+  const three=nameTagLines_({kind:'parent',first:'Marcus',last:'Reyes',
+    children:[{name:'Iris',grade:'6'},{name:'Juno',grade:'8'},{name:'Rafa',grade:'K'}]});
+  ok(three.lines.length===3,'three children is three lines: '+
+     three.lines.join(' / '));
+  ok(three.lines.every(l=>l.length<16),
+     'each one short enough to read across a lobby: '+
+     three.lines.map(l=>l.length).join(', ')+' characters');
+  // Four lines of a 2.5 inch box is 88 points of 180, so it still fits.
+  ok(28+three.lines.length*20<=NAME_TAG_.height,
+     'and a tag with all of them on it still sits inside its box');
+  // The old single pair of boxes still works, so nothing typed before
+  // this existed reads differently.
+  const one=nameTagLines_({kind:'parent',first:'Dana',last:'Okonkwo',
+    child:'Ada Okonkwo',grade:'4s'});
+  ok(one.lines.join('')==='Ada, 4s','one child on its own is unchanged: "'+
+     one.lines.join('')+'"');
+  const none=nameTagLines_({kind:'parent',first:'Sam',last:'Lee',children:[]});
+  ok(none.top==='Sam Lee'&&none.lines.length===0,
+     'and a parent with no child typed in is just their name');
+}
+
 console.log('\na child in the 4s, on both kinds of tag');
 {
   const p=nameTagLines_({kind:'parent',first:'Dana',last:'Okonkwo',
@@ -253,6 +283,9 @@ console.log('\nthere is a button for it');
   ok(/Print name tags/.test(html),'the dialog opens');
   ok(/id="pf"/.test(html)&&/id="pl"/.test(html),'with a first and last name box');
   ok(/id="pc"/.test(html)&&/id="pg"/.test(html),'the child and their grade');
+  ok(/Another child for this parent/.test(html),
+     'a button for a second child, and a third');
+  ok(/function addKid\(/.test(html),'which the dialog knows what to do with');
   ok(/id="sn"/.test(html)&&/id="sg"/.test(html),'a box for a student and their grade');
   ok(/First names only on a student tag/.test(html),
      'saying first names only on a student tag');

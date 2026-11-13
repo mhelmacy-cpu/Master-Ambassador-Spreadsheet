@@ -1348,7 +1348,11 @@ Three kinds of tag:
   child by **first name only** and the grade **short**: "Theo, 6th". The
   child's last name is the parent's own, two lines above it, and the
   whole of a badge has to be read across a lobby, so a full name typed
-  into the box still comes out short. A tick for **current LREI parent**
+  into the box still comes out short. **As many children as they have**,
+  one to a line, added a child at a time with "Another child for this
+  parent": a line each rather than one long line, so three of them still
+  read at arm's length, and four lines of a 2.5 inch box is 88 points of
+  180. A tick for **current LREI parent**
   adds a line saying so underneath; untick it and the line is simply not
   there. The wording of that line is **Current Parent Line** on Settings,
   so "Current LREI Parent" or "Current LREI Family" is one cell.
