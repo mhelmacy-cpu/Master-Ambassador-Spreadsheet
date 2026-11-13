@@ -1315,12 +1315,29 @@ morning, not only in an inbox the night before.
 
 **Print Name Tags** builds the sheet she used to make by hand in Pages,
 to the same measurements taken off that document: eight tags to a page,
-two across and four down, half-inch margins, boxes of 3.75 by 2.5 inches,
-every tag centred in its own box, in **Times New Roman, 28 point for the
-name and 20 point for the line or two under it**, never bold and never
-italic. The grid is a borderless table, so a page out of this prints over
-the same label stock as the ones already in the drawer, and a part-full
-last page still has its eight places so the boxes land on the labels.
+two across and four down, boxes of 3.75 by 2.5 inches, every tag centred
+in its own box, in **Times New Roman, 28 point for the name and 20 point
+for the line or two under it**, never bold and never italic. The grid is
+a borderless table, so a page out of this prints over the same label
+stock as the ones already in the drawer, and a part-full last page still
+has its eight places so the boxes land on the labels.
+
+**Eight to a page, always, and never more.** Four rows of 2.5 inches is
+exactly ten, which with half-inch margins is the whole sheet and nothing
+to spare, so any stray line pushes the last row onto a second page and a
+sheet of labels is thrown away. Three of them are taken out:
+
+- the empty paragraph a cleared Document always keeps, which sat above
+  the grid (`dropBlankTop_`, now used by every printout);
+- the empty paragraph Docs puts after a table, which cannot be removed
+  between two tables without them running together, so it is left at one
+  point with no space around it (`squashBlankAfterTable_`);
+- the paragraph a page break sits in, squashed the same way.
+
+The foot margin is a quarter inch rather than a half for the same reason.
+That leaves 721 points of page used out of 738, and `t102` measures it:
+if anything ever grows enough to carry a row over, the test fails before
+the labels do.
 
 Three kinds of tag:
 

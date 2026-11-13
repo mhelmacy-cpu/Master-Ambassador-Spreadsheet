@@ -44,7 +44,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-13 d';
+var BUILD_ = '2026-11-13 e';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -5678,6 +5678,7 @@ function buildRouteSheets(dateStr) {
   built.forEach(function (lines, i) {
     if (i > 0) body.appendPageBreak();
     sheetRender_(body, lines, looks[i]);
+    if (i === 0) dropBlankTop_(body);
   });
 
   doc.saveAndClose();
@@ -5860,6 +5861,7 @@ function buildLockerSlips(dateStr) {
   body.clear();
 
   body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  dropBlankTop_(body);
   body.appendParagraph('Print and cut along the boxes.');
 
   slips.forEach(function (slip) {
@@ -6529,6 +6531,61 @@ function api_composeEmail(kind, ids, subject, body, useBcc) {
   };
 }
 
+/**
+ * The empty paragraph a cleared Body keeps, taken off the top.
+ *
+ * clear() does not leave a Document empty: one paragraph stays, above
+ * everything the script then appends. On an ordinary printout that is a
+ * blank first line and no worse. On a page laid out to the inch, like
+ * the name tags, it is what pushes the last row of the grid onto a
+ * second sheet, and a sheet of labels is thrown away over it.
+ *
+ * It can only go once something else is on the page, because a Document
+ * must always end with something, so this is called after the first
+ * thing is appended rather than straight after clear().
+ */
+function dropBlankTop_(body) {
+  try {
+    if (!body.getNumChildren || body.getNumChildren() < 2) return false;
+    const first = body.getChild(0);
+    if (!first.getType || first.getType() !== DocumentApp.ElementType.PARAGRAPH) {
+      return false;
+    }
+    if (trim_(first.getText())) return false;
+    body.removeChild(first);
+    return true;
+  } catch (err) {
+    // An older Document, or nothing there to take off. Never worth a stop.
+    return false;
+  }
+}
+
+/**
+ * The empty paragraph Docs puts after a table, made to cost nothing.
+ *
+ * It cannot be removed between two tables without the two running into
+ * each other, so it is left there at one point with no space around it,
+ * which is the difference between four rows fitting on a page and three.
+ */
+function squashBlankAfterTable_(body) {
+  try {
+    if (!body.getNumChildren) return false;
+    const last = body.getChild(body.getNumChildren() - 1);
+    if (!last.getType || last.getType() !== DocumentApp.ElementType.PARAGRAPH) {
+      return false;
+    }
+    if (trim_(last.getText())) return false;
+    const p = last.asParagraph();
+    if (p.setSpacingBefore) p.setSpacingBefore(0);
+    if (p.setSpacingAfter) p.setSpacingAfter(0);
+    if (p.setLineSpacing) p.setLineSpacing(1);
+    if (p.editAsText) p.editAsText().setFontSize(1);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 /* =========================================================
  * Name tags
  *
@@ -6552,7 +6609,8 @@ var NAME_TAG_ = {
   down: 4,
   width: 270,               // 3.75 inches, in points
   height: 180,              // 2.5 inches
-  margin: 36                // half an inch all round
+  margin: 36,               // half an inch at the top and the sides
+  foot: 18                  // and a quarter at the bottom, so four rows fit
 };
 
 /**
@@ -6664,7 +6722,13 @@ function buildNameTags(dateStr, people) {
   const doc = DocumentApp.create(title);
   const body = doc.getBody();
   body.clear();
-  body.setMarginTop(NAME_TAG_.margin).setMarginBottom(NAME_TAG_.margin)
+  /* Half an inch at the top and the sides, which is where the grid is
+   * measured from, and a quarter at the foot. Four rows of 2.5 inches
+   * is exactly ten, and ten plus two half-inch margins is the whole
+   * sheet with nothing to spare: the quarter inch at the bottom is the
+   * room the page needs to hold all four rows rather than carrying the
+   * last one over. */
+  body.setMarginTop(NAME_TAG_.margin).setMarginBottom(NAME_TAG_.foot)
     .setMarginLeft(NAME_TAG_.margin).setMarginRight(NAME_TAG_.margin);
 
   const perPage = NAME_TAG_.across * NAME_TAG_.down;
@@ -6675,7 +6739,13 @@ function buildNameTags(dateStr, people) {
   });
 
   pages.forEach(function (page, at) {
-    if (at > 0) body.appendPageBreak();
+    if (at > 0) {
+      body.appendPageBreak();
+      /* The break itself sits in a paragraph, at the foot of the page it
+       * ends. Left at its own size that paragraph is a line of the page
+       * the grid needs, so it is made to cost nothing too. */
+      squashBlankAfterTable_(body);
+    }
     const rows = [];
     for (let r = 0; r < NAME_TAG_.down; r++) {
       const row = [];
@@ -6683,6 +6753,8 @@ function buildNameTags(dateStr, people) {
       rows.push(row);
     }
     const grid = body.appendTable(rows);
+    if (at === 0) dropBlankTop_(body);
+    squashBlankAfterTable_(body);
     if (grid.setBorderWidth) grid.setBorderWidth(0);
     for (let c = 0; c < NAME_TAG_.across; c++) {
       if (grid.setColumnWidth) grid.setColumnWidth(c, NAME_TAG_.width);
@@ -6721,6 +6793,11 @@ function nameTagLook_(paragraph, size) {
   if (paragraph.setAlignment) {
     paragraph.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
   }
+  // No air around a line but its own: the box is 2.5 inches and every
+  // point of that is wanted for the name.
+  if (paragraph.setSpacingBefore) paragraph.setSpacingBefore(0);
+  if (paragraph.setSpacingAfter) paragraph.setSpacingAfter(0);
+  if (paragraph.setLineSpacing) paragraph.setLineSpacing(1);
   const text = paragraph.editAsText();
   if (text.setFontFamily) text.setFontFamily(NAME_TAG_.font);
   text.setFontSize(size);
@@ -6973,6 +7050,7 @@ function buildTourRoster(dateStr) {
   const body = doc.getBody();
   body.clear();
   body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  dropBlankTop_(body);
   const tags = rows.filter(function (r) { return r.needsTag; }).length;
   const sheets = rows.filter(function (r) { return r.needsRoute; }).length;
   body.appendParagraph(rows.length + ' ambassadors on duty. ' + tags +
@@ -9633,6 +9711,7 @@ function buildMeetingDoc(dateStr, fromTime, toTime, names) {
   const body = doc.getBody();
   body.clear();
   body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  dropBlankTop_(body);
   body.appendParagraph(p.rows.length + ' student(s).');
 
   const table = [['Student', 'In', 'Teacher', 'When']];

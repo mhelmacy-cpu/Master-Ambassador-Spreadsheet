@@ -284,17 +284,59 @@ function makeMock() {
     ParagraphHeading: { HEADING1: 'H1', HEADING2: 'H2', HEADING3: 'H3', NORMAL: 'N' },
     VerticalAlignment: { TOP: 'top', CENTER: 'center' },
     HorizontalAlignment: { LEFT: 'left', CENTER: 'center', RIGHT: 'right' },
+    ElementType: { PARAGRAPH: 'PARAGRAPH', TABLE: 'TABLE' },
     create: function (name) {
       global.__doc = [];
       global.__page = {};
       global.__docTable = null;
       global.__docTables = [];
       global.__docName = name;
+      /* What is on the page, in order, the way a real Body holds it: a
+       * real one keeps an empty paragraph after clear() and another
+       * after every table, and a script that lays a page out by hand
+       * has to deal with both, so the mock has them too. */
+      const kids = [];
+      global.__kids = kids;
+      const wrap = function (o) {
+        return {
+          __o: o,
+          getType: function () {
+            return o.table ? DocumentApp.ElementType.TABLE
+              : DocumentApp.ElementType.PARAGRAPH;
+          },
+          // A paragraph holding a page break reads as empty, as a real
+          // one does, whatever the mock writes in it for the tests.
+          getText: function () { return o.brk ? '' : String(o.t == null ? '' : o.t); },
+          asParagraph: function () { return o; },
+          editAsText: function () { return o.editAsText(); },
+          removeFromParent: function () { body.removeChild(this); return this; }
+        };
+      };
       const body = {
-        clear: function () { global.__doc.length = 0; return body; },
-        appendParagraph: function (t) { return para(t, false); },
+        clear: function () {
+          global.__doc.length = 0;
+          kids.length = 0;
+          // A cleared Body is not empty: one paragraph is always left.
+          kids.push(para(''));
+          return body;
+        },
+        getNumChildren: function () { return kids.length; },
+        getChild: function (i) { return wrap(kids[i]); },
+        removeChild: function (c) {
+          const o = c && c.__o ? c.__o : c;
+          const at = kids.indexOf(o);
+          if (at === -1) return body;
+          if (kids.length === 1) throw new Error('cannot remove the last child');
+          kids.splice(at, 1);
+          const d = global.__doc.indexOf(o);
+          if (d !== -1) global.__doc.splice(d, 1);
+          return body;
+        },
+        appendParagraph: function (t) { const o = para(t, false); kids.push(o); return o; },
         appendPageBreak: function () {
-          global.__doc.push({ t: '--- PAGE BREAK ---', h: '', b: false, cell: false });
+          const o = para('--- PAGE BREAK ---', false);
+          o.brk = true;
+          kids.push(o);
           return {};
         },
         appendTable: function (rows) {
@@ -309,9 +351,13 @@ function makeMock() {
           });
           const widths = [];
           const heights = [];
-          const slot = { widths: widths, heights: heights };
+          const slot = { widths: widths, heights: heights, table: true, rows: grid.length,
+            cols: (grid[0] || []).length };
           global.__docTables.push(slot);
           global.__docTable = slot;
+          kids.push(slot);
+          // Docs leaves an empty paragraph after a table, every time.
+          kids.push(para(''));
           const t = {
             getCell: function (r, k) { return grid[r][k]; },
             getNumRows: function () { return grid.length; },

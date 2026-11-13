@@ -163,6 +163,33 @@ ok(under.indexOf('Current LREI Parent')!==-1,'with the LREI line where it was ti
 ok(under.indexOf('Theo, 6th')!==-1,'and the child line short: "Theo, 6th"');
 ok(under.every(l=>!/Denson, /.test(l)),'never the child with a last name on it');
 
+console.log('\nand the page holds all four rows, which is what a wasted sheet is');
+{
+  /* A sheet of labels is thrown away when a row carries over, so the
+   * page is measured here the way the route sheets are: what is on it,
+   * at the size it is, against what the margins leave. */
+  const room=()=>792-(global.__page.top||0)-(global.__page.bottom||0);
+  const gridHeight=t=>(t.heights||[]).reduce((n,h)=>n+(h||0),0);
+  // Everything on the page that is not inside the grid: Docs keeps an
+  // empty paragraph after a table and puts a page break in one of its
+  // own, and each of those is a line of the page unless it is squashed.
+  const loose=global.__doc.filter(o=>!o.cell);
+  ok(loose.every(o=>o.size===1),
+     loose.length+' line(s) outside the grid, all of them squashed to 1 point');
+  const used=gridHeight(global.__docTables[0])+loose.reduce((n,o)=>n+(o.size||11)*1.2,0);
+  ok(used<=room(),'the page holds its four rows: '+Math.round(used)+'pt of '+
+     room()+'pt, '+Math.round(room()-used)+'pt spare');
+  ok(gridHeight(global.__docTables[0])===720,'the grid itself is ten inches of it');
+  ok((global.__page.top||0)+(global.__page.bottom||0)<=72,
+     'with the margins kept to what the grid leaves: '+global.__page.top+
+     ' at the top, '+global.__page.bottom+' at the foot');
+  /* The empty paragraph a cleared Document keeps is off the top
+   * altogether: that one line above the grid is what pushed the last row
+   * onto a second sheet. */
+  ok((global.__kids[0]||{}).table===true,
+     'and the page starts with the grid itself, not with a blank line');
+}
+
 console.log('\nnine of them is two pages, and the grid stays eight to a page');
 {
   const more=[];
@@ -179,6 +206,36 @@ console.log('\nnine of them is two pages, and the grid stays eight to a page');
      'with the labels');
   const tops=global.__doc.filter(o=>o.cell&&o.size===28).map(o=>o.t);
   ok(tops.length===9,'nine names on the two pages');
+  ok(global.__doc.filter(o=>!o.cell).every(o=>o.size===1),
+     'nothing between the two grids is any bigger than a point');
+  global.__docTables.forEach((t,i)=>ok(
+    (t.heights||[]).reduce((n,h)=>n+(h||0),0)===720,
+    'page '+(i+1)+' is four rows of 2.5 inches, whether it is full or not'));
+  // Eight on the first page and one on the second: never nine on one,
+  // and never six because a row carried over.
+  const perPage=[];
+  let n=0;
+  global.__doc.forEach(o=>{ if(!o.cell&&String(o.t)==='--- PAGE BREAK ---'){perPage.push(n);n=0;return;}
+    if(o.cell&&o.size===28) n++; });
+  perPage.push(n);
+  ok(perPage.join(',')==='8,1','eight on the first page, then the rest: '+
+     perPage.join(' then '));
+  ok(perPage.every(x=>x<=8),'and never more than eight on any of them');
+}
+
+console.log('\nseventeen of them, which is three pages and no sheet wasted');
+{
+  const lots=[];
+  for(let i=0;i<17;i++) lots.push({kind:'student',name:'Child '+(i+1),grade:'6'});
+  global.__doc=[];
+  const out=api_buildNameTags(DAY,lots,false);
+  ok(out.pages===3,'three pages for seventeen');
+  const perPage=[];
+  let n=0;
+  global.__doc.forEach(o=>{ if(!o.cell&&String(o.t)==='--- PAGE BREAK ---'){perPage.push(n);n=0;return;}
+    if(o.cell&&o.size===28) n++; });
+  perPage.push(n);
+  ok(perPage.join(',')==='8,8,1','filled eight at a time: '+perPage.join(' then '));
 }
 
 console.log('\nand nothing to print is said rather than printed');
