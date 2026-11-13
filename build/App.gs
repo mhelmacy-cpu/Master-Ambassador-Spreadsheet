@@ -44,7 +44,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-13 a';
+var BUILD_ = '2026-11-13 b';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -6593,8 +6593,11 @@ function nameTagLines_(p) {
     }
     return { top: name, lines: lines };
   }
-  if (kind === 'ambassador') {
-    // First names only, the way her own sheet reads.
+  if (kind === 'ambassador' || kind === 'student') {
+    /* A student's tag is their first name and nothing else, the way her
+     * own sheet reads, whether the script found them on the tour or she
+     * typed them in. A whole name typed into the box still prints as
+     * the first name alone. */
     const first = trim_(String(p.name || '').split(/\s+/)[0]);
     return { top: first, lines: [gradeLabel_(p.grade)].filter(Boolean) };
   }
@@ -8961,7 +8964,20 @@ function showNameTagDialog() {
     '</div></div>' +
 
     '<div class="byhand">' +
-    '<label><span class="step">2</span> Anybody else</label>' +
+    '<label><span class="step">2</span> Add a student</label>' +
+    '<p class="sub" style="margin:0 0 8px;">A visiting child, or anybody the tour ' +
+    'date does not know about. <b>First names only on a student tag</b>, so a whole ' +
+    'name typed here prints as the first name alone.</p>' +
+    '<div class="two"><div><label for="sn">Name</label><input type="text" id="sn"></div>' +
+    '<div><label for="sg">Grade</label><input type="text" id="sg" placeholder="6"></div>' +
+    '</div>' +
+    '<div style="margin-top:10px;"><button onclick="addStudent()">Add this student</button>' +
+    '</div></div>' +
+
+    '<div class="byhand">' +
+    '<label><span class="step">3</span> Anybody else</label>' +
+    '<p class="sub" style="margin:0 0 8px;">A teacher, a visitor, anyone. This one ' +
+    'prints exactly what you type, both lines.</p>' +
     '<div class="two"><div><label for="xn">Name</label><input type="text" id="xn"></div>' +
     '<div><label for="xs">Underneath</label>' +
     '<input type="text" id="xs" placeholder="6th Grade"></div></div>' +
@@ -8984,6 +9000,11 @@ function showNameTagDialog() {
     'document.getElementById("pf").value="";document.getElementById("pl").value="";' +
     'document.getElementById("pc").value="";document.getElementById("pg").value="";' +
     'document.getElementById("pcur").checked=false;look();}' +
+    'function addStudent(){var n=val("sn");' +
+    'if(!n){alert("Type the student\'s name first.");return;}' +
+    'window.__people.push({kind:"student",name:n,grade:val("sg")});' +
+    'document.getElementById("sn").value="";document.getElementById("sg").value="";' +
+    'look();}' +
     'function addOther(){var n=val("xn");' +
     'if(!n){alert("Type a name first.");return;}' +
     'window.__people.push({kind:"person",name:n,note:val("xs")});' +

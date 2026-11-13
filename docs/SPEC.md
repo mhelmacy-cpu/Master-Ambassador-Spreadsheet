@@ -1333,7 +1333,13 @@ Three kinds of tag:
   underneath; untick it and the line is simply not there. The wording of
   that line is **Current Parent Line** on Settings, so "Current LREI
   Parent" or "Current LREI Family" is one cell.
-- **Anybody else**, typed in: a name and whatever goes under it.
+- **A student**, typed in: a visiting child, or anybody the tour date
+  does not know about. **First names only on a student tag**, as her own
+  sheet has always had, so a whole name typed into the box prints as the
+  first name alone.
+- **Anybody else**, typed in: a name and whatever goes under it. This is
+  the one that prints exactly what she types, both lines, because it is
+  for anybody at all.
 
 A grade typed as "6" prints as "6th Grade"; one she writes out herself is
 left exactly as she wrote it, and so is anything that is not a number.

@@ -78,6 +78,24 @@ console.log('\nan ambassador is their first name and their grade');
   ok(onDuty.every(x=>!!x.grade),'each with their grade off the Ambassadors sheet');
 }
 
+console.log('\na student she types in is a first name too');
+{
+  // Her sheet has never had a last name on a student's tag, and that
+  // holds whether the script found them on the tour or she typed them.
+  const t=nameTagLines_({kind:'student',name:'Veronica Madar',grade:'6'});
+  ok(t.top==='Veronica','a whole name typed in prints as "'+t.top+'"');
+  ok(t.top.indexOf(' ')===-1,'with no last name on it');
+  ok(t.lines.join('')==='6th Grade','and "'+t.lines.join('')+'" under it');
+  const one=nameTagLines_({kind:'student',name:'Veronica',grade:'6th'});
+  ok(one.top==='Veronica','a first name on its own is left as it is');
+  // The free-form box is the one thing that prints exactly what she
+  // types, both lines, because it is for anybody at all.
+  const any=nameTagLines_({kind:'person',name:'Mary Katherine Doyle',note:'Spanish'});
+  ok(any.top==='Mary Katherine Doyle','"anybody else" prints what she types: "'+
+     any.top+'"');
+  ok(any.lines.join('')==='Spanish','and whatever she puts under it');
+}
+
 console.log('\nthe page itself');
 const people=[
   {kind:'parent',first:'Annie',last:'Denson',child:'Theo Denson',grade:'6',current:true},
@@ -143,6 +161,9 @@ console.log('\nthere is a button for it');
   ok(/Print name tags/.test(html),'the dialog opens');
   ok(/id="pf"/.test(html)&&/id="pl"/.test(html),'with a first and last name box');
   ok(/id="pc"/.test(html)&&/id="pg"/.test(html),'the child and their grade');
+  ok(/id="sn"/.test(html)&&/id="sg"/.test(html),'a box for a student and their grade');
+  ok(/First names only on a student tag/.test(html),
+     'saying first names only on a student tag');
   ok(/Current LREI parent/.test(html),'and the tick for a current parent');
   ok(/api_buildNameTags/.test(html)&&typeof api_buildNameTags==='function',
      'and it builds them');
