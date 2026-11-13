@@ -36,6 +36,13 @@ ok(gradeLabel_('8')==='8th Grade','"8" is "'+gradeLabel_('8')+'"');
 ok(gradeLabel_('6th Grade')==='6th Grade','and one she has written out is left alone');
 ok(gradeLabel_('Kindergarten')==='Kindergarten','so is anything that is not a number');
 ok(gradeLabel_('')==='','and nothing is nothing');
+/* The school's own names for a year are not numbers and must never be
+ * read as one: the 4s are the 4s, not the 4th grade. */
+ok(gradeLabel_('4s')==='4s','"4s" stays "'+gradeLabel_('4s')+'", not 4th Grade');
+ok(gradeLabel_('2s')==='2s','"2s" stays "'+gradeLabel_('2s')+'"');
+ok(gradeLabel_('K')==='K','"K" stays "'+gradeLabel_('K')+'"');
+ok(gradeLabel_('Pre-K')==='Pre-K','"Pre-K" stays "'+gradeLabel_('Pre-K')+'"');
+ok(gradeLabel_('11')==='11th Grade','and 11 is still "'+gradeLabel_('11')+'"');
 
 console.log('\na parent who is not an LREI parent yet');
 {
@@ -77,6 +84,8 @@ ok(gradeShort_('6')==='6th','"6" is "'+gradeShort_('6')+'"');
 ok(gradeShort_('6th')==='6th','"6th" is "'+gradeShort_('6th')+'"');
 ok(gradeShort_('6th Grade')==='6th','and "6th Grade" is "'+gradeShort_('6th Grade')+'"');
 ok(gradeShort_('Kindergarten')==='Kindergarten','anything else is left as she typed it');
+ok(gradeShort_('4s')==='4s','the 4s are the 4s on a parent tag too: "'+
+   gradeShort_('4s')+'"');
 ok(gradeShort_('')==='','and nothing is nothing');
 
 console.log('\nan ambassador is their first name and their grade');
@@ -105,6 +114,17 @@ console.log('\na student she types in is a first name too');
   ok(any.top==='Mary Katherine Doyle','"anybody else" prints what she types: "'+
      any.top+'"');
   ok(any.lines.join('')==='Spanish','and whatever she puts under it');
+}
+
+console.log('\na child in the 4s, on both kinds of tag');
+{
+  const p=nameTagLines_({kind:'parent',first:'Dana',last:'Okonkwo',
+    child:'Ada Okonkwo',grade:'4s',current:true});
+  ok(p.lines[0]==='Ada, 4s','the parent tag reads "'+p.lines[0]+'"');
+  ok(p.lines.join(' ').indexOf('4th')===-1,'with no 4th anywhere on it');
+  const s2=nameTagLines_({kind:'student',name:'Ada Okonkwo',grade:'4s'});
+  ok(s2.lines.join('')==='4s','and the child\'s own tag reads "'+
+     s2.lines.join('')+'"');
 }
 
 console.log('\nthe page itself');

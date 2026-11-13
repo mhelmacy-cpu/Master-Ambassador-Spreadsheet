@@ -44,7 +44,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-13 c';
+var BUILD_ = '2026-11-13 d';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -6558,15 +6558,17 @@ var NAME_TAG_ = {
 /**
  * "6" or "6th" written the way the tags write it.
  *
- * Anything that is not a number is left exactly as she typed it, since
- * that is her saying something the script has no name for.
+ * Only a plain number is turned into a grade. Everything else is left
+ * exactly as she typed it, because the school's own names for a year
+ * are not numbers and must not be read as one: the 4s are the 4s, not
+ * the 4th grade, and K is K.
  */
 function gradeLabel_(grade) {
   const g = trim_(grade);
   if (!g) return '';
-  if (/grade/i.test(g)) return g;
-  const n = g.replace(/[^0-9]/g, '');
-  if (!n) return g;
+  const m = /^(\d{1,2})(?:st|nd|rd|th)?$/i.exec(g);
+  if (!m) return g;
+  const n = m[1];
   const last = n.charAt(n.length - 1);
   const suffix = n.length === 2 && n.charAt(0) === '1' ? 'th'
     : (last === '1' ? 'st' : last === '2' ? 'nd' : last === '3' ? 'rd' : 'th');
@@ -8977,7 +8979,8 @@ function showNameTagDialog() {
     '</div>' +
     '<p class="sub" style="margin:6px 0 0;">The child goes on by their first name ' +
     'and the grade short, as "Theo, 6th": their last name is the parent\'s own, ' +
-    'two lines above it.</p>' +
+    'two lines above it. A year that is not a number, the 4s or K, prints just ' +
+    'as you type it.</p>' +
     '<label class="opt"><input type="checkbox" id="pcur">' +
     '<span><b>Current LREI parent.</b> Ticked, the tag says so under their ' +
     'child\'s name. Unticked, it is just their name and their child.</span></label>' +

@@ -1343,8 +1343,11 @@ Three kinds of tag:
   the one that prints exactly what she types, both lines, because it is
   for anybody at all.
 
-A grade typed as "6" prints as "6th Grade"; one she writes out herself is
-left exactly as she wrote it, and so is anything that is not a number.
+A grade typed as "6" prints as "6th Grade", and "6th" on a parent's line.
+**Only a plain number is turned into a grade.** The school's own names
+for a year are not numbers and must never be read as one: the 4s stay
+the 4s, not the 4th grade, and K stays K. Anything she writes out
+herself is left exactly as she wrote it.
 
 The redirect works inside `mailOptions_`, which every message is built
 by, so a send cannot get past it - and it is cleared in a `finally`, so
