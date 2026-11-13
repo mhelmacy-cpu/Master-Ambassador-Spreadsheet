@@ -44,7 +44,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-13 b';
+var BUILD_ = '2026-11-13 c';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -6574,6 +6574,20 @@ function gradeLabel_(grade) {
 }
 
 /**
+ * "6th", the short way a parent's tag names their child's grade.
+ *
+ * The tag says "Theo, 6th" rather than "Theo Denson, 6th Grade": it is
+ * a line under a name on a badge, and the whole of it has to be read
+ * across a lobby.
+ */
+function gradeShort_(grade) {
+  const full = gradeLabel_(grade);
+  if (!full) return '';
+  const m = /^(\d+(?:st|nd|rd|th))\b/.exec(full);
+  return m ? m[1] : full;
+}
+
+/**
  * One tag: the big line, and the small lines under it.
  *
  * Three kinds, and the only one with any rules is a parent's. Her words:
@@ -6585,7 +6599,11 @@ function nameTagLines_(p) {
   const kind = norm_(p && p.kind) || 'person';
   if (kind === 'parent') {
     const name = [trim_(p.first), trim_(p.last)].filter(Boolean).join(' ');
-    const child = [trim_(p.child), gradeLabel_(p.grade)].filter(Boolean).join(', ');
+    /* The child by their first name and the grade short: "Theo, 6th".
+     * Their last name is the parent's own, two lines above it, and the
+     * whole of a badge has to be read across a lobby. */
+    const first = trim_(String(p.child || '').split(/\s+/)[0]);
+    const child = [first, gradeShort_(p.grade)].filter(Boolean).join(', ');
     const lines = [];
     if (child) lines.push(child);
     if (isYes_(p.current) || p.current === true) {
@@ -8954,9 +8972,12 @@ function showNameTagDialog() {
     '<input type="text" id="pf"></div>' +
     '<div><label for="pl">Last name</label><input type="text" id="pl"></div></div>' +
     '<div class="two" style="margin-top:8px;"><div><label for="pc">Child\'s name</label>' +
-    '<input type="text" id="pc"></div>' +
+    '<input type="text" id="pc" placeholder="Theo"></div>' +
     '<div><label for="pg">Grade</label><input type="text" id="pg" placeholder="6"></div>' +
     '</div>' +
+    '<p class="sub" style="margin:6px 0 0;">The child goes on by their first name ' +
+    'and the grade short, as "Theo, 6th": their last name is the parent\'s own, ' +
+    'two lines above it.</p>' +
     '<label class="opt"><input type="checkbox" id="pcur">' +
     '<span><b>Current LREI parent.</b> Ticked, the tag says so under their ' +
     'child\'s name. Unticked, it is just their name and their child.</span></label>' +

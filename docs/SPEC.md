@@ -1328,11 +1328,13 @@ Three kinds of tag:
   tour date: their **first name**, the way her own sheet reads, and their
   grade under it.
 - **A parent**, typed in: first name and last name on top, then their
-  child and the grade the child is applying for ("Theo Denson, 6th
-  Grade"). A tick for **current LREI parent** adds a line saying so
-  underneath; untick it and the line is simply not there. The wording of
-  that line is **Current Parent Line** on Settings, so "Current LREI
-  Parent" or "Current LREI Family" is one cell.
+  child by **first name only** and the grade **short**: "Theo, 6th". The
+  child's last name is the parent's own, two lines above it, and the
+  whole of a badge has to be read across a lobby, so a full name typed
+  into the box still comes out short. A tick for **current LREI parent**
+  adds a line saying so underneath; untick it and the line is simply not
+  there. The wording of that line is **Current Parent Line** on Settings,
+  so "Current LREI Parent" or "Current LREI Family" is one cell.
 - **A student**, typed in: a visiting child, or anybody the tour date
   does not know about. **First names only on a student tag**, as her own
   sheet has always had, so a whole name typed into the box prints as the

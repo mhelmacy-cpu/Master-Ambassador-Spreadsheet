@@ -43,7 +43,11 @@ console.log('\na parent who is not an LREI parent yet');
     child:'Iris Reyes',grade:'6',current:false});
   ok(t.top==='Marcus Reyes','their name on top: "'+t.top+'"');
   ok(t.lines.length===1,'one line under it');
-  ok(t.lines[0]==='Iris Reyes, 6th Grade','their child and the grade: "'+t.lines[0]+'"');
+  ok(t.lines[0]==='Iris, 6th','their child, by first name, and the grade short: "'+
+     t.lines[0]+'"');
+  ok(t.lines[0].indexOf('Reyes')===-1,
+     'no last name on the child: it is the parent\'s own, on the line above');
+  ok(t.lines[0].indexOf('Grade')===-1,'and the grade short, since it is a badge');
   ok(t.lines.every(l=>!/LREI/.test(l)),'and nothing about being an LREI parent');
 }
 
@@ -52,7 +56,7 @@ console.log('\nand one who is');
   const t=nameTagLines_({kind:'parent',first:'Annie',last:'Denson',
     child:'Theo Denson',grade:'6',current:true});
   ok(t.top==='Annie Denson','their name on top: "'+t.top+'"');
-  ok(t.lines[0]==='Theo Denson, 6th Grade','their child first: "'+t.lines[0]+'"');
+  ok(t.lines[0]==='Theo, 6th','their child first: "'+t.lines[0]+'"');
   ok(t.lines[1]==='Current LREI Parent','then: "'+t.lines[1]+'"');
   ok(t.lines.length===2,'and nothing else');
   // The wording is hers: one cell on Settings changes it everywhere.
@@ -67,6 +71,13 @@ console.log('\nand one who is');
   m.sheets[S].getRange(at,2).setValue('Current LREI Parent');
   clearReadCache_();
 }
+
+console.log('\nthe grade short, which is what a parent tag uses');
+ok(gradeShort_('6')==='6th','"6" is "'+gradeShort_('6')+'"');
+ok(gradeShort_('6th')==='6th','"6th" is "'+gradeShort_('6th')+'"');
+ok(gradeShort_('6th Grade')==='6th','and "6th Grade" is "'+gradeShort_('6th Grade')+'"');
+ok(gradeShort_('Kindergarten')==='Kindergarten','anything else is left as she typed it');
+ok(gradeShort_('')==='','and nothing is nothing');
 
 console.log('\nan ambassador is their first name and their grade');
 {
@@ -99,6 +110,8 @@ console.log('\na student she types in is a first name too');
 console.log('\nthe page itself');
 const people=[
   {kind:'parent',first:'Annie',last:'Denson',child:'Theo Denson',grade:'6',current:true},
+  // written out the long way to show it still comes out short
+
   {kind:'parent',first:'Marcus',last:'Reyes',child:'Iris Reyes',grade:'6'},
   {kind:'person',name:'Veronica Madar',note:'6th Grade'}
 ];
@@ -127,6 +140,8 @@ ok(under.length===6,'six lines under them at 20 point');
 ok(names.indexOf('Annie Denson')!==-1&&names.indexOf('Jane')!==-1,
    'the parents by both names and the ambassadors by their first');
 ok(under.indexOf('Current LREI Parent')!==-1,'with the LREI line where it was ticked');
+ok(under.indexOf('Theo, 6th')!==-1,'and the child line short: "Theo, 6th"');
+ok(under.every(l=>!/Denson, /.test(l)),'never the child with a last name on it');
 
 console.log('\nnine of them is two pages, and the grid stays eight to a page');
 {
