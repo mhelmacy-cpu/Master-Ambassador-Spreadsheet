@@ -853,6 +853,46 @@ date brings her own answers back rather than a fresh list.
 A no-show is not charged against the child: fairness counts every job
 except one marked No, so a child pulled on the day goes first next time.
 
+## Scheduling emails
+
+"Scheduling Emails..." is her letter to a family whose application has
+come through: call me and we will book the parent interview and the
+student assessment. One letter per family, so each is addressed to the
+parents by name and names the child.
+
+Three columns on Prospective Students carry it:
+
+    Parent Name              hers to type
+    Parent Email             hers to type
+    Scheduling Email Sent    written by the command, never typed
+
+The child comes off the sheet. A name typed either way round reads the
+same: "Twombly, Cy" is Cy, not Twombly.
+
+The dialog lists **every** family, including the ones it cannot write to
+yet, because a name missing from a list is a name she cannot act on. A
+family with no parent name or no address is shown with the reason and
+cannot be ticked. Anyone already written to shows the date and starts
+unticked, so a second run picks up only the new families.
+
+**Test is ticked.** Every letter comes to her instead, marked as a test
+and naming the family it would really have gone to, and nobody is marked
+as written to: a test must not make a family look dealt with. Unticking
+it arms a real send, which asks a second time before it goes, since a
+dialog cannot use the browser's own confirm box.
+
+Only a real send stamps the date into Scheduling Email Sent, and only
+against the families it actually wrote to.
+
+### The wording is hers
+
+The letter in the file is the default, not the rule. A
+`Scheduling Email Body` row on Settings replaces it, and
+`Scheduling Email Subject` replaces the subject. `{parent}` and
+`{student}` are filled in wherever they appear, so she can rewrite the
+letter, or write a second one for another division, without anybody
+touching the script.
+
 ## Writing an email by hand
 
 "Write an Email..." is her own correspondence, not the automatic

@@ -44,7 +44,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-13 f';
+var BUILD_ = '2026-11-16 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -61,7 +61,13 @@ var COUNT_COLUMNS_ = ['Signed Up', 'Confirmed', 'Jobs Done'];
 HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'Tour With', 'School', 'Grade', 'Gender',
   'Race', 'Borough',
   'Full Pay', 'Well Connected', 'Class Visit', 'Route', 'Tour Guides', 'Class Buddy',
-  'Class Visit To', 'Pass Off', 'Notes'];
+  'Class Visit To', 'Pass Off', 'Parent Name', 'Parent Email', 'Scheduling Email Sent',
+  'Notes'];
+
+/* The family's own details, which she types. The scheduling email is the
+ * only thing that reads them: nothing about a tour needs them, and a
+ * blank pair simply means that family is not ready to be written to. */
+var FAMILY_COLUMNS_ = ['Parent Name', 'Parent Email'];
 HEADERS[SHEETS.APART] = ['Ambassador', 'And', 'Notes'];
 HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route',
   'Class Visit', 'Showed Up', 'Notes'];
@@ -575,6 +581,12 @@ function setupSpreadsheet() {
   }
   if (ensureColumn_(SHEETS.PROSPECTIVE, 'Tour With')) {
     added.push('Tour With on Prospective Students');
+  }
+  FAMILY_COLUMNS_.forEach(function (h) {
+    if (ensureColumn_(SHEETS.PROSPECTIVE, h)) added.push(h + ' on Prospective Students');
+  });
+  if (ensureColumn_(SHEETS.PROSPECTIVE, 'Scheduling Email Sent')) {
+    added.push('Scheduling Email Sent on Prospective Students');
   }
   COUNT_COLUMNS_.forEach(function (h) {
     if (ensureColumn_(SHEETS.AMBASSADORS, h)) added.push(h + ' on Ambassadors');
@@ -7380,6 +7392,188 @@ var TABLE_STYLE_ = 'border-collapse:collapse;font-family:Arial,Helvetica,sans-se
 var TH_ = 'padding:6px 10px;background:#a8322a;color:#fff;text-align:left;';
 var TD_ = 'padding:6px 10px;border:1px solid #ddd;';
 
+/* =========================================================
+ * The scheduling email
+ *
+ * Her own letter to a family whose application has come through: call
+ * me and we will book the parent interview and the student assessment.
+ * One per family, addressed to the parents by name and naming the child.
+ *
+ * The wording below is hers, word for word. It is the default, not the
+ * rule: a "Scheduling Email Body" row on Settings replaces it, and
+ * {parent} and {student} are filled in wherever they appear, so she can
+ * rewrite the letter without anybody touching this file.
+ * ========================================================= */
+
+var SCHEDULING_SUBJECT_ = 'LREI Scheduling: Parent Interview and Student Assessment';
+
+var SCHEDULING_BODY_ = [
+  'Dear {parent},',
+  '',
+  'Thank you for applying to LREI! {student}\'s application has been received and ' +
+    'processed for payment, and we are now ready to schedule the student assessment ' +
+    'and parent interview.',
+  '',
+  'Please call me at 212-477-5316 x298 to schedule a parent interview and student ' +
+    'assessment at your earliest convenience. Given the complexity of scheduling, ' +
+    'phone contact is the preferred method for scheduling appointments.',
+  '',
+  'As a reminder, notifications regarding admissions decisions will be sent via email ' +
+    'from ms-admissions@lrei.org.',
+  '',
+  'I can be reached Monday-Friday between the hours of 9:30AM-4:30PM, and I\'m looking ' +
+    'forward to speaking to you soon.',
+  '',
+  'Best,',
+  '',
+  'Maren'
+].join('\n');
+
+/**
+ * The child's first name, which is what the letter says.
+ *
+ * "Rivera, Sam" is turned round first, so a name typed either way round
+ * comes out as Sam rather than as Rivera.
+ */
+function firstNameOf_(name) {
+  const whole = flipName_(name);
+  const bits = trim_(whole).split(/\s+/);
+  return bits.length ? bits[0] : '';
+}
+
+/**
+ * Every family on Prospective Students, with what the letter would need.
+ *
+ * Nobody is left out of the list: a family with no address still appears,
+ * with the reason, because a name missing from a list is a name she
+ * cannot act on.
+ */
+function schedulingFamilies_() {
+  const N = SHEETS.PROSPECTIVE;
+  const out = [];
+  rows_(N).forEach(function (r, i) {
+    const name = trim_(cell_(r, N, 'Name'));
+    if (!name) return;
+    const email = trim_(cell_(r, N, 'Parent Email'));
+    const parent = trim_(cell_(r, N, 'Parent Name'));
+    const sent = trim_(cell_(r, N, 'Scheduling Email Sent'));
+    const missing = [];
+    if (!parent) missing.push('no parent name');
+    if (!email) missing.push('no parent email');
+    out.push({
+      id: String(i + 2),
+      row: i + 2,
+      student: name,
+      first: firstNameOf_(name),
+      parent: parent,
+      email: email,
+      sent: sent,
+      ready: missing.length === 0,
+      missing: missing.join(' and ')
+    });
+  });
+  return out;
+}
+
+/** The letter for one family, as the plain text she would have typed. */
+function schedulingText_(family) {
+  const body = setting_('Scheduling Email Body', SCHEDULING_BODY_);
+  return String(body)
+    .split('{parent}').join(family.parent)
+    .split('{student}').join(family.first || family.student);
+}
+
+/** The same letter as the mail body, her line breaks kept. */
+function schedulingHtml_(family) {
+  return '<div style="' + MAIL_STYLE_ + '">' +
+    escapeHtml_(schedulingText_(family)).split('\n').join('<br>') +
+    '</div>';
+}
+
+function schedulingSubject_() {
+  return setting_('Scheduling Email Subject', SCHEDULING_SUBJECT_);
+}
+
+/**
+ * Writes to the families ticked, one letter each.
+ *
+ * Goes through sendMail_ like everything else, so a test copy comes to
+ * her instead and a dry run stops it, and the date lands in Scheduling
+ * Email Sent only on a real send: a test must not make a family look
+ * written to.
+ */
+function sendSchedulingEmails(ids, test) {
+  clearReadCache_();
+  const want = {};
+  (ids || []).forEach(function (id) { want[String(id)] = true; });
+  const chosen = schedulingFamilies_().filter(function (f) { return want[f.id]; });
+  if (!chosen.length) throw new Error('Tick at least one family.');
+
+  const notReady = chosen.filter(function (f) { return !f.ready; });
+  if (notReady.length) {
+    throw new Error('Fill these in on Prospective Students first: ' +
+      notReady.map(function (f) { return f.student + ' (' + f.missing + ')'; }).join('; '));
+  }
+
+  const subject = schedulingSubject_();
+  const sent = [];
+  const write = function () {
+    chosen.forEach(function (f) {
+      sendMail_(f.email, subject, schedulingHtml_(f));
+      sent.push(f);
+    });
+  };
+  if (test) {
+    // asTest_ puts PREVIEW_TO_ back in a finally, so a letter that fails
+    // part way cannot leave the next real send pointing at her.
+    const label = TEST_LABEL_;
+    TEST_LABEL_ = 'scheduling';
+    try {
+      asTest_(previewAddress_(), write);
+    } finally {
+      TEST_LABEL_ = label;
+    }
+  } else {
+    write();
+  }
+
+  if (!test) {
+    const N = SHEETS.PROSPECTIVE;
+    const s = sheet_(N);
+    const col = optionalCol_(N, 'Scheduling Email Sent');
+    if (col !== -1) {
+      const stamp = dateKey_(new Date());
+      sent.forEach(function (f) { s.getRange(f.row, col + 1).setValue(stamp); });
+    }
+    clearReadCache_();
+  }
+
+  return {
+    sent: sent.length,
+    test: !!test,
+    to: sent.map(function (f) { return f.parent + ' (' + f.email + ')'; }),
+    where: test ? previewAddress_() : ''
+  };
+}
+
+function api_schedulingFamilies() {
+  return schedulingFamilies_().map(function (f) {
+    return {
+      id: String(f.id), student: String(f.student), first: String(f.first),
+      parent: String(f.parent), email: String(f.email), sent: String(f.sent),
+      ready: !!f.ready, missing: String(f.missing)
+    };
+  });
+}
+
+function api_schedulingPreview(id) {
+  const one = schedulingFamilies_().filter(function (f) { return f.id === String(id); })[0];
+  if (!one) throw new Error('That family is not on the sheet any more.');
+  return { subject: String(schedulingSubject_()), text: String(schedulingText_(one)) };
+}
+
+function api_sendScheduling(ids, test) { return sendSchedulingEmails(ids, test); }
+
 /* ---------- students ---------- */
 
 function sendStudentEmails(dateStr) {
@@ -8370,6 +8564,7 @@ function onOpen() {
     .addItem('Make a Check In Sheet...', 'showCheckInDialog')
     .addSeparator()
     .addItem('Write an Email...', 'showWriteDialog')
+    .addItem('Scheduling Emails...', 'showSchedulingDialog')
     .addItem('Test Emails...', 'showTestEmailDialog')
     .addItem('Send Emails Now...', 'showEmailDialog')
     .addSeparator()
@@ -9355,6 +9550,111 @@ function showRouteSheetDialog() {
     '.api_buildRouteSheets(document.getElementById("d").value);}' +
     '<\/script>';
   dialog_(html, 'Print Tour Routes', 600, 460);
+}
+
+function showSchedulingDialog() {
+  const html =
+    '<style>' + DIALOG_CSS_ +
+    '.fam label{display:flex;align-items:flex-start;gap:8px;font-weight:normal;margin:0;' +
+    'padding:3px 0;cursor:pointer;}' +
+    '.fam input{width:15px;height:15px;margin-top:2px;flex:none;cursor:pointer;}' +
+    '.fam .gap{color:#8a5a12;}' +
+    '.fam .done{color:#777;}' +
+    'pre.letter{white-space:pre-wrap;font-family:Arial,Helvetica,sans-serif;font-size:13px;' +
+    'background:#fafafa;border:1px solid #e0e0e0;border-radius:6px;padding:12px;margin:6px 0 0;}' +
+    '</style>' +
+    '<h2>Scheduling emails</h2>' +
+    '<p class="sub">One letter per family: call me and we will book the parent interview ' +
+    'and the student assessment. The child is named from Prospective Students. The parent ' +
+    'name and address are the ones you type there.</p>' +
+    '<div id="who"><p class="muted">Loading...</p></div>' +
+    '<div id="out"></div>' +
+    '<script>' +
+    'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;")' +
+    '.replace(/>/g,"&gt;").replace(/"/g,"&quot;");}' +
+    'function fail(e){document.getElementById("out").innerHTML=' +
+    '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    'function load(){google.script.run.withSuccessHandler(show).withFailureHandler(fail)' +
+    '.api_schedulingFamilies();}' +
+
+    'function show(list){window.__fam=list;' +
+    'if(!list.length){document.getElementById("who").innerHTML=' +
+    '"<div class=\'warn\'><b>Nobody is on Prospective Students yet.</b></div>";return;}' +
+    'var ready=0,gaps=0;' +
+    'var h="<label>Who hears from you</label>";' +
+    'h+="<div style=\'margin-bottom:6px;\'>' +
+    '<button class=\'ghost\' onclick=\'tickAll(1)\'>Tick all</button>' +
+    '<button class=\'ghost\' onclick=\'tickAll(0)\'>Untick all</button>' +
+    '<button class=\'ghost\' onclick=\'unwritten()\'>Not written to yet</button></div>";' +
+    'h+="<div class=\'fam\' style=\'max-height:220px;overflow:auto;\'>";' +
+    'list.forEach(function(f){' +
+    'if(f.ready){ready++;}else{gaps++;}' +
+    'h+="<label><input type=\'checkbox\' class=\'f\' value=\'"+esc(f.id)+"\'"+' +
+    '(f.ready&&!f.sent?" checked":"")+(f.ready?"":" disabled")+' +
+    '" data-sent=\'"+esc(f.sent)+"\' onchange=\'peek(this.value)\'>";' +
+    'h+="<span><b>"+esc(f.student)+"</b>";' +
+    'if(f.ready){h+="<span class=\'muted\'> to "+esc(f.parent)+", "+esc(f.email)+"</span>";}' +
+    'else{h+="<span class=\'gap\'> "+esc(f.missing)+"</span>";}' +
+    'if(f.sent){h+="<span class=\'done\'> written to "+esc(f.sent)+"</span>";}' +
+    'h+="</span></label>";});' +
+    'h+="</div>";' +
+    'if(gaps){h+="<div class=\'warn\'><b>"+gaps+" family/families cannot be written to ' +
+    'yet.</b> Type the parent name and address against them on Prospective Students and ' +
+    'reopen this.</div>";}' +
+    'h+="<label class=\'opt\'><input type=\'checkbox\' id=\'test\' checked><span>' +
+    '<b>Test first.</b> Every letter comes to you instead, each one marked as a test and ' +
+    'naming the family it would really go to. Nothing reaches a parent, and nobody is ' +
+    'marked as written to.</span></label>";' +
+    'h+="<div style=\'margin-top:12px;\'><button id=\'go\' onclick=\'send()\'>' +
+    'Send them</button></div>";' +
+    'h+="<label style=\'margin-top:14px;\'>What one of them says</label><div id=\'peek\'>' +
+    '<p class=\'muted\'>Tick a family to read their letter.</p></div>";' +
+    'document.getElementById("who").innerHTML=h;' +
+    'var first=list.filter(function(f){return f.ready&&!f.sent;})[0]||' +
+    'list.filter(function(f){return f.ready;})[0];' +
+    'if(first){peek(first.id);}}' +
+
+    'function tickAll(on){var b=document.querySelectorAll("input.f");' +
+    'for(var i=0;i<b.length;i++){if(!b[i].disabled){b[i].checked=!!on;}}}' +
+    'function unwritten(){var b=document.querySelectorAll("input.f");' +
+    'for(var i=0;i<b.length;i++){if(!b[i].disabled){' +
+    'b[i].checked=!b[i].getAttribute("data-sent");}}}' +
+
+    'function peek(id){google.script.run.withSuccessHandler(function(p){' +
+    'document.getElementById("peek").innerHTML="<div class=\'muted\'>Subject: "+' +
+    'esc(p.subject)+"</div><pre class=\'letter\'>"+esc(p.text)+"</pre>";})' +
+    '.withFailureHandler(fail).api_schedulingPreview(id);}' +
+
+    'function send(){var ids=[],b=document.querySelectorAll("input.f");' +
+    'for(var i=0;i<b.length;i++){if(b[i].checked){ids.push(b[i].value);}}' +
+    'if(!ids.length){fail({message:"Tick at least one family."});return;}' +
+    'var test=document.getElementById("test").checked;' +
+    'if(!test&&!confirmReal(ids.length)){return;}' +
+    'document.getElementById("go").disabled=true;' +
+    'document.getElementById("out").innerHTML="<p class=\'muted\'>Sending...</p>";' +
+    'google.script.run.withSuccessHandler(function(r){' +
+    'document.getElementById("go").disabled=false;' +
+    'var h="<div class=\'free\'><b>"+r.sent+" letter(s) "+(r.test?"sent to you as a test":' +
+    '"sent")+".</b>";' +
+    'if(r.test){h+="<br><span class=\'muted\'>They went to "+esc(r.where)+". Nobody on ' +
+    'the list has been written to, and nothing was marked. Untick Test to send them for ' +
+    'real.</span>";}' +
+    'else{h+="<br>"+esc(r.to.join("; "))+"<br><span class=\'muted\'>Today\'s date is now ' +
+    'against each of them in Scheduling Email Sent.</span>";}' +
+    'h+="</div>";document.getElementById("out").innerHTML=h;' +
+    'if(!r.test){load();}})' +
+    '.withFailureHandler(function(e){document.getElementById("go").disabled=false;fail(e);})' +
+    '.api_sendScheduling(ids,test);}' +
+
+    // A dialog cannot use confirm(), so the second press is the check.
+    'var armed=0;' +
+    'function confirmReal(n){if(armed){armed=0;return true;}armed=1;' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>This goes to "+n+' +
+    '" real family/families.</b><br>Press Send them again to go ahead, or tick Test ' +
+    'first.</div>";return false;}' +
+    'load();' +
+    '<\/script>';
+  dialog_(html, 'Scheduling Emails', 680, 760);
 }
 
 function showWriteDialog() {
