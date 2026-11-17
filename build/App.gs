@@ -45,7 +45,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-17 b';
+var BUILD_ = '2026-11-17 c';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -74,8 +74,14 @@ HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'Tour With', 'School', 'Grad
  *
  * Scheduling Email Sent is written by the command and never typed.
  */
-HEADERS[SHEETS.APPLICANTS] = ['Student Name', 'Grade', 'Parent Name', 'Parent Email',
+HEADERS[SHEETS.APPLICANTS] = ['Student Name', 'Grade',
+  'Parent 1 Name', 'Parent 1 Email', 'Parent 2 Name', 'Parent 2 Email',
   'Scheduling Email Sent', 'Notes'];
+
+/* A child can have two parents, and the letter goes to both of them.
+ * Named as on Ambassadors, which has carried a second parent all along. */
+var APPLICANT_PARENTS_ = ['Parent 1 Name', 'Parent 1 Email',
+  'Parent 2 Name', 'Parent 2 Email'];
 HEADERS[SHEETS.APART] = ['Ambassador', 'And', 'Notes'];
 HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route',
   'Class Visit', 'Showed Up', 'Notes'];
@@ -611,6 +617,9 @@ function setupSpreadsheet() {
   setupAmbassadors_();
   setupProspective_();
   sheet_(SHEETS.APPLICANTS);
+  APPLICANT_PARENTS_.forEach(function (h) {
+    if (ensureColumn_(SHEETS.APPLICANTS, h)) added.push(h + ' on ' + SHEETS.APPLICANTS);
+  });
   setupTracker_();
   setupBuddies_();
   setupJobs_();
@@ -7560,20 +7569,32 @@ function schedulingFamilies_() {
   rows_(N).forEach(function (r, i) {
     const name = trim_(cell_(r, N, 'Student Name'));
     if (!name) return;
-    const email = trim_(cell_(r, N, 'Parent Email'));
-    const parent = trim_(cell_(r, N, 'Parent Name'));
+    /* Either parent can be the only one, and a sheet set up before there
+     * was a second one says "Parent Name" with no number. Both are read,
+     * so neither costs her a retype. */
+    const names = [
+      trim_(cell_(r, N, 'Parent 1 Name')) || trim_(cell_(r, N, 'Parent Name')),
+      trim_(cell_(r, N, 'Parent 2 Name'))
+    ].filter(Boolean);
+    const emails = [
+      trim_(cell_(r, N, 'Parent 1 Email')) || trim_(cell_(r, N, 'Parent Email')),
+      trim_(cell_(r, N, 'Parent 2 Email'))
+    ].filter(Boolean);
     const sent = trim_(cell_(r, N, 'Scheduling Email Sent'));
     const grade = trim_(cell_(r, N, 'Grade'));
     const missing = [];
-    if (!parent) missing.push('no parent name');
-    if (!email) missing.push('no parent email');
+    if (!names.length) missing.push('no parent name');
+    if (!emails.length) missing.push('no parent email');
     out.push({
       id: String(i + 2),
       row: i + 2,
       student: name,
       first: firstNameOf_(name),
-      parent: parent,
-      email: email,
+      // "Jo Rivera and Alex Rivera". Whatever she typed is what it says,
+      // so a couple who go by one line can still be typed as one.
+      parent: names.join(' and '),
+      emails: emails,
+      email: emails.join(', '),
       grade: grade,
       gradeNum: schedulingGrade_(grade),
       sent: sent,
@@ -7625,8 +7646,9 @@ function sendSchedulingEmails(ids, test, drafts, key) {
   const sent = [];
   const write = function () {
     chosen.forEach(function (f) {
-      if (drafts) draftMail_(f.email, subject, schedulingHtml_(f, key));
-      else sendMail_(f.email, subject, schedulingHtml_(f, key));
+      const to = f.emails.join(',');
+      if (drafts) draftMail_(to, subject, schedulingHtml_(f, key));
+      else sendMail_(to, subject, schedulingHtml_(f, key));
       sent.push(f);
     });
   };

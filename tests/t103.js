@@ -15,12 +15,12 @@ const P=SHEETS.APPLICANTS, sh=m.sheets[P];
 const put=(row,h,v)=>sh.getRange(row,col_(P,h)+1).setValue(v);
 
 // Three families: one ready, one already written to, one with no address.
-put(2,'Student Name','Sam Rivera');      put(2,'Parent Name','Jo Rivera');
-                                  put(2,'Parent Email','jo@example.com');
-put(3,'Student Name','Twombly, Cy');     put(3,'Parent Name','Pat Twombly');
-                                  put(3,'Parent Email','pat@example.com');
+put(2,'Student Name','Sam Rivera');      put(2,'Parent 1 Name','Jo Rivera');
+                                  put(2,'Parent 1 Email','jo@example.com');
+put(3,'Student Name','Twombly, Cy');     put(3,'Parent 1 Name','Pat Twombly');
+                                  put(3,'Parent 1 Email','pat@example.com');
                                   put(3,'Scheduling Email Sent','2026-11-01');
-put(4,'Student Name','Robin Chen');      put(4,'Parent Name','Lee Chen');
+put(4,'Student Name','Robin Chen');      put(4,'Parent 1 Name','Lee Chen');
 Object.keys(HEADER_CACHE_).forEach(k=>delete HEADER_CACHE_[k]);
 clearReadCache_();
 

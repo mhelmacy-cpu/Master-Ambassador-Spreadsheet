@@ -864,10 +864,22 @@ It reads its own sheet, **Applicants**, which she fills:
 
     Student Name             hers to type
     Grade                    hers to type, Pre-K and K included
-    Parent Name              hers to type
-    Parent Email             hers to type
+    Parent 1 Name            hers to type
+    Parent 1 Email           hers to type
+    Parent 2 Name            hers to type, where there are two
+    Parent 2 Email           hers to type, where there are two
     Scheduling Email Sent    written by the command, never typed
     Notes                    hers
+
+A child with two parents gets one letter addressed to both of them, with
+both greeted by name: "Dear Jo Rivera and Alex Rivera,". Whatever she
+typed is what it says, so a couple who go by one line can be typed as one
+and the second pair left empty.
+
+Either pair can stand alone. One parent is one address and no stray
+comma, a second parent with no address of their own is still greeted, and
+a sheet set up before there was a second parent, whose columns say
+"Parent Name" with no number, is read as it stands rather than retyped.
 
 Not Prospective Students. That sheet is who is coming on a tour, and the
 two are not the same people: an application comes through without a tour,

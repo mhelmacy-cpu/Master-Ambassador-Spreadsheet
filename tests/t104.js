@@ -15,7 +15,7 @@ const put=(r,h,v)=>sh.getRange(r,col_(P,h)+1).setValue(v);
 [[2,'Sam Rivera','6'],[3,'Robin Chen','3'],[4,'Cy Twombly','K'],[5,'Pat Lee','Pre-K'],
  [6,'Nobody Yet','']].forEach(([r,n,g])=>{
   put(r,'Student Name',n); put(r,'Grade',g);
-  put(r,'Parent Name','Parent of '+n); put(r,'Parent Email','p'+r+'@example.com');});
+  put(r,'Parent 1 Name','Parent of '+n); put(r,'Parent 1 Email','p'+r+'@example.com');});
 Object.keys(HEADER_CACHE_).forEach(k=>delete HEADER_CACHE_[k]);
 clearReadCache_();
 
