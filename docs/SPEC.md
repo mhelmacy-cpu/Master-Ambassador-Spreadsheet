@@ -863,6 +863,7 @@ parents by name and names the child.
 It reads its own sheet, **Applicants**, which she fills:
 
     Student Name             hers to type
+    Grade                    hers to type, Pre-K and K included
     Parent Name              hers to type
     Parent Email             hers to type
     Scheduling Email Sent    written by the command, never typed
@@ -891,14 +892,48 @@ dialog cannot use the browser's own confirm box.
 Only a real send stamps the date into Scheduling Email Sent, and only
 against the families it actually wrote to.
 
+### One letter in three dresses
+
+She picks the division at the top of the dialog, and the families whose
+Grade falls in that band are the ones ticked. Everyone else stays on the
+list, unticked, so she can add somebody whose grade she has not typed yet.
+
+Every division gets the same words. Two things move:
+
+    5-8        ms-admissions@lrei.org    student assessment
+    1-4        ls-admissions@lrei.org    student assessment
+    K/Pre-K    ls-admissions@lrei.org    student playgroup
+
+The subject follows the appointment, so the youngest two say Student
+Playgroup where the others say Student Assessment.
+
+It is written as one body with those two holes in it rather than as
+three copies, so a change to the wording cannot reach two divisions and
+miss the third. A test holds the three to that: the K/Pre-K letter must
+be the 1-4 letter with the one word changed, to the character.
+
+### Into her drafts, or straight out
+
+The dialog offers both, and **Drafts is what it opens on**. A draft is
+written by her own account, so it goes out from her address and lands in
+her own Sent, and she reads it over before anybody else does.
+
+Only a real send asks a second time first, and only a real send is
+offered the test copy: a draft is already a thing she reads before it
+goes. The sheet records which: `drafted 2026-11-17 (K/Pre-K)` against a
+draft, the bare date and division against a send. A draft has reached
+nobody and must not read as though it had.
+
 ### The wording is hers
 
-The letter in the file is the default, not the rule. A
-`Scheduling Email Body` row on Settings replaces it, and
-`Scheduling Email Subject` replaces the subject. `{parent}` and
-`{student}` are filled in wherever they appear, so she can rewrite the
-letter, or write a second one for another division, without anybody
-touching the script.
+The letters in the file are defaults, not rules. A Settings row named for
+a division replaces either half of one:
+
+    Scheduling Email Body: 1-4
+    Scheduling Email Subject: K/Pre-K
+
+`{parent}` and `{student}` are filled in wherever they appear, so she can
+rewrite any of them without anybody touching the script.
 
 ## Writing an email by hand
 
