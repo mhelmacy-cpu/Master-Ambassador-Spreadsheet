@@ -38,13 +38,14 @@ var SHEETS = {
   ROUTES: 'Tour Routes',
   BUDDIES: '5th Grade Buddies',
   APART: 'Keep Apart',
+  APPLICANTS: 'Applicants',
   SETTINGS: 'Settings'
 };
 
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-16 a';
+var BUILD_ = '2026-11-17 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -61,13 +62,20 @@ var COUNT_COLUMNS_ = ['Signed Up', 'Confirmed', 'Jobs Done'];
 HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'Tour With', 'School', 'Grade', 'Gender',
   'Race', 'Borough',
   'Full Pay', 'Well Connected', 'Class Visit', 'Route', 'Tour Guides', 'Class Buddy',
-  'Class Visit To', 'Pass Off', 'Parent Name', 'Parent Email', 'Scheduling Email Sent',
-  'Notes'];
+  'Class Visit To', 'Pass Off', 'Notes'];
 
-/* The family's own details, which she types. The scheduling email is the
- * only thing that reads them: nothing about a tour needs them, and a
- * blank pair simply means that family is not ready to be written to. */
-var FAMILY_COLUMNS_ = ['Parent Name', 'Parent Email'];
+/**
+ * The applicants, which she types.
+ *
+ * Not the same people as Prospective Students: that sheet is who is
+ * coming on a tour, and an application can come through without a tour
+ * and a tour can happen without an application. So they have a sheet of
+ * their own, and nothing about a tour reads it.
+ *
+ * Scheduling Email Sent is written by the command and never typed.
+ */
+HEADERS[SHEETS.APPLICANTS] = ['Student Name', 'Parent Name', 'Parent Email',
+  'Scheduling Email Sent', 'Notes'];
 HEADERS[SHEETS.APART] = ['Ambassador', 'And', 'Notes'];
 HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route',
   'Class Visit', 'Showed Up', 'Notes'];
@@ -582,12 +590,6 @@ function setupSpreadsheet() {
   if (ensureColumn_(SHEETS.PROSPECTIVE, 'Tour With')) {
     added.push('Tour With on Prospective Students');
   }
-  FAMILY_COLUMNS_.forEach(function (h) {
-    if (ensureColumn_(SHEETS.PROSPECTIVE, h)) added.push(h + ' on Prospective Students');
-  });
-  if (ensureColumn_(SHEETS.PROSPECTIVE, 'Scheduling Email Sent')) {
-    added.push('Scheduling Email Sent on Prospective Students');
-  }
   COUNT_COLUMNS_.forEach(function (h) {
     if (ensureColumn_(SHEETS.AMBASSADORS, h)) added.push(h + ' on Ambassadors');
   });
@@ -608,6 +610,7 @@ function setupSpreadsheet() {
 
   setupAmbassadors_();
   setupProspective_();
+  sheet_(SHEETS.APPLICANTS);
   setupTracker_();
   setupBuddies_();
   setupJobs_();
@@ -622,7 +625,8 @@ function setupSpreadsheet() {
   setupSettings_();
 
   if (firstRun) {
-    const order = [SHEETS.PROSPECTIVE, SHEETS.TRACKER, SHEETS.AMBASSADORS, SHEETS.ELIGIBILITY,
+    const order = [SHEETS.PROSPECTIVE, SHEETS.APPLICANTS, SHEETS.TRACKER, SHEETS.AMBASSADORS,
+        SHEETS.ELIGIBILITY,
         SHEETS.JOBS, SHEETS.APART, SHEETS.BUDDIES, SHEETS.TEACHERS, SHEETS.ROUTES,
         SHEETS.SETTINGS].concat(BELL_GRADES_.map(bellSheet_));
     order.forEach(function (name, i) {
@@ -7449,10 +7453,10 @@ function firstNameOf_(name) {
  * cannot act on.
  */
 function schedulingFamilies_() {
-  const N = SHEETS.PROSPECTIVE;
+  const N = SHEETS.APPLICANTS;
   const out = [];
   rows_(N).forEach(function (r, i) {
-    const name = trim_(cell_(r, N, 'Name'));
+    const name = trim_(cell_(r, N, 'Student Name'));
     if (!name) return;
     const email = trim_(cell_(r, N, 'Parent Email'));
     const parent = trim_(cell_(r, N, 'Parent Name'));
@@ -7511,7 +7515,7 @@ function sendSchedulingEmails(ids, test) {
 
   const notReady = chosen.filter(function (f) { return !f.ready; });
   if (notReady.length) {
-    throw new Error('Fill these in on Prospective Students first: ' +
+    throw new Error('Fill these in on ' + SHEETS.APPLICANTS + ' first: ' +
       notReady.map(function (f) { return f.student + ' (' + f.missing + ')'; }).join('; '));
   }
 
@@ -7538,7 +7542,7 @@ function sendSchedulingEmails(ids, test) {
   }
 
   if (!test) {
-    const N = SHEETS.PROSPECTIVE;
+    const N = SHEETS.APPLICANTS;
     const s = sheet_(N);
     const col = optionalCol_(N, 'Scheduling Email Sent');
     if (col !== -1) {
@@ -9565,8 +9569,8 @@ function showSchedulingDialog() {
     '</style>' +
     '<h2>Scheduling emails</h2>' +
     '<p class="sub">One letter per family: call me and we will book the parent interview ' +
-    'and the student assessment. The child is named from Prospective Students. The parent ' +
-    'name and address are the ones you type there.</p>' +
+    'and the student assessment. Everyone on the <b>Applicants</b> sheet, which is yours ' +
+    'to fill: the student, the parents, and where to write to them.</p>' +
     '<div id="who"><p class="muted">Loading...</p></div>' +
     '<div id="out"></div>' +
     '<script>' +
@@ -9599,8 +9603,8 @@ function showSchedulingDialog() {
     'h+="</span></label>";});' +
     'h+="</div>";' +
     'if(gaps){h+="<div class=\'warn\'><b>"+gaps+" family/families cannot be written to ' +
-    'yet.</b> Type the parent name and address against them on Prospective Students and ' +
-    'reopen this.</div>";}' +
+    'yet.</b> Type the missing parent name or address against them on the Applicants ' +
+    'sheet and reopen this.</div>";}' +
     'h+="<label class=\'opt\'><input type=\'checkbox\' id=\'test\' checked><span>' +
     '<b>Test first.</b> Every letter comes to you instead, each one marked as a test and ' +
     'naming the family it would really go to. Nothing reaches a parent, and nobody is ' +

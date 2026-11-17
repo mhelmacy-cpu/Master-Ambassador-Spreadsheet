@@ -860,14 +860,21 @@ come through: call me and we will book the parent interview and the
 student assessment. One letter per family, so each is addressed to the
 parents by name and names the child.
 
-Three columns on Prospective Students carry it:
+It reads its own sheet, **Applicants**, which she fills:
 
+    Student Name             hers to type
     Parent Name              hers to type
     Parent Email             hers to type
     Scheduling Email Sent    written by the command, never typed
+    Notes                    hers
 
-The child comes off the sheet. A name typed either way round reads the
-same: "Twombly, Cy" is Cy, not Twombly.
+Not Prospective Students. That sheet is who is coming on a tour, and the
+two are not the same people: an application comes through without a tour,
+and a tour happens without an application. Nothing about a tour reads
+this sheet, and nothing here reads the tour.
+
+The child's name is typed once, on this sheet, and read from there. Typed
+either way round it reads the same: "Twombly, Cy" is Cy, not Twombly.
 
 The dialog lists **every** family, including the ones it cannot write to
 yet, because a name missing from a list is a name she cannot act on. A

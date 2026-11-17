@@ -1,5 +1,6 @@
 // The scheduling email: her letter to a family whose application has come
-// through. One per family, the parents addressed by the name she typed and
+// through. Its own Applicants sheet, which she types: not Prospective
+// Students, who are the families coming on a tour and not the same people. One per family, the parents addressed by the name she typed and
 // the child named from the sheet. A test copy comes to her and marks
 // nobody; a real send stamps the date against each family it wrote to.
 const fs=require('fs'); const {makeMock}=require(__dirname+'/mock.js');
@@ -10,16 +11,16 @@ eval(G(fs.readFileSync('build/App.gs','utf8')));
 const ok=(c,msg)=>{ if(!c) throw new Error('FAIL: '+msg); console.log('  ok: '+msg); };
 
 setupSpreadsheet();
-const P=SHEETS.PROSPECTIVE, sh=m.sheets[P];
+const P=SHEETS.APPLICANTS, sh=m.sheets[P];
 const put=(row,h,v)=>sh.getRange(row,col_(P,h)+1).setValue(v);
 
 // Three families: one ready, one already written to, one with no address.
-put(2,'Name','Sam Rivera');      put(2,'Parent Name','Jo Rivera');
+put(2,'Student Name','Sam Rivera');      put(2,'Parent Name','Jo Rivera');
                                   put(2,'Parent Email','jo@example.com');
-put(3,'Name','Twombly, Cy');     put(3,'Parent Name','Pat Twombly');
+put(3,'Student Name','Twombly, Cy');     put(3,'Parent Name','Pat Twombly');
                                   put(3,'Parent Email','pat@example.com');
                                   put(3,'Scheduling Email Sent','2026-11-01');
-put(4,'Name','Robin Chen');      put(4,'Parent Name','Lee Chen');
+put(4,'Student Name','Robin Chen');      put(4,'Parent Name','Lee Chen');
 Object.keys(HEADER_CACHE_).forEach(k=>delete HEADER_CACHE_[k]);
 clearReadCache_();
 
@@ -75,5 +76,17 @@ ok(/Robin Chen/.test(threw)&&/no parent email/.test(threw),
 m.sheets[SHEETS.SETTINGS].getRange(2,1,1,2).setValues([['Scheduling Email Body','Hi {parent}, about {student}.']]);
 clearReadCache_();
 ok(api_schedulingPreview('2').text==='Hi Jo Rivera, about Sam.','a Settings row replaces the letter');
+
+// The two lists are not the same people. A family on a tour is not an
+// applicant, and nothing about a tour reads the parents' addresses.
+clearReadCache_();
+const PR=SHEETS.PROSPECTIVE;
+ok(optionalCol_(PR,'Parent Email')===-1,'Prospective Students has no parent address on it');
+ok(optionalCol_(PR,'Scheduling Email Sent')===-1,'nor anything about a scheduling email');
+m.sheets[PR].getRange(2,col_(PR,'Name')+1).setValue('Someone On A Tour');
+clearReadCache_();
+ok(!api_schedulingFamilies().some(f=>f.student==='Someone On A Tour'),
+  'somebody booked on a tour is not written to about an application');
+ok(api_schedulingFamilies().length===3,'the letter list is still only the applicants');
 
 console.log('t103 ok');
