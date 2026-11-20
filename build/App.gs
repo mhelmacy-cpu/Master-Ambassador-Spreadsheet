@@ -38,6 +38,7 @@ var SHEETS = {
   ROUTES: 'Tour Routes',
   BUDDIES: '5th Grade Buddies',
   APART: 'Keep Apart',
+  APPLICANTS: 'Applicants',
   SETTINGS: 'Settings'
 };
 
@@ -62,6 +63,25 @@ HEADERS[SHEETS.PROSPECTIVE] = ['Tour Date', 'Name', 'Tour With', 'School', 'Grad
   'Race', 'Borough',
   'Full Pay', 'Well Connected', 'Class Visit', 'Route', 'Tour Guides', 'Class Buddy',
   'Class Visit To', 'Pass Off', 'Notes'];
+
+/**
+ * The applicants, which she types.
+ *
+ * Not the same people as Prospective Students: that sheet is who is
+ * coming on a tour, and an application can come through without a tour
+ * and a tour can happen without an application. So they have a sheet of
+ * their own, and nothing about a tour reads it.
+ *
+ * Scheduling Email Sent is written by the command and never typed.
+ */
+HEADERS[SHEETS.APPLICANTS] = ['Student Name', 'Grade',
+  'Parent 1 Name', 'Parent 1 Email', 'Parent 2 Name', 'Parent 2 Email',
+  'Scheduling Email Sent', 'Notes'];
+
+/* A child can have two parents, and the letter goes to both of them.
+ * Named as on Ambassadors, which has carried a second parent all along. */
+var APPLICANT_PARENTS_ = ['Parent 1 Name', 'Parent 1 Email',
+  'Parent 2 Name', 'Parent 2 Email'];
 HEADERS[SHEETS.APART] = ['Ambassador', 'And', 'Notes'];
 HEADERS[SHEETS.TRACKER] = ['Tour Date', 'Ambassador', 'Job', 'Prospective Student(s)', 'Route',
   'Class Visit', 'Showed Up', 'Notes'];
@@ -596,6 +616,10 @@ function setupSpreadsheet() {
 
   setupAmbassadors_();
   setupProspective_();
+  sheet_(SHEETS.APPLICANTS);
+  APPLICANT_PARENTS_.forEach(function (h) {
+    if (ensureColumn_(SHEETS.APPLICANTS, h)) added.push(h + ' on ' + SHEETS.APPLICANTS);
+  });
   setupTracker_();
   setupBuddies_();
   setupJobs_();
@@ -610,7 +634,8 @@ function setupSpreadsheet() {
   setupSettings_();
 
   if (firstRun) {
-    const order = [SHEETS.PROSPECTIVE, SHEETS.TRACKER, SHEETS.AMBASSADORS, SHEETS.ELIGIBILITY,
+    const order = [SHEETS.PROSPECTIVE, SHEETS.APPLICANTS, SHEETS.TRACKER, SHEETS.AMBASSADORS,
+        SHEETS.ELIGIBILITY,
         SHEETS.JOBS, SHEETS.APART, SHEETS.BUDDIES, SHEETS.TEACHERS, SHEETS.ROUTES,
         SHEETS.SETTINGS].concat(BELL_GRADES_.map(bellSheet_));
     order.forEach(function (name, i) {
@@ -7472,6 +7497,22 @@ function sendMail_(to, subject, html) {
   MailApp.sendEmail(opts);
 }
 
+/**
+ * The same letter, left in her own Drafts instead of sent.
+ *
+ * A draft is written by her account, not by the script, so it goes out
+ * from her own address and lands in her own Sent. Nothing about it is
+ * redirected for a test: a draft is already a thing she reads before
+ * anybody else does, which is what a test copy is for.
+ */
+function draftMail_(to, subject, html) {
+  if (DRY_RUN_) {
+    DRY_RUN_.push({ to: to, subject: subject, draft: true });
+    return;
+  }
+  GmailApp.createDraft(to, subject, '', { htmlBody: html });
+}
+
 function mailOptions_(to, subject, html) {
   if (PREVIEW_TO_) {
     html = '<div style="' + MAIL_STYLE_ + 'background:#fbf0ee;border:1px solid #a8322a;' +
@@ -7496,6 +7537,307 @@ var MAIL_STYLE_ = 'font-family:Arial,Helvetica,sans-serif;font-size:14px;line-he
 var TABLE_STYLE_ = 'border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:13px;';
 var TH_ = 'padding:6px 10px;background:#a8322a;color:#fff;text-align:left;';
 var TD_ = 'padding:6px 10px;border:1px solid #ddd;';
+
+/* =========================================================
+ * The scheduling email
+ *
+ * Her own letter to a family whose application has come through: call
+ * me and we will book the parent interview and the student assessment.
+ * One per family, addressed to the parents by name and naming the child.
+ *
+ * The wording below is hers, word for word. It is the default, not the
+ * rule: a "Scheduling Email Body" row on Settings replaces it, and
+ * {parent} and {student} are filled in wherever they appear, so she can
+ * rewrite the letter without anybody touching this file.
+ * ========================================================= */
+
+/**
+ * The letter, which is one letter in three dresses.
+ *
+ * Every division gets the same words. Only two things move: which
+ * admissions address decisions come from, and what the appointment is
+ * called. The youngest two sit a playgroup rather than an assessment;
+ * everything else about their letter is the Lower School's.
+ *
+ * Written as one body with those two holes in it rather than as three
+ * copies, so a change to the wording cannot reach two divisions and miss
+ * the third.
+ */
+function schedulingBody_(admissions, event) {
+  return [
+    'Dear {parent},',
+    '',
+    'Thank you for applying to LREI! {student}\'s application has been received and ' +
+      'processed for payment, and we are now ready to schedule the ' + event + ' and ' +
+      'parent interview.',
+    '',
+    'Please call me at 212-477-5316 x298 to schedule a parent interview and ' + event +
+      ' at your earliest convenience. Given the complexity of scheduling, phone contact ' +
+      'is the preferred method for scheduling appointments.',
+    '',
+    'As a reminder, notifications regarding admissions decisions will be sent via email ' +
+      'from ' + admissions + '.',
+    '',
+    'I can be reached Monday-Friday between the hours of 9:30AM-4:30PM, and I\'m looking ' +
+      'forward to speaking to you soon.',
+    '',
+    'Best,',
+    '',
+    'Maren'
+  ].join('\n');
+}
+
+function schedulingSubjectFor_(event) {
+  return 'LREI Scheduling: Parent Interview and ' +
+    event.replace(/^student /, 'Student ').replace('student ', 'Student ');
+}
+
+/**
+ * The three divisions, with the band each covers.
+ *
+ * The band is what ticks the right families when she picks a division.
+ * The wording is a default and not a rule: a Settings row named for a
+ * letter replaces either half of it, so a change of hours, or a fourth
+ * division, is a cell away rather than a change to this file.
+ */
+var SCHEDULING_LETTERS_ = [
+  {
+    key: '5-8',
+    label: 'Middle School, 5th to 8th',
+    lo: 5,
+    hi: 8,
+    subject: 'LREI Scheduling: Parent Interview and Student Assessment',
+    body: schedulingBody_('ms-admissions@lrei.org', 'student assessment')
+  },
+  {
+    key: '1-4',
+    label: 'Lower School, 1st to 4th',
+    lo: 1,
+    hi: 4,
+    subject: 'LREI Scheduling: Parent Interview and Student Assessment',
+    body: schedulingBody_('ls-admissions@lrei.org', 'student assessment')
+  },
+  {
+    /* The same letter as 1st to 4th, with the one word she changes: the
+     * youngest two come in for a playgroup, not an assessment. */
+    key: 'K/Pre-K',
+    label: 'Kindergarten and Pre-K',
+    lo: -1,
+    hi: 0,
+    subject: 'LREI Scheduling: Parent Interview and Student Playgroup',
+    body: schedulingBody_('ls-admissions@lrei.org', 'student playgroup')
+  }
+];
+
+/** The letter she picked, with anything she has overridden on Settings. */
+function schedulingLetter_(key) {
+  let found = null;
+  SCHEDULING_LETTERS_.forEach(function (l) { if (l.key === String(key)) found = l; });
+  if (!found) found = SCHEDULING_LETTERS_[0];
+  return {
+    key: found.key,
+    label: found.label,
+    lo: found.lo,
+    hi: found.hi,
+    subject: setting_('Scheduling Email Subject: ' + found.key, found.subject),
+    body: setting_('Scheduling Email Body: ' + found.key, found.body)
+  };
+}
+
+/**
+ * A grade as a number, so a band can be compared.
+ *
+ * K is 0 and Pre-K is below it, which keeps the order right with no
+ * special case anywhere else. Not gradeNumber_, which keeps digits only
+ * and so cannot tell K from nothing at all.
+ */
+function schedulingGrade_(value) {
+  if (value instanceof Date) return null;
+  const t = norm_(value);
+  if (!t) return null;
+  if (/^(pre-?k|p-?k|t-?k)/.test(t)) return -1;
+  if (/^(k(\b|$)|kindergarten)/.test(t)) return 0;
+  const m = /(\d{1,2})/.exec(t);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * The child's first name, which is what the letter says.
+ *
+ * "Rivera, Sam" is turned round first, so a name typed either way round
+ * comes out as Sam rather than as Rivera.
+ */
+function firstNameOf_(name) {
+  const whole = flipName_(name);
+  const bits = trim_(whole).split(/\s+/);
+  return bits.length ? bits[0] : '';
+}
+
+/**
+ * Every family on Prospective Students, with what the letter would need.
+ *
+ * Nobody is left out of the list: a family with no address still appears,
+ * with the reason, because a name missing from a list is a name she
+ * cannot act on.
+ */
+function schedulingFamilies_() {
+  const N = SHEETS.APPLICANTS;
+  const out = [];
+  rows_(N).forEach(function (r, i) {
+    const name = trim_(cell_(r, N, 'Student Name'));
+    if (!name) return;
+    /* Either parent can be the only one, and a sheet set up before there
+     * was a second one says "Parent Name" with no number. Both are read,
+     * so neither costs her a retype. */
+    const names = [
+      trim_(cell_(r, N, 'Parent 1 Name')) || trim_(cell_(r, N, 'Parent Name')),
+      trim_(cell_(r, N, 'Parent 2 Name'))
+    ].filter(Boolean);
+    const emails = [
+      trim_(cell_(r, N, 'Parent 1 Email')) || trim_(cell_(r, N, 'Parent Email')),
+      trim_(cell_(r, N, 'Parent 2 Email'))
+    ].filter(Boolean);
+    const sent = trim_(cell_(r, N, 'Scheduling Email Sent'));
+    const grade = trim_(cell_(r, N, 'Grade'));
+    const missing = [];
+    if (!names.length) missing.push('no parent name');
+    if (!emails.length) missing.push('no parent email');
+    out.push({
+      id: String(i + 2),
+      row: i + 2,
+      student: name,
+      first: firstNameOf_(name),
+      // "Jo Rivera and Alex Rivera". Whatever she typed is what it says,
+      // so a couple who go by one line can still be typed as one.
+      parent: names.join(' and '),
+      emails: emails,
+      email: emails.join(', '),
+      grade: grade,
+      gradeNum: schedulingGrade_(grade),
+      sent: sent,
+      ready: missing.length === 0,
+      missing: missing.join(' and ')
+    });
+  });
+  return out;
+}
+
+/** The letter for one family, as the plain text she would have typed. */
+function schedulingText_(family, key) {
+  return String(schedulingLetter_(key).body)
+    .split('{parent}').join(family.parent)
+    .split('{student}').join(family.first || family.student);
+}
+
+/** The same letter as the mail body, her line breaks kept. */
+function schedulingHtml_(family, key) {
+  return '<div style="' + MAIL_STYLE_ + '">' +
+    escapeHtml_(schedulingText_(family, key)).split('\n').join('<br>') +
+    '</div>';
+}
+
+function schedulingSubject_(key) { return schedulingLetter_(key).subject; }
+
+/**
+ * Writes to the families ticked, one letter each.
+ *
+ * Goes through sendMail_ like everything else, so a test copy comes to
+ * her instead and a dry run stops it, and the date lands in Scheduling
+ * Email Sent only on a real send: a test must not make a family look
+ * written to.
+ */
+function sendSchedulingEmails(ids, test, drafts, key) {
+  clearReadCache_();
+  const want = {};
+  (ids || []).forEach(function (id) { want[String(id)] = true; });
+  const chosen = schedulingFamilies_().filter(function (f) { return want[f.id]; });
+  if (!chosen.length) throw new Error('Tick at least one family.');
+
+  const notReady = chosen.filter(function (f) { return !f.ready; });
+  if (notReady.length) {
+    throw new Error('Fill these in on ' + SHEETS.APPLICANTS + ' first: ' +
+      notReady.map(function (f) { return f.student + ' (' + f.missing + ')'; }).join('; '));
+  }
+
+  const subject = schedulingSubject_(key);
+  const sent = [];
+  const write = function () {
+    chosen.forEach(function (f) {
+      const to = f.emails.join(',');
+      if (drafts) draftMail_(to, subject, schedulingHtml_(f, key));
+      else sendMail_(to, subject, schedulingHtml_(f, key));
+      sent.push(f);
+    });
+  };
+  if (drafts) {
+    write();
+  } else if (test) {
+    // asTest_ puts PREVIEW_TO_ back in a finally, so a letter that fails
+    // part way cannot leave the next real send pointing at her.
+    const label = TEST_LABEL_;
+    TEST_LABEL_ = 'scheduling';
+    try {
+      asTest_(previewAddress_(), write);
+    } finally {
+      TEST_LABEL_ = label;
+    }
+  } else {
+    write();
+  }
+
+  /* A test is marked nowhere, because a test must not make a family look
+   * dealt with. A draft is marked as a draft, because it is waiting in
+   * her Drafts and she needs to see which ones are, but it has not
+   * reached anybody and must not read as though it had. */
+  if (drafts || !test) {
+    const N = SHEETS.APPLICANTS;
+    const s = sheet_(N);
+    const col = optionalCol_(N, 'Scheduling Email Sent');
+    if (col !== -1) {
+      const stamp = (drafts ? 'drafted ' : '') + dateKey_(new Date()) +
+        ' (' + schedulingLetter_(key).key + ')';
+      sent.forEach(function (f) { s.getRange(f.row, col + 1).setValue(stamp); });
+    }
+    clearReadCache_();
+  }
+
+  return {
+    sent: sent.length,
+    test: !!test && !drafts,
+    drafts: !!drafts,
+    to: sent.map(function (f) { return f.parent + ' (' + f.email + ')'; }),
+    where: (test && !drafts) ? previewAddress_() : ''
+  };
+}
+
+function api_schedulingFamilies() {
+  return {
+    letters: SCHEDULING_LETTERS_.map(function (l) {
+      return { key: String(l.key), label: String(l.label) };
+    }),
+    families: schedulingFamilies_().map(function (f) {
+      return {
+        id: String(f.id), student: String(f.student), first: String(f.first),
+        parent: String(f.parent), email: String(f.email), sent: String(f.sent),
+        grade: String(f.grade), gradeNum: f.gradeNum === null ? '' : String(f.gradeNum),
+        ready: !!f.ready, missing: String(f.missing)
+      };
+    })
+  };
+}
+
+function api_schedulingPreview(id, key) {
+  const one = schedulingFamilies_().filter(function (f) { return f.id === String(id); })[0];
+  if (!one) throw new Error('That family is not on the sheet any more.');
+  return {
+    subject: String(schedulingSubject_(key)),
+    text: String(schedulingText_(one, key))
+  };
+}
+
+function api_sendScheduling(ids, test, drafts, key) {
+  return sendSchedulingEmails(ids, test, drafts, key);
+}
 
 /* ---------- students ---------- */
 
@@ -8487,6 +8829,7 @@ function onOpen() {
     .addItem('Make a Check In Sheet...', 'showCheckInDialog')
     .addSeparator()
     .addItem('Write an Email...', 'showWriteDialog')
+    .addItem('Scheduling Emails...', 'showSchedulingDialog')
     .addItem('Test Emails...', 'showTestEmailDialog')
     .addItem('Send Emails Now...', 'showEmailDialog')
     .addSeparator()
@@ -9480,6 +9823,152 @@ function showRouteSheetDialog() {
   dialog_(html, 'Print Tour Routes', 600, 460);
 }
 
+function showSchedulingDialog() {
+  const html =
+    '<style>' + DIALOG_CSS_ +
+    '.fam label{display:flex;align-items:flex-start;gap:8px;font-weight:normal;margin:0;' +
+    'padding:3px 0;cursor:pointer;}' +
+    '.fam input{width:15px;height:15px;margin-top:2px;flex:none;cursor:pointer;}' +
+    '.fam .gap{color:#8a5a12;}' +
+    '.fam .done{color:#777;}' +
+    'pre.letter{white-space:pre-wrap;font-family:Arial,Helvetica,sans-serif;font-size:13px;' +
+    'background:#fafafa;border:1px solid #e0e0e0;border-radius:6px;padding:12px;margin:6px 0 0;}' +
+    '</style>' +
+    '<h2>Scheduling emails</h2>' +
+    '<p class="sub">One letter per family: call me and we will book the parent interview ' +
+    'and the student assessment. Everyone on the <b>Applicants</b> sheet, which is yours ' +
+    'to fill: the student, the parents, and where to write to them. They go to your Gmail ' +
+    'drafts, so you send them yourself.</p>' +
+    '<label for="div">Which grades you are scheduling</label>' +
+    '<select id="div" onchange="divChanged()"></select>' +
+    '<div id="who"><p class="muted">Loading...</p></div>' +
+    '<div id="out"></div>' +
+    '<script>' +
+    'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;")' +
+    '.replace(/>/g,"&gt;").replace(/"/g,"&quot;");}' +
+    'function fail(e){document.getElementById("out").innerHTML=' +
+    '"<div class=\'warn\'><b>"+esc(e.message)+"</b></div>";}' +
+    'function load(){google.script.run.withSuccessHandler(got).withFailureHandler(fail)' +
+    '.api_schedulingFamilies();}' +
+    'function divKey(){return document.getElementById("div").value;}' +
+    'function got(d){window.__bands={};' +
+    'd.letters.forEach(function(l){window.__bands[l.key]=l;});' +
+    'var sel=document.getElementById("div");' +
+    'if(!sel.options.length){d.letters.forEach(function(l){' +
+    'var o=document.createElement("option");o.value=l.key;o.text=l.label;sel.add(o);});}' +
+    'show(d.families);}' +
+    'function divChanged(){armed=0;document.getElementById("out").innerHTML="";' +
+    'if(window.__fam){show(window.__fam);}}' +
+
+    'function show(list){window.__fam=list;' +
+    'if(!list.length){document.getElementById("who").innerHTML=' +
+    '"<div class=\'warn\'><b>Nobody is on Prospective Students yet.</b></div>";return;}' +
+    'var ready=0,gaps=0;' +
+    'var inBand=function(f){if(f.gradeNum==="")return false;' +
+    'var g=Number(f.gradeNum),L=window.__bands&&window.__bands[divKey()];' +
+    'return L?(g>=L.lo&&g<=L.hi):false;};' +
+    'var h="<label>Who hears from you</label>";' +
+    'h+="<div style=\'margin-bottom:6px;\'>' +
+    '<button class=\'ghost\' onclick=\'tickAll(1)\'>Tick all</button>' +
+    '<button class=\'ghost\' onclick=\'tickAll(0)\'>Untick all</button>' +
+    '<button class=\'ghost\' onclick=\'unwritten()\'>Not written to yet</button>' +
+    '<button class=\'ghost\' onclick=\'theseGrades()\'>Only these grades</button></div>";' +
+    'h+="<div class=\'fam\' style=\'max-height:220px;overflow:auto;\'>";' +
+    'list.forEach(function(f){' +
+    'if(f.ready){ready++;}else{gaps++;}' +
+    'h+="<label><input type=\'checkbox\' class=\'f\' value=\'"+esc(f.id)+"\'"+' +
+    '(f.ready&&!f.sent&&inBand(f)?" checked":"")+(f.ready?"":" disabled")+' +
+    '" data-sent=\'"+esc(f.sent)+"\' data-band=\'"+(inBand(f)?"1":"0")+"\' ' +
+    'onchange=\'peek(this.value)\'>";' +
+    'h+="<span><b>"+esc(f.student)+"</b>";' +
+    'if(f.grade){h+="<span class=\'muted\'> ("+esc(f.grade)+")</span>";}' +
+    'if(f.ready){h+="<span class=\'muted\'> to "+esc(f.parent)+", "+esc(f.email)+"</span>";}' +
+    'else{h+="<span class=\'gap\'> "+esc(f.missing)+"</span>";}' +
+    'if(f.sent){h+="<span class=\'done\'> written to "+esc(f.sent)+"</span>";}' +
+    'h+="</span></label>";});' +
+    'h+="</div>";' +
+    'if(gaps){h+="<div class=\'warn\'><b>"+gaps+" family/families cannot be written to ' +
+    'yet.</b> Type the missing parent name or address against them on the Applicants ' +
+    'sheet and reopen this.</div>";}' +
+    'h+="<label>What happens to them</label>";' +
+    'h+="<label class=\'opt\'><input type=\'radio\' name=\'how\' value=\'draft\' ' +
+    'checked onchange=\'howChanged()\'><span><b>Put them in my Drafts.</b> One draft per ' +
+    'family in Gmail, from your own address, for you to read over and send yourself. ' +
+    'Nothing leaves until you send it.</span></label>";' +
+    'h+="<label class=\'opt\'><input type=\'radio\' name=\'how\' value=\'send\' ' +
+    'onchange=\'howChanged()\'><span><b>Send them from here.</b> They go straight to the ' +
+    'parents.</span></label>";' +
+    'h+="<label class=\'opt\' id=\'testWrap\' style=\'display:none;\'>' +
+    '<input type=\'checkbox\' id=\'test\' checked><span>' +
+    '<b>Test first.</b> Every letter comes to you instead, each one marked as a test and ' +
+    'naming the family it would really go to. Nothing reaches a parent, and nobody is ' +
+    'marked as written to.</span></label>";' +
+    'h+="<div style=\'margin-top:12px;\'><button id=\'go\' onclick=\'send()\'>' +
+    'Put them in my Drafts</button></div>";' +
+    'h+="<label style=\'margin-top:14px;\'>What one of them says</label><div id=\'peek\'>' +
+    '<p class=\'muted\'>Tick a family to read their letter.</p></div>";' +
+    'document.getElementById("who").innerHTML=h;' +
+    'var first=list.filter(function(f){return f.ready&&!f.sent;})[0]||' +
+    'list.filter(function(f){return f.ready;})[0];' +
+    'if(first){peek(first.id);}}' +
+
+    'function howNow(){var r=document.querySelectorAll("input[name=how]");' +
+    'for(var i=0;i<r.length;i++){if(r[i].checked){return r[i].value;}}return "draft";}' +
+    'function howChanged(){var d=howNow()==="draft";armed=0;' +
+    'document.getElementById("testWrap").style.display=d?"none":"flex";' +
+    'document.getElementById("go").innerHTML=d?"Put them in my Drafts":"Send them";' +
+    'document.getElementById("out").innerHTML="";}' +
+    'function tickAll(on){var b=document.querySelectorAll("input.f");' +
+    'for(var i=0;i<b.length;i++){if(!b[i].disabled){b[i].checked=!!on;}}}' +
+    'function unwritten(){var b=document.querySelectorAll("input.f");' +
+    'for(var i=0;i<b.length;i++){if(!b[i].disabled){' +
+    'b[i].checked=!b[i].getAttribute("data-sent");}}}' +
+    'function theseGrades(){var b=document.querySelectorAll("input.f");' +
+    'for(var i=0;i<b.length;i++){if(!b[i].disabled){' +
+    'b[i].checked=b[i].getAttribute("data-band")==="1";}}}' +
+
+    'function peek(id){google.script.run.withSuccessHandler(function(p){' +
+    'document.getElementById("peek").innerHTML="<div class=\'muted\'>Subject: "+' +
+    'esc(p.subject)+"</div><pre class=\'letter\'>"+esc(p.text)+"</pre>";})' +
+    '.withFailureHandler(fail).api_schedulingPreview(id,divKey());}' +
+
+    'function send(){var ids=[],b=document.querySelectorAll("input.f");' +
+    'for(var i=0;i<b.length;i++){if(b[i].checked){ids.push(b[i].value);}}' +
+    'if(!ids.length){fail({message:"Tick at least one family."});return;}' +
+    'var drafts=howNow()==="draft";' +
+    'var test=!drafts&&document.getElementById("test").checked;' +
+    'if(!drafts&&!test&&!confirmReal(ids.length)){return;}' +
+    'document.getElementById("go").disabled=true;' +
+    'document.getElementById("out").innerHTML="<p class=\'muted\'>"+' +
+    '(drafts?"Writing the drafts...":"Sending...")+"</p>";' +
+    'google.script.run.withSuccessHandler(function(r){' +
+    'document.getElementById("go").disabled=false;' +
+    'var h="<div class=\'free\'><b>"+r.sent+" letter(s) "+(r.drafts?"waiting in your Drafts":' +
+    '(r.test?"sent to you as a test":"sent"))+".</b>";' +
+    'if(r.drafts){h+="<br>"+esc(r.to.join("; "))+"<br><span class=\'muted\'>Open Gmail, ' +
+    'read them over and send them yourself. They are marked as drafted on the Applicants ' +
+    'sheet, not as sent.</span>";}' +
+    'else if(r.test){h+="<br><span class=\'muted\'>They went to "+esc(r.where)+". Nobody ' +
+    'on the list has been written to, and nothing was marked. Untick Test to send them for ' +
+    'real.</span>";}' +
+    'else{h+="<br>"+esc(r.to.join("; "))+"<br><span class=\'muted\'>Today\'s date is now ' +
+    'against each of them in Scheduling Email Sent.</span>";}' +
+    'h+="</div>";document.getElementById("out").innerHTML=h;' +
+    'if(!r.test){load();}})' +
+    '.withFailureHandler(function(e){document.getElementById("go").disabled=false;fail(e);})' +
+    '.api_sendScheduling(ids,test,drafts,divKey());}' +
+
+    // A dialog cannot use confirm(), so the second press is the check.
+    'var armed=0;' +
+    'function confirmReal(n){if(armed){armed=0;return true;}armed=1;' +
+    'document.getElementById("out").innerHTML="<div class=\'warn\'><b>This goes to "+n+' +
+    '" real family/families.</b><br>Press Send them again to go ahead, or tick Test ' +
+    'first.</div>";return false;}' +
+    'load();' +
+    '<\/script>';
+  dialog_(html, 'Scheduling Emails', 680, 760);
+}
+
 function showWriteDialog() {
   const html =
     '<style>' + DIALOG_CSS_ + '</style>' +
@@ -9525,6 +10014,12 @@ function showWriteDialog() {
     'all in the To line.</span></label>";' +
     'h+="<div style=\'margin-top:12px;\'><button onclick=\'make()\'>Open it in Gmail</button></div>";' +
     'document.getElementById("who").innerHTML=h;}' +
+    'function howNow(){var r=document.querySelectorAll("input[name=how]");' +
+    'for(var i=0;i<r.length;i++){if(r[i].checked){return r[i].value;}}return "draft";}' +
+    'function howChanged(){var d=howNow()==="draft";armed=0;' +
+    'document.getElementById("testWrap").style.display=d?"none":"flex";' +
+    'document.getElementById("go").innerHTML=d?"Put them in my Drafts":"Send them";' +
+    'document.getElementById("out").innerHTML="";}' +
     'function tickAll(on){var b=document.querySelectorAll("input.who");' +
     'for(var i=0;i<b.length;i++){b[i].checked=on;}}' +
     'function onlyActive(){var b=document.querySelectorAll("input.who");' +
@@ -9586,6 +10081,12 @@ function showConfirmDialog() {
     '<button class=\'ghost\' onclick=\'tickAll(true)\'>Tick all</button>' +
     '<button class=\'ghost\' onclick=\'tickAll(false)\'>Untick all</button></div>";' +
     'document.getElementById("out").innerHTML=h;}' +
+    'function howNow(){var r=document.querySelectorAll("input[name=how]");' +
+    'for(var i=0;i<r.length;i++){if(r[i].checked){return r[i].value;}}return "draft";}' +
+    'function howChanged(){var d=howNow()==="draft";armed=0;' +
+    'document.getElementById("testWrap").style.display=d?"none":"flex";' +
+    'document.getElementById("go").innerHTML=d?"Put them in my Drafts":"Send them";' +
+    'document.getElementById("out").innerHTML="";}' +
     'function tickAll(on){var b=document.querySelectorAll("input.did");' +
     'for(var i=0;i<b.length;i++){b[i].checked=on;}}' +
     'function save(){var out=[],b=document.querySelectorAll("input.did");' +
@@ -9920,6 +10421,12 @@ function showMeetingDialog() {
     '(r.ready?"":" <b class=\'yel\'>needs Homeroom, Split and Grade</b>")+"</label>";});' +
     'h+="</div><span class=\'muted\'>Tick nobody and it shows everyone.</span>";' +
     'document.getElementById("who").innerHTML=h;}' +
+    'function howNow(){var r=document.querySelectorAll("input[name=how]");' +
+    'for(var i=0;i<r.length;i++){if(r[i].checked){return r[i].value;}}return "draft";}' +
+    'function howChanged(){var d=howNow()==="draft";armed=0;' +
+    'document.getElementById("testWrap").style.display=d?"none":"flex";' +
+    'document.getElementById("go").innerHTML=d?"Put them in my Drafts":"Send them";' +
+    'document.getElementById("out").innerHTML="";}' +
     'function tickAll(on){var b=document.querySelectorAll("input.mp");' +
     'for(var i=0;i<b.length;i++){b[i].checked=on;}}' +
     'function picked(){var out=[],w=window.__who||[];' +

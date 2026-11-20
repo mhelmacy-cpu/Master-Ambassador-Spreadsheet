@@ -880,6 +880,100 @@ date brings her own answers back rather than a fresh list.
 A no-show is not charged against the child: fairness counts every job
 except one marked No, so a child pulled on the day goes first next time.
 
+## Scheduling emails
+
+"Scheduling Emails..." is her letter to a family whose application has
+come through: call me and we will book the parent interview and the
+student assessment. One letter per family, so each is addressed to the
+parents by name and names the child.
+
+It reads its own sheet, **Applicants**, which she fills:
+
+    Student Name             hers to type
+    Grade                    hers to type, Pre-K and K included
+    Parent 1 Name            hers to type
+    Parent 1 Email           hers to type
+    Parent 2 Name            hers to type, where there are two
+    Parent 2 Email           hers to type, where there are two
+    Scheduling Email Sent    written by the command, never typed
+    Notes                    hers
+
+A child with two parents gets one letter addressed to both of them, with
+both greeted by name: "Dear Jo Rivera and Alex Rivera,". Whatever she
+typed is what it says, so a couple who go by one line can be typed as one
+and the second pair left empty.
+
+Either pair can stand alone. One parent is one address and no stray
+comma, a second parent with no address of their own is still greeted, and
+a sheet set up before there was a second parent, whose columns say
+"Parent Name" with no number, is read as it stands rather than retyped.
+
+Not Prospective Students. That sheet is who is coming on a tour, and the
+two are not the same people: an application comes through without a tour,
+and a tour happens without an application. Nothing about a tour reads
+this sheet, and nothing here reads the tour.
+
+The child's name is typed once, on this sheet, and read from there. Typed
+either way round it reads the same: "Twombly, Cy" is Cy, not Twombly.
+
+The dialog lists **every** family, including the ones it cannot write to
+yet, because a name missing from a list is a name she cannot act on. A
+family with no parent name or no address is shown with the reason and
+cannot be ticked. Anyone already written to shows the date and starts
+unticked, so a second run picks up only the new families.
+
+**Test is ticked.** Every letter comes to her instead, marked as a test
+and naming the family it would really have gone to, and nobody is marked
+as written to: a test must not make a family look dealt with. Unticking
+it arms a real send, which asks a second time before it goes, since a
+dialog cannot use the browser's own confirm box.
+
+Only a real send stamps the date into Scheduling Email Sent, and only
+against the families it actually wrote to.
+
+### One letter in three dresses
+
+She picks the division at the top of the dialog, and the families whose
+Grade falls in that band are the ones ticked. Everyone else stays on the
+list, unticked, so she can add somebody whose grade she has not typed yet.
+
+Every division gets the same words. Two things move:
+
+    5-8        ms-admissions@lrei.org    student assessment
+    1-4        ls-admissions@lrei.org    student assessment
+    K/Pre-K    ls-admissions@lrei.org    student playgroup
+
+The subject follows the appointment, so the youngest two say Student
+Playgroup where the others say Student Assessment.
+
+It is written as one body with those two holes in it rather than as
+three copies, so a change to the wording cannot reach two divisions and
+miss the third. A test holds the three to that: the K/Pre-K letter must
+be the 1-4 letter with the one word changed, to the character.
+
+### Into her drafts, or straight out
+
+The dialog offers both, and **Drafts is what it opens on**. A draft is
+written by her own account, so it goes out from her address and lands in
+her own Sent, and she reads it over before anybody else does.
+
+Only a real send asks a second time first, and only a real send is
+offered the test copy: a draft is already a thing she reads before it
+goes. The sheet records which: `drafted 2026-11-17 (K/Pre-K)` against a
+draft, the bare date and division against a send. A draft has reached
+nobody and must not read as though it had.
+
+### The wording is hers
+
+The letters in the file are defaults, not rules. A Settings row named for
+a division replaces either half of one:
+
+    Scheduling Email Body: 1-4
+    Scheduling Email Subject: K/Pre-K
+
+`{parent}` and `{student}` are filled in wherever they appear, so she can
+rewrite any of them without anybody touching the script.
+
 ## Writing an email by hand
 
 "Write an Email..." is her own correspondence, not the automatic

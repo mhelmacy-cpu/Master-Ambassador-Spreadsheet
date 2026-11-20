@@ -10,6 +10,7 @@ globals, which the tests then read:
 | global | what it holds |
 | --- | --- |
 | `__sent` | every email, as it was passed to `MailApp.sendEmail` |
+| `__drafts` | every draft, as it was passed to `GmailApp.createDraft` |
 | `__doc` | a Google Doc's paragraphs in order, with heading, bold, size, and whether each is in a table cell |
 | `__docTables` | each table on the page, with any column widths and row heights |
 | `__dialogs` | each dialog, with the HTML it was given |

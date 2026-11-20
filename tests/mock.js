@@ -15,6 +15,7 @@ function makeMock() {
 
   global.__reads = 0;
   global.__sent = [];
+  global.__drafts = [];
   global.__dialogs = [];
   global.__doc = [];
   global.__docTable = null;
@@ -402,7 +403,19 @@ function makeMock() {
     sendEmail: function (opts) { global.__sent.push(opts); },
     getRemainingDailyQuota: function () { return 1000; }
   };
-  global.GmailApp = global.MailApp;
+  /* A draft is not a send, so it is recorded apart from one: a test that
+   * expects a letter in her Drafts must not pass on a letter that went
+   * out to a parent instead. */
+  global.GmailApp = {
+    sendEmail: MailApp.sendEmail,
+    getRemainingDailyQuota: MailApp.getRemainingDailyQuota,
+    createDraft: function (to, subject, body, opts) {
+      const draft = { to: to, subject: subject, body: body };
+      Object.keys(opts || {}).forEach(function (k) { draft[k] = opts[k]; });
+      global.__drafts.push(draft);
+      return { getId: function () { return 'draft' + global.__drafts.length; } };
+    }
+  };
 
   global.HtmlService = {
     createHtmlOutput: function (html) {
