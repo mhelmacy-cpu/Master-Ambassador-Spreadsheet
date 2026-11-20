@@ -45,7 +45,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-20 b';
+var BUILD_ = '2026-11-20 c';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -1468,20 +1468,6 @@ var ROUTE_FIXED_STOPS_ = [
  * to watch, and she does not take them in. */
 var ROUTE_SKIP_SUBJECTS_ = ['choices'];
 
-/* What a tour sees on a morning with no classes on at all, which is a
- * Monday: the whole school is in its meeting, so the route shows the
- * rooms themselves instead. The same places a tour always walks, named
- * as rooms rather than as lessons, and still a choice of room where
- * there is one, so the seven routes differ from each other. */
-var ROUTE_EMPTY_DAY_ = [
-  { label: 'Humanities room', rooms: ['M107', 'M108'] },
-  { label: 'World Language room', rooms: ['M207', 'M208', 'M209'] },
-  { label: 'Art room', rooms: ['M306'] },
-  { label: 'Main Science Lab', rooms: ['M307'], note: ' - talk about robotics' },
-  { label: 'Math room', rooms: ['M308'] },
-  { label: 'Science room', rooms: ['M310'] }
-];
-
 /* Rooms the school calls something other than their number. */
 var ROUTE_ROOM_NAMES_ = { 'M306': 'Art', 'M307': 'Main Science Lab' };
 
@@ -1584,16 +1570,19 @@ function routeTeacherFirstName_(initials) {
  * to choose between, the stop names the teacher, because the room on its
  * own does not say which class it is.
  */
-function dayRouteStops_(day) {
-  const schedule = bellSchedule_();
-  const byDay = schedule.byDay[day];
-  if (!byDay) return [];
+/**
+ * The classes on while a tour walks on one day, gathered a room at a
+ * time: what it is, who teaches it, and which grade is in it.
+ *
+ * The sections of one class come back together, so the seven routes can
+ * each take a different room out of it.
+ */
+function routeClassesOn_(day, groups, byKey, seenRoom) {
+  const byDay = (bellSchedule_().byDay || {})[day];
+  if (!byDay) return groups;
   const startMin = toMinutes_(setting_('Tour Start Time', '8:30'));
   const endMin = toMinutes_(setting_('Class Visit Handoff Time', '9:06'));
-  if (startMin == null || endMin == null) return [];
-  const groups = [];
-  const byKey = {};
-  const seenRoom = {};
+  if (startMin == null || endMin == null) return groups;
   PODS.forEach(function (pod) {
     (byDay[pod] || []).forEach(function (b) {
       if (NON_CLASS_RE_.test(b.what)) return;
@@ -1622,23 +1611,70 @@ function dayRouteStops_(day) {
       });
     });
   });
+  return groups;
+}
 
-  /* A day with no class on while the tour walks, which is a Monday: the
-   * whole school is in its meeting. The walk is the same walk, the same
-   * places in the same order, with the rooms shown rather than the
-   * lessons in them. */
-  if (!groups.length) {
-    return ROUTE_EMPTY_DAY_.map(function (r) {
-      return {
-        stops: r.rooms.map(function (room) {
-          return {
-            label: r.label + ' (' + room + ')' + (r.note || ''),
-            room: room, floor: routeFloorOf_(room), order: routeOrderOf_(room),
-            language: '', humanities: ''
-          };
-        })
-      };
+/**
+ * The rooms her own routes already walk through, in the order she has
+ * them, for a day that has to be built without a class to go on.
+ *
+ * Read off the Tour Routes sheet rather than listed here, so a stop she
+ * has added or taken off is on the quiet day's route too. Wednesday's
+ * are asked for first, since those are the seven she has always had;
+ * any other day with routes will do if Wednesday has none.
+ */
+function usualRouteRooms_(skipDay) {
+  const out = [];
+  const seen = {};
+  const look = ['Wednesday'].concat(SCHEDULE_DAYS_);
+  look.forEach(function (day) {
+    if (out.length || norm_(day) === norm_(skipDay)) return;
+    const mine = routesForDay_(day);
+    mine.numbers.forEach(function (n) {
+      String(mine.byNumber[n].itinerary).split('\n').forEach(function (line) {
+        (trim_(line).match(/\bM\d{3}\b/g) || []).forEach(function (room) {
+          if (seen[room]) return;
+          seen[room] = true;
+          out.push(room);
+        });
+      });
     });
+  });
+  return out;
+}
+
+function dayRouteStops_(day) {
+  const groups = [];
+  const byKey = {};
+  const seenRoom = {};
+  routeClassesOn_(day, groups, byKey, seenRoom);
+
+  /* A day with no class on at all while the tour walks, which is a
+   * Monday: the whole school is in its meeting. The walk is still the
+   * walk she knows, so it goes to the same rooms it always goes to, and
+   * each one is named for the class that is usually in it, taken from
+   * the rest of the week. The rooms are empty that morning and the
+   * guides talk them through instead, which the first line says.
+   *
+   * Which rooms those are is hers, not the script's: they are read off
+   * the routes already on her Tour Routes sheet. */
+  let usual = [];
+  if (!groups.length) {
+    SCHEDULE_DAYS_.forEach(function (other) {
+      if (norm_(other) === norm_(day)) return;
+      routeClassesOn_(other, groups, byKey, seenRoom);
+    });
+    usual = usualRouteRooms_(day);
+    if (usual.length) {
+      const want = {};
+      usual.forEach(function (r) { want[r] = true; });
+      groups.forEach(function (g) {
+        g.rooms = g.rooms.filter(function (r) { return want[r.room]; });
+      });
+      const kept = groups.filter(function (g) { return g.rooms.length; });
+      groups.length = 0;
+      kept.forEach(function (g) { groups.push(g); });
+    }
   }
 
   groups.forEach(function (g) {
@@ -1669,6 +1705,38 @@ function dayRouteStops_(day) {
       };
     });
   });
+
+  /* A room her routes always walk through that no class fills at that
+   * hour on any day of the week, which is what the world language
+   * rooms are: the stop is the room, and the guides say what happens
+   * in it. The language rooms are one stop between them, so the seven
+   * routes still take a different door each. Only reached on a day
+   * built without classes, since `usual` is empty otherwise. */
+  const taken = {};
+  groups.forEach(function (g) {
+    g.stops.forEach(function (s) { taken[s.room] = true; });
+  });
+  const languages = [];
+  usual.forEach(function (room) {
+    if (taken[room]) return;
+    const language = LANGUAGE_ROOMS_[room];
+    const named = language ?
+      language + ' (' + room + ') - talk about world languages' :
+      (ROUTE_ROOM_NAMES_[room] ? ROUTE_ROOM_NAMES_[room] + ' (' + room + ')' +
+        (ROUTE_ROOM_NOTES_[room] || '') : '');
+    if (!named) return;
+    const stop = {
+      label: named, room: room, floor: routeFloorOf_(room),
+      order: routeOrderOf_(room), language: language || '', humanities: ''
+    };
+    if (language) languages.push(stop);
+    else groups.push({ grade: '', subject: named, what: named, stops: [stop] });
+  });
+  if (languages.length) {
+    groups.push({ grade: '', subject: 'World Language',
+      what: 'World Language', stops: languages });
+  }
+
   return groups.filter(function (g) { return g.stops.length; });
 }
 
@@ -1709,7 +1777,9 @@ function generateDayRoutes_(day) {
     const last = handMin - 3;
     const gap = stops.length > 1 ?
       Math.max(2, Math.floor((last - first) / (stops.length - 1))) : 0;
-    const lines = [routeClock_(startMin) + ' Leave cafeteria to start tour'];
+    const lines = [routeClock_(startMin) + ' Leave cafeteria to start tour' +
+      (meeting ? ' - the whole school is at ' + meeting + ' this morning, so the ' +
+        'rooms are empty: tell them what happens in each one' : '')];
     stops.forEach(function (stop, k) {
       lines.push(routeClock_(Math.min(first + k * gap, handMin - 1)) + ' ' + stop.label);
     });

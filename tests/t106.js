@@ -44,19 +44,33 @@ const mine=routesForDate_(mon);
 clearReadCache_();
 ok(mine.numbers.length===7,'seven routes for Monday, like every other day');
 const all=mine.numbers.map(n=>mine.byNumber[n].itinerary);
-ok(all.every(t=>/^8:30 Leave cafeteria to start tour$/m.test(t)),
+ok(all.every(t=>/^8:30 Leave cafeteria to start tour\b/m.test(t)),
    'every one of them leaves from the cafeteria at 8:30, as they always have');
+ok(all.every(t=>/^8:30 .*whole school is at MS Meeting this morning, so the rooms are empty/m
+     .test(t)),
+   'and the first line says why the rooms are quiet: "'+
+   (all[0].match(/^8:30.*$/m)||[])[0]+'"');
 ok(mine.numbers.map(n=>mine.byNumber[n].direction).join(',')===
    'Bottom-Up,Top-Down,Bottom-Up,Top-Down,Bottom-Up,Top-Down,Bottom-Up',
    'and they alternate bottom up and top down');
-[['Library',/Library/],['the board by the front desk',/Sports Bulletin Board/],
- ['the Learning Center',/Learning Center/],['a Humanities room',/Humanities room \(M10[78]\)/],
- ['a World Language room',/World Language room \(M20[789]\)/],
- ['the Art room',/Art room \(M306\)/],['the science lab',/Main Science Lab \(M307\)/],
- ['the Math room',/Math room \(M308\)/],['the Science room',/Science room \(M310\)/]]
+/* The stops are the rooms she always walks through, and each one is
+ * named for the class that is usually in it, so a guide standing in an
+ * empty doorway knows what to talk about. */
+[['the Library',/Library/],['the board by the front desk',/Sports Bulletin Board/],
+ ['the Learning Center',/Learning Center/],
+ ['a 7th grade Humanities room',/7th Grade Humanities - \w+ \(M10[78]\)/],
+ ['a 6th grade Humanities room',/6th Grade Humanities - \w+ \(M2\d\d\)/],
+ ['a World Language room',/\(M20[789]\) - talk about world languages/],
+ ['the Art room',/Art \(M306\)/],['the science lab',/Main Science Lab \(M307\)/],
+ ['8th grade Math',/8th Grade Math \(M308\)/],
+ ['6th grade Science',/6th Grade Science \(M310\)/]]
   .forEach(([what,re])=>ok(all.every(t=>re.test(t)),'every route shows '+what));
-ok(all.every(t=>!/\dth Grade/.test(t)),
-   'and none of them names a class, because none is sitting');
+/* Which rooms those are comes off her own Tour Routes sheet, not a list
+ * in the script, so a stop she adds or drops carries over. */
+const usual=usualRouteRooms_('Monday');
+ok(usual.length>0,'the rooms are read off her routes: '+usual.join(' '));
+ok(all.every(t=>(t.match(/\bM\d{3}\b/g)||[]).every(r=>usual.indexOf(r)!==-1)),
+   'and no route walks into a room her own routes never go to');
 const floorsOf=txt=>txt.split('\n').map(l=>{
   const r=/\bM(\d)\d\d\b/.exec(l);
   if(r) return Number(r[1]);

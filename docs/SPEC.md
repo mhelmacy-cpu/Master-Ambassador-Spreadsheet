@@ -236,12 +236,27 @@ still runs, and nothing about it is special-cased beyond these two
 things:
 
 - **The routes walk the same places in the same order**, from the same
-  cafeteria, bottom up and top down as always, showing **the rooms
-  rather than the lessons in them**: "Humanities room (M107)", "World
-  Language room (M208)", "Art room (M306)", "Main Science Lab (M307)",
-  "Math room (M308)", "Science room (M310)", with the library, the board
-  and the Learning Center where they always are. The seven routes still
-  take a different room where there is a choice of one.
+  cafeteria, bottom up and top down as always, and each stop is named
+  for **the class that is usually in that room**: "7th Grade
+  Humanities - Elizabeth (M107)", "Mandarin (M208) - talk about world
+  languages",
+  "6th Grade Humanities - Amanda (M209)", "Art (M306)", "Main Science
+  Lab (M307) - talk about robotics", "8th Grade Math (M308)", "6th Grade
+  Science (M310)", with the library, the board and the Learning Center
+  where they always are. The seven routes still take a different room
+  where there is a choice of one.
+
+  Which rooms those are is read off **her own Tour Routes sheet**, not a
+  list in the script: the rooms her seven Wednesday routes walk through
+  are the rooms a quiet Monday walks through, so a stop she adds or
+  drops carries over. What each one is called comes from the bell
+  schedule for the rest of the week, a room at a time, since nothing is
+  sitting in them that morning. A room no class ever fills at that hour,
+  which is what the world language rooms are, is named for itself.
+
+  The first line of the route says why the rooms are quiet: "8:30 Leave
+  cafeteria to start tour - the whole school is at MS Meeting this
+  morning, so the rooms are empty: tell them what happens in each one".
 - **There is no class visit.** At 9:06 the family goes to the meeting
   with their own guides, and every sheet says so: the route sheet reads
   "You and Camille Bedeau take Sam Visitor to MS Meeting with you", the
