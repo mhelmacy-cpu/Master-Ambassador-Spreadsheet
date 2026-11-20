@@ -45,7 +45,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-20 c';
+var BUILD_ = '2026-11-20 d';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -1838,17 +1838,64 @@ function ensureRouteDayColumn_() {
  * nothing has to be run first. It only ever adds: a day with rows is
  * left alone, and Wednesday's seven are hers for good.
  */
+/**
+ * What the whole middle school is at while a tour walks on a weekday,
+ * or '' if they are all in their own classes, which is every day but
+ * Monday.
+ */
+function quietMorningAt_(day) {
+  const walkFrom = toMinutes_(setting_('Tour Start Time', '8:30'));
+  const walkTo = toMinutes_(setting_('Class Visit Handoff Time', '9:06'));
+  if (walkFrom == null || walkTo == null) return '';
+  return wholeSchoolAt_(toDate_(nextWeekday_(day)), walkFrom, walkTo);
+}
+
+/**
+ * A route the script itself wrote before it knew to name the classes
+ * that are usually in the rooms.
+ *
+ * Two ways to tell: a stop that is a room with no class on it at all
+ * ("Humanities room (M107)"), or a first line that does not say why the
+ * rooms are empty, which every quiet morning's route says now. Both are
+ * the script's own words, so there is nothing of hers to lose.
+ */
+function staleQuietRoute_(text) {
+  const t = String(text || '');
+  if (/^\d{1,2}:\d\d (?:Humanities|World Language|Art|Math|Science|Learning) ?room \(M\d\d\d\)\s*$/m
+      .test(t)) {
+    return true;
+  }
+  return /^\d{1,2}:\d\d Leave cafeteria to start tour\s*$/m.test(t);
+}
+
 function ensureDayRoutes_(day) {
   if (SCHEDULE_DAYS_.indexOf(day) === -1) return [];
   ensureRouteDayColumn_();
   const N = SHEETS.ROUTES;
   const at = optionalCol_(N, 'Day');
   if (at === -1) return [];
-  const already = rows_(N).some(function (r) {
-    return trim_(r[col_(N, 'Route')]) &&
-      norm_(trim_(r[at]) || 'Wednesday') === norm_(day);
+  const have = [];
+  const atRoute = {};
+  rows_(N).forEach(function (r, i) {
+    const no = trim_(r[col_(N, 'Route')]);
+    if (!no) return;
+    if (norm_(trim_(r[at]) || 'Wednesday') !== norm_(day)) return;
+    const h = { row: i + 2, no: no, itinerary: String(r[col_(N, 'Itinerary')] || '') };
+    have.push(h);
+    if (!atRoute[no]) atRoute[no] = h;
   });
-  if (already) return [];
+  /* Routes already on her sheet are hers and are left alone, with one
+   * exception: a quiet morning's route that is the script's own older
+   * answer, from before it knew to name the classes that are usually in
+   * the rooms. Those are worked out again, in the rows they are already
+   * in, and a row she has touched herself is not one of them. Her
+   * Wednesday routes are never a quiet morning, so they are never
+   * touched. */
+  const quiet = !!quietMorningAt_(day);
+  const stale = quiet && have.some(function (h) {
+    return staleQuietRoute_(h.itinerary);
+  });
+  if (have.length && !stale) return [];
   const made = generateDayRoutes_(day);
   if (!made.length) return [];
   const s = sheet_(N);
@@ -1863,25 +1910,46 @@ function ensureDayRoutes_(day) {
     row[at] = r.day;
     return row;
   });
-  const start = Math.max(s.getLastRow(), 1) + 1;
-  s.getRange(start, 1, rows.length, width).setValues(rows);
-  s.getRange(start, col_(N, 'Itinerary') + 1, rows.length, 1)
-    .setWrap(true).setVerticalAlignment('top');
-  s.setRowHeights(start, rows.length, 180);
+  /* Route 3 is written back into the row route 3 is already in, so
+   * anything she keeps beside it stays where she put it, and a route
+   * the sheet does not have yet is added at the bottom. */
+  let done = 0;
+  const fresh = [];
+  rows.forEach(function (row, i) {
+    const mine = atRoute[made[i].route];
+    if (!mine) { fresh.push(row); return; }
+    if (!staleQuietRoute_(mine.itinerary)) return;
+    s.getRange(mine.row, 1, 1, width).setValues([row]);
+    s.getRange(mine.row, col_(N, 'Itinerary') + 1).setWrap(true)
+      .setVerticalAlignment('top');
+    done++;
+  });
+  if (fresh.length) {
+    const start = Math.max(s.getLastRow(), 1) + 1;
+    s.getRange(start, 1, fresh.length, width).setValues(fresh);
+    s.getRange(start, col_(N, 'Itinerary') + 1, fresh.length, 1)
+      .setWrap(true).setVerticalAlignment('top');
+    s.setRowHeights(start, fresh.length, 180);
+  }
+  if (!done && !fresh.length) return [];
   clearReadCache_();
-  const said = rows.length + ' tour routes worked out for ' + day +
-    ' and added to ' + SHEETS.ROUTES;
+  const said = done ?
+    done + ' tour route' + (done === 1 ? '' : 's') + ' for ' + day +
+      ' worked out again on ' + SHEETS.ROUTES +
+      ', with the classes that are usually in each room' +
+      (fresh.length ? ' and ' + fresh.length + ' added' : '') :
+    fresh.length + ' tour routes worked out for ' + day +
+      ' and added to ' + SHEETS.ROUTES;
   /* Monday morning is the whole middle school in its meeting, so there
    * is no class to walk past at tour time. The routes still walk the
-   * same places in the same order, the rooms shown rather than the
-   * lessons in them, and she should know that is what they are. */
-  const walkFrom = toMinutes_(setting_('Tour Start Time', '8:30'));
-  const walkTo = toMinutes_(setting_('Class Visit Handoff Time', '9:06'));
-  const meeting = walkFrom != null && walkTo != null
-    ? wholeSchoolAt_(toDate_(nextWeekday_(day)), walkFrom, walkTo) : '';
+   * same places in the same order, each stop named for the class that
+   * is usually in that room, and she should know that is what they
+   * are. */
+  const meeting = quietMorningAt_(day);
   if (meeting) {
     return [said + ' - the whole school is at ' + meeting + ' while the tour walks ' +
-      'that day, so the routes show the rooms rather than the classes in them'];
+      'that day, so the rooms are empty and each stop is named for the class ' +
+      'that is usually in it'];
   }
   return [said];
 }

@@ -279,6 +279,15 @@ Once a day has routes they are hers: **nothing is ever written over
 them.** Wednesday's seven stay exactly as she has them, and an itinerary
 she edits on any other day survives every run after it.
 
+The one exception is a quiet morning's route that the script itself
+wrote before it knew to name the classes: a stop that is a bare room
+("Humanities room (M107)"), or a first line that does not say why the
+rooms are empty. Those are the script's own older words, so they are
+worked out again, route by route, in the rows they already sit in, the
+next time she staffs that day or prints its route sheets. A route she
+has changed herself does not look like that, so it is left alone, and
+Wednesday is never a quiet morning, so Wednesday is never touched.
+
 ## What the staffing command does
 
 One command, run once the prospective students are entered. It assigns:
