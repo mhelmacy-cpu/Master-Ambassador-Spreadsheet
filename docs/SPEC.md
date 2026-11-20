@@ -1084,6 +1084,26 @@ morning before they reach the printer.
   nobody needs. A guide walking a family alone is told nothing, rather
   than told about nobody.
 
+## When no menu appears at all
+
+A paste that stops part way through is the one failure with nothing to
+read: Apps Script cannot compile the file, so `onOpen` never runs, no
+menu is drawn, no dialog opens, and nothing anywhere says why. It looks
+exactly like "the button is gone".
+
+Two things make it findable:
+
+- **App.gs ends with a marked last line**, a comment block headed THE
+  LAST LINE OF App.gs followed by `endOfApp_()`. If that is not the last
+  thing in the editor, the paste did not land whole: click into the file,
+  select all, paste again over the lot, save. **Check This Script** lists
+  that function among the parts it checks, so a file that is whole says
+  so.
+- **Running `onOpen` by hand from the editor** draws the menu there and
+  then, and prints the real error when it cannot: a syntax error with a
+  line number for a half-paste, an authorization prompt where the browser
+  is signed in to the wrong Google account.
+
 ## Is the editor running this script?
 
 A build stamp only says what the last line of the paste said. If an older

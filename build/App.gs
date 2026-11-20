@@ -45,7 +45,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-20 a';
+var BUILD_ = '2026-11-20 b';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -10508,6 +10508,10 @@ var LIVE_MARKERS_ = [
   { what: 'A button for each day of the week', fn: 'showStaffDialog', has: 'nextToStaff_' },
   { what: 'Reminder emails counted from the tour date',
     fn: 'enableReminders', has: 'everyDays' },
+  /* The last function in the file. If this one is missing, the paste
+   * stopped before the end of App.gs. */
+  { what: 'The end of App.gs, so the whole file is there',
+    fn: 'endOfApp_', has: 'BUILD_' },
   { what: 'The check in sheet', fn: 'buildCheckInDoc', has: 'setPageWidth' }
 ];
 
@@ -10968,3 +10972,20 @@ function api_sendEveryEmail(dateStr, onlyDay) {
     roster: dateVal ? mailTourRoster_(dateVal) : null
   };
 }
+
+/* =========================================================
+ * THE LAST LINE OF App.gs
+ *
+ * A paste that stops half way through is the one failure with nothing
+ * to read: Apps Script cannot compile the file, so no menu is drawn, no
+ * dialog opens, and nothing says why. The file always ends here, so:
+ *
+ *   If this is not the last line in the editor, the paste did not land
+ *   whole. Click into the file, select all (Ctrl+A or Cmd+A), paste
+ *   again over the lot, and save.
+ *
+ * Running onOpen by hand from the editor is the other half of the same
+ * check: it draws the menu and says out loud what is wrong when it
+ * cannot.
+ * ========================================================= */
+function endOfApp_() { return BUILD_; }
