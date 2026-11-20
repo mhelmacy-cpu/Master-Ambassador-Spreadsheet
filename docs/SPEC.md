@@ -228,10 +228,37 @@ How a day's route is built, which is how she builds one by hand:
   visit, and the last two lines are the ones every route ends with: the
   hand-over at 9:06 and the co-lab at 9:25.
 
-A day whose schedule has no class on at all while the tour walks - Monday,
-which is the whole middle school in its meeting - still gets its seven
-routes, walking the library, the board and the Learning Center, and the
-run says so rather than leaving her to wonder.
+### A morning when the whole school is together
+
+Monday at tour time is the whole middle school in its meeting, so there
+is no class to look into and none to take a family to at the end. A tour
+still runs, and nothing about it is special-cased beyond these two
+things:
+
+- **The routes walk the same places in the same order**, from the same
+  cafeteria, bottom up and top down as always, showing **the rooms
+  rather than the lessons in them**: "Humanities room (M107)", "World
+  Language room (M208)", "Art room (M306)", "Main Science Lab (M307)",
+  "Math room (M308)", "Science room (M310)", with the library, the board
+  and the Learning Center where they always are. The seven routes still
+  take a different room where there is a choice of one.
+- **There is no class visit.** At 9:06 the family goes to the meeting
+  with their own guides, and every sheet says so: the route sheet reads
+  "You and Camille Bedeau take Sam Visitor to MS Meeting with you", the
+  staffing dialog says "no class visit: ... in lieu of a class visit",
+  Class Visit To reads "... - MS Meeting", and the roster puts them
+  there. Nobody is offered to hand the family to instead, because
+  everyone is in the same room, and no class can be over its number.
+
+It is found rather than hard-coded: `wholeSchoolAt_` says what the whole
+school is at between two times, and only when **every** homeroom is at
+the same thing and none of them has a lesson. So a Tuesday assembly would
+behave the same way, and one grade at something of its own would not.
+
+Two things follow from there being no lesson to go back to: the guides
+are not told to stop at their locker (nothing is waiting for them), and
+no class teacher is emailed about a visitor arriving. Their advisors
+still hear, as always.
 
 Once a day has routes they are hers: **nothing is ever written over
 them.** Wednesday's seven stay exactly as she has them, and an itinerary

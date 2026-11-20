@@ -44,7 +44,7 @@ var SHEETS = {
 /* Bumped every time these two files change, so "Check This Script" can say
  * which copy is in the editor. If the number it reports is not the one you
  * were told to paste, the paste did not land. */
-var BUILD_ = '2026-11-13 f';
+var BUILD_ = '2026-11-20 a';
 
 var HEADERS = {};
 HEADERS[SHEETS.AMBASSADORS] = ['First Name', 'Last Name', 'Homeroom', 'Split', 'Grade', 'Advisor',
@@ -1443,11 +1443,61 @@ var ROUTE_FIXED_STOPS_ = [
  * to watch, and she does not take them in. */
 var ROUTE_SKIP_SUBJECTS_ = ['choices'];
 
+/* What a tour sees on a morning with no classes on at all, which is a
+ * Monday: the whole school is in its meeting, so the route shows the
+ * rooms themselves instead. The same places a tour always walks, named
+ * as rooms rather than as lessons, and still a choice of room where
+ * there is one, so the seven routes differ from each other. */
+var ROUTE_EMPTY_DAY_ = [
+  { label: 'Humanities room', rooms: ['M107', 'M108'] },
+  { label: 'World Language room', rooms: ['M207', 'M208', 'M209'] },
+  { label: 'Art room', rooms: ['M306'] },
+  { label: 'Main Science Lab', rooms: ['M307'], note: ' - talk about robotics' },
+  { label: 'Math room', rooms: ['M308'] },
+  { label: 'Science room', rooms: ['M310'] }
+];
+
 /* Rooms the school calls something other than their number. */
 var ROUTE_ROOM_NAMES_ = { 'M306': 'Art', 'M307': 'Main Science Lab' };
 
 /* What the guides talk about at a stop, beside saying where they are. */
 var ROUTE_ROOM_NOTES_ = { 'M307': ' - talk about robotics' };
+
+/* Something the whole middle school is at together rather than a
+ * lesson: the Monday meeting. A tour walking at that hour has no class
+ * to look into and no class to take the visitors to at the end, so it
+ * shows them the rooms and takes them to the meeting instead. */
+var MEETING_RE_ = /MS Meeting|Assembly|Town Hall/i;
+
+/**
+ * What the whole school is at between two times, or nothing.
+ *
+ * Only where every homeroom is at the same thing and none of them has a
+ * lesson: that is the difference between the Monday meeting, which a
+ * visitor can be taken to, and one grade being at something of its own.
+ */
+function wholeSchoolAt_(dateVal, startMin, endMin) {
+  const day = WEEKDAYS_[dateVal.getDay()];
+  const sched = (bellSchedule_().byDay || {})[day];
+  if (!sched) return '';
+  let said = '';
+  let every = true;
+  PODS.forEach(function (pod) {
+    if (!every) return;
+    const blocks = (sched[pod] || []).filter(function (b) {
+      const s = toMinutes_(b.start);
+      const e = toMinutes_(b.end);
+      return s != null && e != null && s < endMin && startMin < e;
+    });
+    const meeting = blocks.filter(function (b) { return MEETING_RE_.test(b.what); })[0];
+    const lesson = blocks.filter(function (b) { return !NON_CLASS_RE_.test(b.what); })[0];
+    if (!blocks.length || !meeting || lesson) { every = false; return; }
+    const what = cleanBlock_(meeting.what);
+    if (!said) said = what;
+    else if (norm_(said) !== norm_(what)) every = false;
+  });
+  return every ? said : '';
+}
 
 /** The floor a room is on, or null for somewhere a tour does not walk. */
 function routeFloorOf_(room) {
@@ -1548,6 +1598,24 @@ function dayRouteStops_(day) {
     });
   });
 
+  /* A day with no class on while the tour walks, which is a Monday: the
+   * whole school is in its meeting. The walk is the same walk, the same
+   * places in the same order, with the rooms shown rather than the
+   * lessons in them. */
+  if (!groups.length) {
+    return ROUTE_EMPTY_DAY_.map(function (r) {
+      return {
+        stops: r.rooms.map(function (room) {
+          return {
+            label: r.label + ' (' + room + ')' + (r.note || ''),
+            room: room, floor: routeFloorOf_(room), order: routeOrderOf_(room),
+            language: '', humanities: ''
+          };
+        })
+      };
+    });
+  }
+
   groups.forEach(function (g) {
     /* Humanities always names its teacher: every grade has two or three
      * sections of it and she says whose room it is. Anything else names
@@ -1595,6 +1663,12 @@ function generateDayRoutes_(day) {
   if (startMin == null || handMin == null) return [];
   const waitFor = setting_('Wait For', 'Maren');
   const ends = endPlace_();
+  /* Where the visitors go when the walking is over. A class, normally.
+   * On a morning when the whole school is together it is that instead,
+   * and the line says so rather than sending them to a class that is
+   * not sitting. */
+  const meeting = wholeSchoolAt_(toDate_(nextWeekday_(day)), handMin,
+    endMin == null ? handMin + 19 : endMin);
   const howMany = TOUR_ROUTES_.length;
   const out = [];
   for (let i = 0; i < howMany; i++) {
@@ -1614,8 +1688,8 @@ function generateDayRoutes_(day) {
     stops.forEach(function (stop, k) {
       lines.push(routeClock_(Math.min(first + k * gap, handMin - 1)) + ' ' + stop.label);
     });
-    lines.push(routeClock_(handMin) + ' Bring visitors to class - Bring the clock ' +
-      'and tour route with you to class.');
+    lines.push(routeClock_(handMin) + ' Bring visitors to ' +
+      (meeting || 'class') + ' - Bring the clock and tour route with you.');
     if (endMin != null) {
       lines.push(routeClock_(endMin) + ' Bring visitor down to ' + ends +
         ' (wait with them for ' + waitFor + ' and parents to get back downstairs)');
@@ -1703,12 +1777,16 @@ function ensureDayRoutes_(day) {
   const said = rows.length + ' tour routes worked out for ' + day +
     ' and added to ' + SHEETS.ROUTES;
   /* Monday morning is the whole middle school in its meeting, so there
-   * is no class to walk past at tour time. The routes are still made,
-   * and still walk the building, but she should know why they are short
-   * rather than wonder what went wrong. */
-  if (!dayRouteStops_(day).length) {
-    return [said + ' - the schedule has no classes on while the tour walks that ' +
-      'day, so they are the library, the board and the Learning Center only'];
+   * is no class to walk past at tour time. The routes still walk the
+   * same places in the same order, the rooms shown rather than the
+   * lessons in them, and she should know that is what they are. */
+  const walkFrom = toMinutes_(setting_('Tour Start Time', '8:30'));
+  const walkTo = toMinutes_(setting_('Class Visit Handoff Time', '9:06'));
+  const meeting = walkFrom != null && walkTo != null
+    ? wholeSchoolAt_(toDate_(nextWeekday_(day)), walkFrom, walkTo) : '';
+  if (meeting) {
+    return [said + ' - the whole school is at ' + meeting + ' while the tour walks ' +
+      'that day, so the routes show the rooms rather than the classes in them'];
   }
   return [said];
 }
@@ -3458,7 +3536,7 @@ function planTour(dateStr, keepExisting) {
     if (!c) return;
     p.classVisit = c.where ? {
       takers: c.takers, where: c.where.label, teacher: c.where.teacher,
-      count: c.count, over: c.over
+      count: c.count, over: c.over, meeting: !!c.where.meeting
     } : null;
     p.classOptions = (c.options || []).slice();
     // Whether "both of them take them" is one of the answers on offer.
@@ -4936,13 +5014,24 @@ function handbackAllocate_(dateVal, entries) {
   const amb = {};
   ambassadors_().forEach(function (a) { amb[norm_(a.name)] = a; });
 
+  /* Where the whole school is, on a morning when it is all in one
+   * place. Then there is no class to take a family into and none to
+   * count against, and the visitors go to that instead. */
+  const meeting = wholeSchoolAt_(dateVal, startMin, endMin);
+
   // What each guide walks into, and the class it identifies.
   const classOf = function (name) {
     const a = amb[norm_(name)];
     if (!a || (!a.pod && !a.split)) return null;
     const blocks = classesMissed_(a.pod, a.split, a.grade, dateVal, startMin, endMin)
       .filter(function (b) { return !b.needsYou; });
-    if (!blocks.length) return null;
+    if (!blocks.length) {
+      // Everybody is at the same thing, this one included, so everybody
+      // lands in the same place and nobody is short of a class.
+      return meeting
+        ? { key: 'meeting', label: meeting, teacher: '', academic: false, meeting: true }
+        : null;
+    }
     const b = blocks[0];
     return {
       key: norm_(b.what),
@@ -5201,6 +5290,20 @@ function handbackAllocate_(dateVal, entries) {
    * last, and the reason for picking them is hers. */
   order.forEach(function (key) {
     const mine = out[key];
+    /* A morning with no class visit at all: the whole school is at the
+     * meeting, the family goes to that with their own guides, and there
+     * is nobody to hand them to instead. The line still says where they
+     * are going; the list underneath is empty, because every answer in
+     * it would be the same answer. */
+    if (mine.where && mine.where.meeting) {
+      mine.options = [];
+      mine.over = false;
+      mine.count = 0;
+      mine.takers = (byVisitor[key] || { guides: [] }).guides.slice();
+      mine.others = [];
+      mine.canBoth = mine.takers.length > 1;
+      return;
+    }
     const hereKey = mine.where ? mine.where.key : '';
     const guiding = {};
     (byVisitor[key] || { guides: [] }).guides.forEach(function (n) {
@@ -5266,12 +5369,15 @@ function handbackPlan_(page, dateVal) {
   const endMin = toMinutes_(setting_('Tour End Time', '9:25'));
   const amb = {};
   ambassadors_().forEach(function (a) { amb[norm_(a.name)] = a; });
+  // The whole school in one place beats a class nobody is in: a Monday
+  // tour hands the family over to the meeting rather than to a lesson.
+  const meeting = wholeSchoolAt_(dateVal, startMin, endMin);
   const classOf = function (name) {
     const a = amb[norm_(name)];
-    if (!a || (!a.pod && !a.split)) return '';
+    if (!a || (!a.pod && !a.split)) return meeting || '';
     const blocks = classesMissed_(a.pod, a.split, a.grade, dateVal, startMin, endMin);
     const usable = blocks.filter(function (b) { return !b.needsYou; });
-    return usable.length ? usable[0].what : '';
+    return usable.length ? usable[0].what : (meeting || '');
   };
   // Which class each of them walks into, so the sheet can name it rather
   // than say "class" and leave them to work it out.
@@ -5599,7 +5705,11 @@ function buildRouteSheets(dateStr) {
     // The walk itself. The last two lines of every route are about
     // handing the visitor back, which the sheet says in its own words
     // below, to this guide rather than to both of them.
-    const closing = /Bring visitors? (to class|down to|to the)/;
+    /* The last two lines of every route are about handing the visitor
+      * back, whatever they are handed back to: a class, or the meeting
+      * the whole school is at on a Monday. Any line that begins "Bring
+      * visitor" after its time is one of them. */
+    const closing = /^\s*\d{1,2}:\d{2}\s+Bring visitors?\b/;
     page.lines.forEach(function (line) {
       if (closing.test(line)) return;
       say_(body, line);
@@ -5613,9 +5723,16 @@ function buildRouteSheets(dateStr) {
      * the block for whoever is receiving them. */
     /* The locker is the guide's own, so it is said once however many
      * children they are taking in. Each child's own 9:06 follows. */
+    /* Their books, where the next thing that happens to them is a
+      * lesson. On a morning when the whole school is together there is
+      * no lesson to be ready for, so they are not sent to their locker
+      * for one. */
     const anyTakes = mineToday.some(function (pg) {
-      return !pg.buddy &&
-        handbackPlan_(pg, dateVal).takers.indexOf(sheet.guide) !== -1;
+      if (pg.buddy) return false;
+      const plan = handbackPlan_(pg, dateVal);
+      if (plan.where && plan.where[sheet.guide] &&
+          MEETING_RE_.test(plan.where[sheet.guide])) return false;
+      return plan.takers.indexOf(sheet.guide) !== -1;
     });
     if (sheet.guide && anyTakes) {
       shout_(body, handoffAt + '   Stop at your locker with your visitor ' +
@@ -8680,9 +8797,15 @@ function showStaffDialog(dateKey) {
     'if(!v&&!o.length){return "";}' +
     'var pass=!!v&&v.takers.some(function(n){' +
     'return (x.guideNames||[]).indexOf(n)===-1;});' +
-    'var h=v?("<br>"+(pass?"<b>PASS OFF</b> ":"")+"<span class=\'muted\'>class visit: "+' +
-    'esc(v.takers.join(" and "))+" takes them to "+esc(v.where)+' +
-    '(v.teacher?" ("+esc(v.teacher)+")":"")+"</span>")' +
+    /* What happens to the family at 9:06. On a morning when the whole
+      * school is together there is no class visit at all: they go to
+      * that with their own guides, and the line says so in those words
+      * rather than calling the meeting a class. */
+    'var h=v?("<br>"+(pass?"<b>PASS OFF</b> ":"")+"<span class=\'muted\'>"+' +
+    '(v.meeting?"no class visit: ":"class visit: ")+' +
+    'esc(v.takers.join(" and "))+(v.takers.length>1?" take them to ":" takes them to ")+' +
+    'esc(v.where)+(v.teacher?" ("+esc(v.teacher)+")":"")+' +
+    '(v.meeting?", in lieu of a class visit":"")+"</span>")' +
     ':(!(x.guideNames||[]).length' +
     '?"<br><span class=\'muted\'>class visit: with their guide, once you have ' +
     'picked one. Or send them to somebody here.</span>"' +
@@ -10180,7 +10303,7 @@ function api_classVisitPreview(dateStr, families) {
     out[c.visitor] = {
       classVisit: c.where ? {
         takers: c.takers, where: c.where.label, teacher: c.where.teacher,
-        count: c.count, over: c.over
+        count: c.count, over: c.over, meeting: !!c.where.meeting
       } : null,
       classOptions: c.options || [],
       classBoth: !!c.canBoth
